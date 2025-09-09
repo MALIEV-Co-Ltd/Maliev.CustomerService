@@ -84,7 +84,7 @@ try
         {
             c.SwaggerEndpoint($"/swagger/{description.GroupName}/swagger.json", description.GroupName.ToUpperInvariant());
         }
-        c.RoutePrefix = "swagger";
+        c.RoutePrefix = "customers/swagger";
     });
 
     app.UseMiddleware<ExceptionHandlingMiddleware>(); // Keep if desired for error handling
