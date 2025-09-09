@@ -82,7 +82,7 @@ try
         var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
         foreach (var description in provider.ApiVersionDescriptions)
         {
-            c.SwaggerEndpoint($"/swagger/{description.GroupName}/swagger.json", description.GroupName.ToUpperInvariant());
+            c.SwaggerEndpoint($"./{description.GroupName}/swagger.json", description.GroupName.ToUpperInvariant());
         }
         c.RoutePrefix = "customers/swagger";
     });
