@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
+using Maliev.CustomerService.Api.Models;
 
 namespace Maliev.CustomerService.Api.Controllers;
 
@@ -8,9 +9,14 @@ namespace Maliev.CustomerService.Api.Controllers;
 [Route("customers/v{version:apiVersion}")]
 public class CustomerController : ControllerBase
 {
-    [HttpGet("validate")]
-    public IActionResult Validate()
+    [HttpPost("validate")]
+    public IActionResult Validate([FromBody] UserValidationRequest request)
     {
+        if(request == null)
+        {
+            return BadRequest("Request body is null.");
+        }
+        
         return Ok();
     }
 }
