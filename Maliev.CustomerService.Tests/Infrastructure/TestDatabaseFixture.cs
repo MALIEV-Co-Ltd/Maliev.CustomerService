@@ -1,4 +1,5 @@
 using Maliev.CustomerService.Data;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
 
@@ -29,6 +30,35 @@ public class TestDatabaseFixture : IAsyncLifetime
         // Apply migrations to test database
         await using var context = CreateDbContext();
         await context.Database.MigrateAsync();
+
+        // Seed ASP.NET Core Identity roles
+        await SeedIdentityRolesAsync(context);
+    }
+
+    /// <summary>
+    /// Seeds ASP.NET Core Identity roles required for testing
+    /// </summary>
+    private static async Task SeedIdentityRolesAsync(CustomerDbContext context)
+    {
+        var roles = new[] { "Customer", "Employee", "Manager", "Admin" };
+
+        foreach (var roleName in roles)
+        {
+            var roleExists = await context.Roles.AnyAsync(r => r.Name == roleName);
+            if (!roleExists)
+            {
+                var role = new IdentityRole
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Name = roleName,
+                    NormalizedName = roleName.ToUpperInvariant(),
+                    ConcurrencyStamp = Guid.NewGuid().ToString()
+                };
+                context.Roles.Add(role);
+            }
+        }
+
+        await context.SaveChangesAsync();
     }
 
     public async Task DisposeAsync()

@@ -41,7 +41,7 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestWebAp
         };
 
         // Act
-        var response = await client.PostAsJsonAsync("/v1/users", request);
+        var response = await client.PostAsJsonAsync("/customers/v1/users", request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -78,7 +78,7 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestWebAp
             password = "ValidP@ssw0rd!",
             roles = new[] { "Customer" }
         };
-        await adminClient.PostAsJsonAsync("/v1/users", createRequest);
+        await adminClient.PostAsJsonAsync("/customers/v1/users", createRequest);
 
         // Create unauthenticated client for validation endpoint
         var unauthenticatedClient = _factory.CreateClient();
@@ -126,7 +126,7 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestWebAp
             password = "CorrectP@ssw0rd!",
             roles = new[] { "Employee" }
         };
-        await adminClient.PostAsJsonAsync("/v1/users", createRequest);
+        await adminClient.PostAsJsonAsync("/customers/v1/users", createRequest);
 
         var unauthenticatedClient = _factory.CreateClient();
 
@@ -242,7 +242,7 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestWebAp
             password = "AuditP@ssw0rd!",
             roles = new[] { "Customer" }
         };
-        await adminClient.PostAsJsonAsync("/v1/users", createRequest);
+        await adminClient.PostAsJsonAsync("/customers/v1/users", createRequest);
 
         var unauthenticatedClient = _factory.CreateClient();
 
@@ -303,7 +303,7 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestWebAp
             password = "OldP@ssw0rd!",
             roles = new[] { "Customer" }
         };
-        var createResponse = await adminClient.PostAsJsonAsync("/v1/users", createRequest);
+        var createResponse = await adminClient.PostAsJsonAsync("/customers/v1/users", createRequest);
         var createdUser = await createResponse.Content.ReadFromJsonAsync<UserResponse>();
 
         // Verify old password works
@@ -327,7 +327,7 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestWebAp
         {
             newPassword = "NewP@ssw0rd!"
         };
-        var resetResponse = await adminClient.PutAsJsonAsync($"/v1/users/{createdUser!.Id}/password", resetRequest);
+        var resetResponse = await adminClient.PutAsJsonAsync($"/customers/v1/users/{createdUser!.Id}/password", resetRequest);
 
         // Assert
         resetResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -371,7 +371,7 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestWebAp
             password = "RoleP@ssw0rd!",
             roles = new[] { "Customer" }
         };
-        var createResponse = await adminClient.PostAsJsonAsync("/v1/users", createRequest);
+        var createResponse = await adminClient.PostAsJsonAsync("/customers/v1/users", createRequest);
         var createdUser = await createResponse.Content.ReadFromJsonAsync<UserResponse>();
 
         // Verify initial role
@@ -392,7 +392,7 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestWebAp
         {
             roles = new[] { "Employee" }
         };
-        var updateResponse = await adminClient.PutAsJsonAsync($"/v1/users/{createdUser!.Id}/roles", updateRolesRequest);
+        var updateResponse = await adminClient.PutAsJsonAsync($"/customers/v1/users/{createdUser!.Id}/roles", updateRolesRequest);
 
         // Assert
         updateResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -405,7 +405,7 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestWebAp
         updatedResult.Roles.Should().NotContain("Customer");
 
         // Verify role change in user retrieval
-        var getUserResponse = await adminClient.GetAsync($"/v1/users/{createdUser.Id}");
+        var getUserResponse = await adminClient.GetAsync($"/customers/v1/users/{createdUser.Id}");
         var retrievedUser = await getUserResponse.Content.ReadFromJsonAsync<UserResponse>();
         retrievedUser!.Roles.Should().Contain("Employee");
         retrievedUser.Roles.Should().NotContain("Customer");

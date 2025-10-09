@@ -52,7 +52,7 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
             preferredLanguage = "en",
             timezone = "Asia/Bangkok"
         };
-        var customerResponse = await client.PostAsJsonAsync("/v1/customers", customerRequest);
+        var customerResponse = await client.PostAsJsonAsync("/customers/v1/customers", customerRequest);
         var customer = await customerResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Create billing address
@@ -70,7 +70,7 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
         };
 
         // Act
-        var response = await client.PostAsJsonAsync("/v1/addresses", addressRequest);
+        var response = await client.PostAsJsonAsync("/customers/v1/addresses", addressRequest);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -122,7 +122,7 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
             preferredLanguage = "en",
             timezone = "Asia/Bangkok"
         };
-        var customerResponse = await client.PostAsJsonAsync("/v1/customers", customerRequest);
+        var customerResponse = await client.PostAsJsonAsync("/customers/v1/customers", customerRequest);
         var customer = await customerResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Create first shipping address
@@ -152,8 +152,8 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
         };
 
         // Act
-        var response1 = await client.PostAsJsonAsync("/v1/addresses", address1Request);
-        var response2 = await client.PostAsJsonAsync("/v1/addresses", address2Request);
+        var response1 = await client.PostAsJsonAsync("/customers/v1/addresses", address1Request);
+        var response2 = await client.PostAsJsonAsync("/customers/v1/addresses", address2Request);
 
         // Assert
         response1.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -208,7 +208,7 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
             preferredLanguage = "en",
             timezone = "Asia/Bangkok"
         };
-        var customerResponse = await client.PostAsJsonAsync("/v1/customers", customerRequest);
+        var customerResponse = await client.PostAsJsonAsync("/customers/v1/customers", customerRequest);
         var customer = await customerResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Create address
@@ -223,7 +223,7 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
             postalCode = "10100",
             countryId = mockCountryId
         };
-        var createResponse = await client.PostAsJsonAsync("/v1/addresses", addressRequest);
+        var createResponse = await client.PostAsJsonAsync("/customers/v1/addresses", addressRequest);
         var createdAddress = await createResponse.Content.ReadFromJsonAsync<AddressResponse>();
 
         // Update postal code and province
@@ -234,7 +234,7 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
         };
 
         // Act
-        var updateResponse = await client.PatchAsJsonAsync($"/v1/addresses/{createdAddress!.Id}", updateRequest);
+        var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/addresses/{createdAddress!.Id}", updateRequest);
 
         // Assert
         updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -274,7 +274,7 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
             preferredLanguage = "en",
             timezone = "Asia/Bangkok"
         };
-        var customerResponse = await client.PostAsJsonAsync("/v1/customers", customerRequest);
+        var customerResponse = await client.PostAsJsonAsync("/customers/v1/customers", customerRequest);
         var customer = await customerResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Create billing address
@@ -315,9 +315,9 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
             countryId = mockCountryId
         };
 
-        await client.PostAsJsonAsync("/v1/addresses", billingRequest);
-        await client.PostAsJsonAsync("/v1/addresses", shipping1Request);
-        await client.PostAsJsonAsync("/v1/addresses", shipping2Request);
+        await client.PostAsJsonAsync("/customers/v1/addresses", billingRequest);
+        await client.PostAsJsonAsync("/customers/v1/addresses", shipping1Request);
+        await client.PostAsJsonAsync("/customers/v1/addresses", shipping2Request);
 
         // Act
         var getResponse = await client.GetAsync($"/v1/addresses/Customer/{customer.Id}");
@@ -366,7 +366,7 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
             preferredLanguage = "en",
             timezone = "Asia/Bangkok"
         };
-        var customerResponse = await client.PostAsJsonAsync("/v1/customers", customerRequest);
+        var customerResponse = await client.PostAsJsonAsync("/customers/v1/customers", customerRequest);
         var customer = await customerResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Create two addresses
@@ -394,13 +394,13 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
             countryId = mockCountryId
         };
 
-        var response1 = await client.PostAsJsonAsync("/v1/addresses", address1Request);
-        var response2 = await client.PostAsJsonAsync("/v1/addresses", address2Request);
+        var response1 = await client.PostAsJsonAsync("/customers/v1/addresses", address1Request);
+        var response2 = await client.PostAsJsonAsync("/customers/v1/addresses", address2Request);
         var address1 = await response1.Content.ReadFromJsonAsync<AddressResponse>();
         var address2 = await response2.Content.ReadFromJsonAsync<AddressResponse>();
 
         // Act - Delete the first address
-        var deleteResponse = await client.DeleteAsync($"/v1/addresses/{address1!.Id}");
+        var deleteResponse = await client.DeleteAsync($"/customers/v1/addresses/{address1!.Id}");
 
         // Assert
         deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);

@@ -45,7 +45,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
         };
 
         // Act
-        var response = await client.PostAsJsonAsync("/v1/customers", request);
+        var response = await client.PostAsJsonAsync("/customers/v1/customers", request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -97,8 +97,8 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
         };
 
         // Act
-        var response1 = await client.PostAsJsonAsync("/v1/customers", request1);
-        var response2 = await client.PostAsJsonAsync("/v1/customers", request2);
+        var response1 = await client.PostAsJsonAsync("/customers/v1/customers", request1);
+        var response2 = await client.PostAsJsonAsync("/customers/v1/customers", request2);
 
         // Assert
         response1.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -136,11 +136,11 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
             }
         };
 
-        var createResponse = await client.PostAsJsonAsync("/v1/customers", createRequest);
+        var createResponse = await client.PostAsJsonAsync("/customers/v1/customers", createRequest);
         var createdCustomer = await createResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Act
-        var getResponse = await client.GetAsync($"/v1/customers/{createdCustomer!.Id}");
+        var getResponse = await client.GetAsync($"/customers/v1/customers/{createdCustomer!.Id}");
 
         // Assert
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -182,7 +182,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
             timezone = "Asia/Bangkok"
         };
 
-        var createResponse = await client.PostAsJsonAsync("/v1/customers", createRequest);
+        var createResponse = await client.PostAsJsonAsync("/customers/v1/customers", createRequest);
         var createdCustomer = await createResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         var updateRequest = new
@@ -192,7 +192,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
         };
 
         // Act
-        var updateResponse = await client.PatchAsJsonAsync($"/v1/customers/{createdCustomer!.Id}", updateRequest);
+        var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer!.Id}", updateRequest);
 
         // Assert
         updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -234,7 +234,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
             timezone = "Asia/Bangkok"
         };
 
-        var createResponse = await employeeClient.PostAsJsonAsync("/v1/customers", createRequest);
+        var createResponse = await employeeClient.PostAsJsonAsync("/customers/v1/customers", createRequest);
         var createdCustomer = await createResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Create customer client with the customer's ID
@@ -245,7 +245,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
         };
 
         // Act
-        var updateResponse = await customerClient.PatchAsJsonAsync($"/v1/customers/{createdCustomer.Id}", updateRequest);
+        var updateResponse = await customerClient.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer.Id}", updateRequest);
 
         // Assert
         updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -285,7 +285,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
             timezone = "Asia/Bangkok"
         };
 
-        var createResponse = await client.PostAsJsonAsync("/v1/customers", createRequest);
+        var createResponse = await client.PostAsJsonAsync("/customers/v1/customers", createRequest);
         var createdCustomer = await createResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         var updateRequest = new
@@ -295,7 +295,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
         };
 
         // Act
-        var updateResponse = await client.PatchAsJsonAsync($"/v1/customers/{createdCustomer!.Id}", updateRequest);
+        var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer!.Id}", updateRequest);
 
         // Assert
         updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -336,7 +336,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
             timezone = "Asia/Bangkok"
         };
 
-        var createResponse = await client.PostAsJsonAsync("/v1/customers", createRequest);
+        var createResponse = await client.PostAsJsonAsync("/customers/v1/customers", createRequest);
         var createdCustomer = await createResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         var updateRequest = new
@@ -350,7 +350,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
         };
 
         // Act
-        var updateResponse = await client.PatchAsJsonAsync($"/v1/customers/{createdCustomer!.Id}", updateRequest);
+        var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer!.Id}", updateRequest);
 
         // Assert
         updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -365,7 +365,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
         updatedCustomer.CommunicationPreferences["marketing_opt_in"].ToString().Should().Be("True");
 
         // Verify the data is persisted in the database
-        var getResponse = await client.GetAsync($"/v1/customers/{createdCustomer.Id}");
+        var getResponse = await client.GetAsync($"/customers/v1/customers/{createdCustomer.Id}");
         var retrievedCustomer = await getResponse.Content.ReadFromJsonAsync<CustomerResponse>();
         retrievedCustomer!.CommunicationPreferences.Should().NotBeNull();
         retrievedCustomer.CommunicationPreferences.Should().HaveCount(3);
@@ -405,20 +405,20 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
             timezone = "Asia/Bangkok"
         };
 
-        var response1 = await client.PostAsJsonAsync("/v1/customers", request1);
+        var response1 = await client.PostAsJsonAsync("/customers/v1/customers", request1);
         var customer1 = await response1.Content.ReadFromJsonAsync<CustomerResponse>();
 
-        var response2 = await client.PostAsJsonAsync("/v1/customers", request2);
+        var response2 = await client.PostAsJsonAsync("/customers/v1/customers", request2);
         var customer2 = await response2.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Act - Soft delete the first customer
-        var deleteResponse = await client.DeleteAsync($"/v1/customers/{customer1!.Id}");
+        var deleteResponse = await client.DeleteAsync($"/customers/v1/customers/{customer1!.Id}");
 
         // Assert - Verify deletion was successful
         deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Verify customer is marked as deleted when retrieved directly
-        var getDeletedResponse = await client.GetAsync($"/v1/customers/{customer1.Id}");
+        var getDeletedResponse = await client.GetAsync($"/customers/v1/customers/{customer1.Id}");
         if (getDeletedResponse.StatusCode == HttpStatusCode.OK)
         {
             var deletedCustomer = await getDeletedResponse.Content.ReadFromJsonAsync<CustomerResponse>();
@@ -426,7 +426,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
         }
 
         // Verify deleted customer is excluded from list queries
-        var listResponse = await client.GetAsync("/v1/customers");
+        var listResponse = await client.GetAsync("/customers/v1/customers");
         listResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var listResult = await listResponse.Content.ReadFromJsonAsync<PaginatedResponse<CustomerResponse>>();
         listResult.Should().NotBeNull();
