@@ -3,6 +3,7 @@ using Maliev.CustomerService.Api.Models.Users;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Data.Models;
 using Maliev.CustomerService.Tests.Infrastructure;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -36,8 +37,10 @@ public class UserServiceTests
         _mockUserManager = new Mock<UserManager<ApplicationUser>>(
             _mockUserStore.Object, null, null, null, null, null, null, null, null);
 
+        var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
+        var mockClaimsFactory = new Mock<IUserClaimsPrincipalFactory<ApplicationUser>>();
         _mockSignInManager = new Mock<SignInManager<ApplicationUser>>(
-            _mockUserManager.Object, null, null, null, null, null, null);
+            _mockUserManager.Object, mockHttpContextAccessor.Object, mockClaimsFactory.Object, null, null, null, null);
 #pragma warning restore CS8625
     }
 
@@ -77,6 +80,9 @@ public class UserServiceTests
 
         _mockUserManager.Setup(m => m.AddToRolesAsync(It.IsAny<ApplicationUser>(), It.IsAny<IEnumerable<string>>()))
             .ReturnsAsync(IdentityResult.Success);
+
+        _mockUserManager.Setup(m => m.GetRolesAsync(It.IsAny<ApplicationUser>()))
+            .ReturnsAsync(new List<string> { "Customer" });
 
         var request = new CreateUserRequest
         {
@@ -138,6 +144,9 @@ public class UserServiceTests
         _mockUserManager.Setup(m => m.AddToRolesAsync(It.IsAny<ApplicationUser>(), It.IsAny<IEnumerable<string>>()))
             .ReturnsAsync(IdentityResult.Success);
 
+        _mockUserManager.Setup(m => m.GetRolesAsync(It.IsAny<ApplicationUser>()))
+            .ReturnsAsync(new List<string> { "Employee" });
+
         var request = new CreateUserRequest
         {
             Username = "audituser",
@@ -185,8 +194,17 @@ public class UserServiceTests
         _mockUserManager.Setup(m => m.FindByNameAsync("validuser"))
             .ReturnsAsync(testUser);
 
-        _mockUserManager.Setup(m => m.CheckPasswordAsync(testUser, "CorrectPassword!"))
-            .ReturnsAsync(true);
+        _mockSignInManager.Setup(m => m.CheckPasswordSignInAsync(testUser, "CorrectPassword!", true))
+            .ReturnsAsync(SignInResult.Success);
+
+        _mockUserManager.Setup(m => m.UpdateAsync(testUser))
+            .ReturnsAsync(IdentityResult.Success)
+            .Callback<ApplicationUser>(async user =>
+            {
+                await using var context = _fixture.CreateDbContext();
+                context.Users.Update(user);
+                await context.SaveChangesAsync();
+            });
 
         _mockUserManager.Setup(m => m.GetRolesAsync(testUser))
             .ReturnsAsync(new List<string> { "Customer" });
@@ -233,8 +251,8 @@ public class UserServiceTests
         _mockUserManager.Setup(m => m.FindByNameAsync("invalidpassuser"))
             .ReturnsAsync(testUser);
 
-        _mockUserManager.Setup(m => m.CheckPasswordAsync(testUser, "WrongPassword!"))
-            .ReturnsAsync(false);
+        _mockSignInManager.Setup(m => m.CheckPasswordSignInAsync(testUser, "WrongPassword!", true))
+            .ReturnsAsync(SignInResult.Failed);
 
         var request = new ValidateCredentialsRequest
         {
@@ -297,6 +315,9 @@ public class UserServiceTests
             .ReturnsAsync(testUser);
 
         _mockUserManager.Setup(m => m.ChangePasswordAsync(testUser, "OldPass!", "NewPass!"))
+            .ReturnsAsync(IdentityResult.Success);
+
+        _mockUserManager.Setup(m => m.UpdateAsync(testUser))
             .ReturnsAsync(IdentityResult.Success);
 
         var request = new UpdatePasswordRequest
@@ -366,6 +387,9 @@ public class UserServiceTests
         _mockUserManager.Setup(m => m.ChangePasswordAsync(testUser, "OldPass!", "NewPass!"))
             .ReturnsAsync(IdentityResult.Success);
 
+        _mockUserManager.Setup(m => m.UpdateAsync(testUser))
+            .ReturnsAsync(IdentityResult.Success);
+
         var request = new UpdatePasswordRequest
         {
             CurrentPassword = "OldPass!",
@@ -378,7 +402,7 @@ public class UserServiceTests
         // Assert
         await using var context = _fixture.CreateDbContext();
         var auditLog = await context.AuditLogs
-            .Where(a => a.EntityId == testUser.Id && a.Action == AuditAction.Update)
+            .Where(a => a.EntityId == testUser.Id && a.Action == "UpdatePassword")
             .FirstOrDefaultAsync();
 
         auditLog.Should().NotBeNull();
@@ -405,13 +429,17 @@ public class UserServiceTests
         _mockUserManager.Setup(m => m.FindByIdAsync(testUser.Id))
             .ReturnsAsync(testUser);
 
-        _mockUserManager.Setup(m => m.GetRolesAsync(testUser))
-            .ReturnsAsync(new List<string> { "Customer" });
+        _mockUserManager.SetupSequence(m => m.GetRolesAsync(testUser))
+            .ReturnsAsync(new List<string> { "Customer" })
+            .ReturnsAsync(new List<string> { "Employee", "Manager" });
 
         _mockUserManager.Setup(m => m.RemoveFromRolesAsync(testUser, It.IsAny<IEnumerable<string>>()))
             .ReturnsAsync(IdentityResult.Success);
 
         _mockUserManager.Setup(m => m.AddToRolesAsync(testUser, It.IsAny<IEnumerable<string>>()))
+            .ReturnsAsync(IdentityResult.Success);
+
+        _mockUserManager.Setup(m => m.UpdateAsync(testUser))
             .ReturnsAsync(IdentityResult.Success);
 
         var request = new UpdateRolesRequest
@@ -525,11 +553,8 @@ public class UserServiceTests
 
         var service = CreateService();
 
-        foreach (var user in users)
-        {
-            _mockUserManager.Setup(m => m.GetRolesAsync(user))
-                .ReturnsAsync(new List<string> { "Customer" });
-        }
+        _mockUserManager.Setup(m => m.GetRolesAsync(It.IsAny<ApplicationUser>()))
+            .ReturnsAsync(new List<string> { "Customer" });
 
         // Act
         var (resultUsers, totalCount) = await service.GetAllAsync(1, 10);
@@ -560,8 +585,7 @@ public class UserServiceTests
 
         var service = CreateService();
 
-        var oldUser = users[1];
-        _mockUserManager.Setup(m => m.GetRolesAsync(oldUser))
+        _mockUserManager.Setup(m => m.GetRolesAsync(It.IsAny<ApplicationUser>()))
             .ReturnsAsync(new List<string> { "Customer" });
 
         // Act - get users who haven't logged in for more than 10 days
