@@ -183,37 +183,56 @@ The service uses configuration from multiple sources in order of precedence:
 
 Managed via **Google Secret Manager** (External Secrets Operator):
 
+**Service-Specific Secrets** (`maliev-{env}-customer-service-config`):
 ```yaml
 # Database
-ConnectionStrings__CustomerDbContext: "Server=postgres-cluster-rw;Port=5432;Database=customer_db;..."
-
-# JWT Authentication
-JwtSettings__SecretKey: "your-secret-key"
-JwtSettings__Issuer: "maliev-auth-service"
-JwtSettings__Audience: "maliev-services"
+ConnectionStrings__CustomerDbContext: "Server=postgres-cluster-rw.maliev-dev.svc.cluster.local;Port=5432;Database=customer_app_db;User Id=postgres;Password=..."
 
 # External Services
-UploadServiceOptions__BaseUrl: "http://maliev-upload-service:8080"
+ExternalServices__UploadService__BaseUrl: "http://maliev-upload-service.maliev-dev.svc.cluster.local:8080/uploads"
+ExternalServices__UploadService__TimeoutSeconds: 180
 ```
 
-**IMPORTANT**: Never commit secrets to source code or appsettings.json!
+**Shared Secrets** (`maliev-{env}-shared-config`):
+```yaml
+# JWT Authentication (RSA Public Key)
+Jwt__PublicKey: "LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K..."  # Base64-encoded RSA public key
+Jwt__Issuer: "https://dev.api.maliev.com/auth"
+Jwt__Audience: "https://dev.api.maliev.com"
+
+# CORS
+CORS_ALLOWED_ORIGINS: "https://dev.api.maliev.com,https://dev.intranet.maliev.com,https://dev.www.maliev.com"
+```
+
+**IMPORTANT**:
+- Never commit secrets to source code or appsettings.json!
+- JWT uses **RSA public key validation** (asymmetric cryptography)
+- Auth Service signs tokens with private key, other services validate with public key
 
 ### Development Overrides
 
-For local development, create `appsettings.Development.json` (git-ignored):
+For local development, create `appsettings.Development.json`:
 
 ```json
 {
   "ConnectionStrings": {
     "CustomerDbContext": "Server=localhost;Port=5432;Database=customer_db_dev;User Id=postgres;Password=dev;"
   },
-  "JwtSettings": {
-    "SecretKey": "dev-secret-key-min-32-characters-long",
-    "Issuer": "maliev-auth-service",
-    "Audience": "maliev-services"
+  "Jwt": {
+    "PublicKey": "LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...",
+    "Issuer": "https://dev.api.maliev.com/auth",
+    "Audience": "https://dev.api.maliev.com"
+  },
+  "ExternalServices": {
+    "UploadService": {
+      "BaseUrl": "http://localhost:8081/uploads",
+      "TimeoutSeconds": 30
+    }
   }
 }
 ```
+
+**Note**: For local development without Auth Service, you can temporarily disable JWT authentication by setting `ASPNETCORE_ENVIRONMENT=Testing`.
 
 ## Deployment
 
