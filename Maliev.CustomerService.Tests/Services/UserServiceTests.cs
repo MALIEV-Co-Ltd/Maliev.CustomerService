@@ -5,6 +5,7 @@ using Maliev.CustomerService.Data.Models;
 using Maliev.CustomerService.Tests.Infrastructure;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -22,12 +23,14 @@ public class UserServiceTests
     private readonly Mock<UserManager<ApplicationUser>> _mockUserManager;
     private readonly Mock<SignInManager<ApplicationUser>> _mockSignInManager;
     private readonly Mock<IUserStore<ApplicationUser>> _mockUserStore;
+    private readonly Mock<Api.Services.MetricsService> _mockMetricsService;
 
     public UserServiceTests(TestDatabaseFixture fixture)
     {
         _fixture = fixture;
         _mockLogger = new Mock<ILogger<Api.Services.UserService>>();
         _mockUserStore = new Mock<IUserStore<ApplicationUser>>();
+        _mockMetricsService = new Mock<Api.Services.MetricsService>(MockBehavior.Loose, new object[] { Mock.Of<IConfiguration>() });
 
 #pragma warning disable CS8625 // Null literal conversion warnings for mock setup
         _mockUserManager = new Mock<UserManager<ApplicationUser>>(
@@ -45,7 +48,8 @@ public class UserServiceTests
             _mockUserManager.Object,
             _mockSignInManager.Object,
             context,
-            _mockLogger.Object);
+            _mockLogger.Object,
+            _mockMetricsService.Object);
     }
 
     [Fact]

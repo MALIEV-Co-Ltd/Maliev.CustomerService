@@ -16,17 +16,20 @@ public class UserService : IUserService
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly CustomerDbContext _context;
     private readonly ILogger<UserService> _logger;
+    private readonly MetricsService _metricsService;
 
     public UserService(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         CustomerDbContext context,
-        ILogger<UserService> logger)
+        ILogger<UserService> logger,
+        MetricsService metricsService)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _context = context;
         _logger = logger;
+        _metricsService = metricsService;
     }
 
     public async Task<UserResponse> CreateAsync(CreateUserRequest request, string actorId, string actorType)
@@ -210,10 +213,14 @@ public class UserService : IUserService
     {
         _logger.LogDebug("Validating credentials for username {Username}", request.Username);
 
+        // Measure auth validation duration
+        using var timer = _metricsService.MeasureAuthValidationDuration();
+
         var user = await _userManager.FindByNameAsync(request.Username);
         if (user == null)
         {
             _logger.LogWarning("User {Username} not found for credential validation", request.Username);
+            _metricsService.RecordAuthValidation(false);
             return new ValidationResponse { IsValid = false };
         }
 
@@ -221,6 +228,7 @@ public class UserService : IUserService
         if (!user.IsActive)
         {
             _logger.LogWarning("Inactive user {Username} attempted to login", request.Username);
+            _metricsService.RecordAuthValidation(false);
             return new ValidationResponse { IsValid = false };
         }
 
@@ -238,6 +246,7 @@ public class UserService : IUserService
                 _logger.LogWarning("Invalid password for user {Username}", request.Username);
             }
 
+            _metricsService.RecordAuthValidation(false);
             return new ValidationResponse { IsValid = false };
         }
 
@@ -250,6 +259,9 @@ public class UserService : IUserService
 
         _logger.LogInformation("Credentials validated successfully for user {Username} ({UserId})",
             request.Username, user.Id);
+
+        // Record successful auth validation
+        _metricsService.RecordAuthValidation(true);
 
         return new ValidationResponse
         {

@@ -10,11 +10,13 @@ public class NDAService : INDAService
 {
     private readonly CustomerDbContext _context;
     private readonly ILogger<NDAService> _logger;
+    private readonly MetricsService _metricsService;
 
-    public NDAService(CustomerDbContext context, ILogger<NDAService> logger)
+    public NDAService(CustomerDbContext context, ILogger<NDAService> logger, MetricsService metricsService)
     {
         _context = context;
         _logger = logger;
+        _metricsService = metricsService;
     }
 
     public async Task<NDAResponse> CreateAsync(CreateNDARequest request, string actorId, string actorType)
@@ -97,6 +99,7 @@ public class NDAService : INDAService
             nda.RevokedAt
         };
 
+        var oldStatus = nda.Status;
         ValidateLifecycleTransition(nda, request);
 
         nda.Status = request.Status;
@@ -140,6 +143,9 @@ public class NDAService : INDAService
         {
             await _context.SaveChangesAsync();
             _logger.LogInformation("NDA {NDAId} status updated successfully to {Status}", id, request.Status);
+
+            // Record NDA state transition metric
+            _metricsService.RecordNdaTransition(oldStatus, request.Status);
         }
         catch (DbUpdateConcurrencyException ex)
         {

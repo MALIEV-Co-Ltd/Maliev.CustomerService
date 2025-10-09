@@ -13,11 +13,13 @@ public class CustomerService : ICustomerService
 {
     private readonly CustomerDbContext _context;
     private readonly ILogger<CustomerService> _logger;
+    private readonly MetricsService _metricsService;
 
-    public CustomerService(CustomerDbContext context, ILogger<CustomerService> logger)
+    public CustomerService(CustomerDbContext context, ILogger<CustomerService> logger, MetricsService metricsService)
     {
         _context = context;
         _logger = logger;
+        _metricsService = metricsService;
     }
 
     public async Task<CustomerResponse> CreateAsync(CreateCustomerRequest request, string actorId, string actorType)
@@ -87,6 +89,9 @@ public class CustomerService : ICustomerService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Customer {CustomerId} created successfully", customer.Id);
+
+        // Record metrics
+        _metricsService.RecordCustomerRegistration(customer.Segment);
 
         return MapToResponse(customer);
     }
@@ -244,6 +249,9 @@ public class CustomerService : ICustomerService
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Customer {CustomerId} updated successfully with {FieldCount} field(s)",
                     id, changedFields.Count);
+
+                // Record metrics
+                _metricsService.RecordCustomerUpdate(actorType);
             }
             catch (DbUpdateConcurrencyException ex)
             {

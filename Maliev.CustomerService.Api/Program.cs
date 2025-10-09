@@ -11,6 +11,7 @@ using Maliev.CustomerService.Data.Models;
 using Maliev.CustomerService.Api.Middleware;
 using FluentValidation;
 using Polly;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -66,6 +67,9 @@ try
 
     // FluentValidation (T029-T030)
     builder.Services.AddValidatorsFromAssemblyContaining<Maliev.CustomerService.Api.Validators.CreateCustomerRequestValidator>();
+
+    // Prometheus metrics (Constitution Principle X)
+    builder.Services.AddSingleton<Maliev.CustomerService.Api.Services.MetricsService>();
 
     // Application Services (T031-T032, T046-T047, T058-T059, T072-T073, T084-T085, T100-T101, T114-T115)
     builder.Services.AddScoped<Maliev.CustomerService.Api.Services.ICustomerService, Maliev.CustomerService.Api.Services.CustomerService>();
@@ -263,6 +267,9 @@ try
         app.UseAuthorization();
     }
 
+    // HTTP metrics middleware (Constitution Principle X)
+    app.UseHttpMetrics();
+
     // Health check endpoints (T017) - simplified routing due to UsePathBase
     app.MapGet("/liveness", () => "Healthy")
         .AllowAnonymous()
@@ -273,6 +280,9 @@ try
         Predicate = healthCheck => healthCheck.Tags.Contains("readiness"),
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     }).AllowAnonymous();
+
+    // Metrics endpoint (Constitution Principle X)
+    app.MapMetrics("/metrics").AllowAnonymous();
 
     app.MapControllers();
 

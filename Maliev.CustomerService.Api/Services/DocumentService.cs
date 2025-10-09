@@ -12,15 +12,18 @@ public class DocumentService : IDocumentService
     private readonly CustomerDbContext _context;
     private readonly IUploadServiceClient _uploadServiceClient;
     private readonly ILogger<DocumentService> _logger;
+    private readonly MetricsService _metricsService;
 
     public DocumentService(
         CustomerDbContext context,
         IUploadServiceClient uploadServiceClient,
-        ILogger<DocumentService> logger)
+        ILogger<DocumentService> logger,
+        MetricsService metricsService)
     {
         _context = context;
         _uploadServiceClient = uploadServiceClient;
         _logger = logger;
+        _metricsService = metricsService;
     }
 
     public async Task<DocumentResponse> CreateAsync(CreateDocumentRequest request, string actorId, string actorType)
@@ -76,6 +79,10 @@ public class DocumentService : IDocumentService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Document {DocumentId} created successfully", document.Id);
+
+        // Record metrics
+        _metricsService.RecordDocumentOperation("create");
+
         return MapToResponse(document);
     }
 
@@ -204,6 +211,10 @@ public class DocumentService : IDocumentService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Document {DocumentId} marked as complete", id);
+
+        // Record metrics
+        _metricsService.RecordDocumentOperation("complete");
+
         return MapToResponse(document);
     }
 
@@ -273,6 +284,9 @@ public class DocumentService : IDocumentService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Document {DocumentId} deleted successfully", id);
+
+        // Record metrics
+        _metricsService.RecordDocumentOperation("delete");
     }
 
     public async Task<int> RetryPendingDeletionsAsync()
@@ -321,10 +335,16 @@ public class DocumentService : IDocumentService
 
                 _context.AuditLogs.Add(auditLog);
                 successCount++;
+
+                // Record successful retry metric
+                _metricsService.RecordDocumentDeletionRetry(true);
             }
             else
             {
                 _logger.LogWarning("Retry deletion failed for document {DocumentId}", document.Id);
+
+                // Record failed retry metric
+                _metricsService.RecordDocumentDeletionRetry(false);
             }
         }
 

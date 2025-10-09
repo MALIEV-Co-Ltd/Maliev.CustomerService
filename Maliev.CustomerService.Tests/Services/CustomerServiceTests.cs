@@ -4,6 +4,7 @@ using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Data.Models;
 using Maliev.CustomerService.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Text.Json;
@@ -19,17 +20,19 @@ public class CustomerServiceTests
 {
     private readonly TestDatabaseFixture _fixture;
     private readonly Mock<ILogger<Api.Services.CustomerService>> _mockLogger;
+    private readonly Mock<Api.Services.MetricsService> _mockMetricsService;
 
     public CustomerServiceTests(TestDatabaseFixture fixture)
     {
         _fixture = fixture;
         _mockLogger = new Mock<ILogger<Api.Services.CustomerService>>();
+        _mockMetricsService = new Mock<Api.Services.MetricsService>(MockBehavior.Loose, new object[] { Mock.Of<IConfiguration>() });
     }
 
     private Api.Services.CustomerService CreateService()
     {
         var context = _fixture.CreateDbContext();
-        return new Api.Services.CustomerService(context, _mockLogger.Object);
+        return new Api.Services.CustomerService(context, _mockLogger.Object, _mockMetricsService.Object);
     }
 
     [Fact]
