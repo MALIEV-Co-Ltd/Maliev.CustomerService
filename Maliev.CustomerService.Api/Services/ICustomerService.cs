@@ -1,0 +1,70 @@
+using Maliev.CustomerService.Api.Models.Customers;
+
+namespace Maliev.CustomerService.Api.Services;
+
+/// <summary>
+/// Service interface for customer management operations
+/// </summary>
+public interface ICustomerService
+{
+    /// <summary>
+    /// Creates a new customer with audit logging
+    /// </summary>
+    /// <param name="request">Customer creation request</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>Created customer response</returns>
+    Task<CustomerResponse> CreateAsync(CreateCustomerRequest request, string actorId, string actorType);
+
+    /// <summary>
+    /// Retrieves a customer by ID
+    /// </summary>
+    /// <param name="id">Customer ID</param>
+    /// <returns>Customer response or null if not found</returns>
+    Task<CustomerResponse?> GetByIdAsync(Guid id);
+
+    /// <summary>
+    /// Updates an existing customer with optimistic concurrency control and audit logging
+    /// </summary>
+    /// <param name="id">Customer ID</param>
+    /// <param name="request">Customer update request</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>Updated customer response</returns>
+    /// <exception cref="KeyNotFoundException">Customer not found</exception>
+    /// <exception cref="DbUpdateConcurrencyException">Version conflict</exception>
+    Task<CustomerResponse> UpdateAsync(Guid id, UpdateCustomerRequest request, string actorId, string actorType);
+
+    /// <summary>
+    /// Soft deletes a customer with audit logging
+    /// </summary>
+    /// <param name="id">Customer ID</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>True if deleted, false if not found</returns>
+    Task<bool> SoftDeleteAsync(Guid id, string actorId, string actorType);
+
+    /// <summary>
+    /// Gets all customers with optional filtering and pagination (T119-T120, T126-T127)
+    /// </summary>
+    Task<PaginatedResponse<CustomerResponse>> GetAllAsync(
+        string? segment = null,
+        string? tier = null,
+        string? preferredLanguage = null,
+        DateTime? lastLoginAtFrom = null,
+        DateTime? lastLoginAtTo = null,
+        string? email = null,
+        Guid? companyId = null,
+        DateTime? createdFrom = null,
+        DateTime? createdTo = null,
+        bool includeDeleted = false,
+        int page = 1,
+        int pageSize = 50);
+
+    /// <summary>
+    /// Gets customer preferences for compliance/audit purposes (T123)
+    /// </summary>
+    Task<PaginatedResponse<GetCustomerPreferencesResponse>> GetPreferencesAsync(
+        int page = 1,
+        int pageSize = 100);
+}

@@ -1,55 +1,115 @@
-using Microsoft.AspNetCore.Mvc;
+using Maliev.CustomerService.Api.Models;
 using System.Net;
 using System.Text.Json;
 
-namespace Maliev.CustomerService.Api.Middleware
+namespace Maliev.CustomerService.Api.Middleware;
+
+/// <summary>
+/// Global exception handling middleware for structured error responses
+/// </summary>
+public class ExceptionHandlingMiddleware
 {
-    public class ExceptionHandlingMiddleware
+    private readonly RequestDelegate _next;
+    private readonly ILogger<ExceptionHandlingMiddleware> _logger;
+
+    public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
     {
-        private readonly RequestDelegate _next;
-        private readonly ILogger<ExceptionHandlingMiddleware> _logger;
-        private readonly IHostEnvironment _env;
+        _next = next;
+        _logger = logger;
+    }
 
-        public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger, IHostEnvironment env)
+    public async Task InvokeAsync(HttpContext context)
+    {
+        try
         {
-            _next = next;
-            _logger = logger;
-            _env = env;
+            await _next(context);
         }
-
-        public async Task InvokeAsync(HttpContext httpContext)
+        catch (Exception ex)
         {
-            try
-            {
-                await _next(httpContext);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "An unhandled exception occurred: {Message}", ex.Message);
-                await HandleExceptionAsync(httpContext, ex);
-            }
-        }
+            _logger.LogError(ex, "Unhandled exception occurred. TraceId: {TraceId}, Path: {Path}, Method: {Method}",
+                context.TraceIdentifier,
+                context.Request.Path,
+                context.Request.Method);
 
-        private async Task HandleExceptionAsync(HttpContext context, Exception exception)
+            await HandleExceptionAsync(context, ex);
+        }
+    }
+
+    private static Task HandleExceptionAsync(HttpContext context, Exception exception)
+    {
+        var errorResponse = new ErrorResponse
         {
-            context.Response.ContentType = "application/problem+json";
-            context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+            Code = GetErrorCode(exception),
+            Message = GetErrorMessage(exception),
+            TraceId = context.TraceIdentifier,
+            Timestamp = DateTime.UtcNow
+        };
 
-            var problemDetails = new ProblemDetails
-            {
-                Status = (int)HttpStatusCode.InternalServerError,
-                Title = "An error occurred while processing your request.",
-                Type = "https://tools.ietf.org/html/rfc7807#section-3.1",
-                Detail = _env.IsDevelopment() ? exception.ToString() : "An unexpected error occurred."
-            };
+        var statusCode = GetStatusCode(exception);
 
-            if (_env.IsDevelopment())
-            {
-                problemDetails.Extensions.Add("traceId", context.TraceIdentifier);
-            }
+        context.Response.ContentType = "application/json";
+        context.Response.StatusCode = statusCode;
 
-            var problemDetailsJson = JsonSerializer.Serialize(problemDetails);
-            await context.Response.WriteAsync(problemDetailsJson);
-        }
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        };
+
+        var json = JsonSerializer.Serialize(errorResponse, options);
+
+        return context.Response.WriteAsync(json);
+    }
+
+    private static int GetStatusCode(Exception exception)
+    {
+        return exception switch
+        {
+            ArgumentException => (int)HttpStatusCode.BadRequest,
+            UnauthorizedAccessException => (int)HttpStatusCode.Unauthorized,
+            KeyNotFoundException => (int)HttpStatusCode.NotFound,
+            InvalidOperationException => (int)HttpStatusCode.Conflict,
+            TimeoutException => (int)HttpStatusCode.RequestTimeout,
+            _ => (int)HttpStatusCode.InternalServerError
+        };
+    }
+
+    private static string GetErrorCode(Exception exception)
+    {
+        return exception switch
+        {
+            ArgumentException => "VALIDATION_ERROR",
+            UnauthorizedAccessException => "UNAUTHORIZED",
+            KeyNotFoundException => "NOT_FOUND",
+            InvalidOperationException => "CONFLICT",
+            TimeoutException => "TIMEOUT",
+            _ => "INTERNAL_SERVER_ERROR"
+        };
+    }
+
+    private static string GetErrorMessage(Exception exception)
+    {
+        // In production, avoid exposing internal exception details
+        // Return generic messages for 500 errors
+        return exception switch
+        {
+            ArgumentException => exception.Message,
+            UnauthorizedAccessException => "You are not authorized to perform this action.",
+            KeyNotFoundException => "The requested resource was not found.",
+            InvalidOperationException => exception.Message,
+            TimeoutException => "The request timed out. Please try again.",
+            _ => "An unexpected error occurred. Please contact support if the problem persists."
+        };
+    }
+}
+
+/// <summary>
+/// Extension method for registering the exception handling middleware
+/// </summary>
+public static class ExceptionHandlingMiddlewareExtensions
+{
+    public static IApplicationBuilder UseExceptionHandling(this IApplicationBuilder builder)
+    {
+        return builder.UseMiddleware<ExceptionHandlingMiddleware>();
     }
 }
