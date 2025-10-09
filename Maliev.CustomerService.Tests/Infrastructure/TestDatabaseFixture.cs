@@ -17,7 +17,7 @@ public class TestDatabaseFixture : IAsyncLifetime
     {
         // Start PostgreSQL container
         _postgresContainer = new PostgreSqlBuilder()
-            .WithImage("postgres:18")
+            .WithImage("postgres:16")
             .WithDatabase("customer_test_db")
             .WithUsername("postgres")
             .WithPassword("test_password")
@@ -61,17 +61,17 @@ public class TestDatabaseFixture : IAsyncLifetime
         // Disable triggers and cascade deletes temporarily
         await context.Database.ExecuteSqlRawAsync("SET session_replication_role = 'replica';");
 
-        // Delete data from all tables in reverse dependency order
-        await context.Database.ExecuteSqlRawAsync("DELETE FROM internal_notes;");
-        await context.Database.ExecuteSqlRawAsync("DELETE FROM document_references;");
-        await context.Database.ExecuteSqlRawAsync("DELETE FROM nda_records;");
-        await context.Database.ExecuteSqlRawAsync("DELETE FROM addresses;");
-        await context.Database.ExecuteSqlRawAsync("DELETE FROM customers;");
-        await context.Database.ExecuteSqlRawAsync("DELETE FROM companies;");
-        await context.Database.ExecuteSqlRawAsync("DELETE FROM audit_logs;");
-        await context.Database.ExecuteSqlRawAsync("DELETE FROM \"AspNetUserRoles\";");
-        await context.Database.ExecuteSqlRawAsync("DELETE FROM \"AspNetUsers\";");
-        await context.Database.ExecuteSqlRawAsync("DELETE FROM \"AspNetRoles\";");
+        // Delete data from all tables in reverse dependency order (ignore errors if tables don't exist)
+        try { await context.Database.ExecuteSqlRawAsync("DELETE FROM internal_notes;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync("DELETE FROM document_references;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync("DELETE FROM nda_records;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync("DELETE FROM addresses;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync("DELETE FROM customers;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync("DELETE FROM companies;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync("DELETE FROM audit_logs;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync("DELETE FROM \"AspNetUserRoles\";"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync("DELETE FROM \"AspNetUsers\";"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync("DELETE FROM \"AspNetRoles\";"); } catch { }
 
         // Re-enable triggers
         await context.Database.ExecuteSqlRawAsync("SET session_replication_role = 'origin';");

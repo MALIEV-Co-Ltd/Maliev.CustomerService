@@ -55,8 +55,11 @@ public class CustomerDbContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(e => e.Tier).HasDatabaseName("ix_customer_tier");
             entity.HasIndex(e => e.PreferredLanguage).HasDatabaseName("ix_customer_preferred_language");
 
-            // Concurrency token
-            entity.Property(e => e.Version).IsRowVersion();
+            // Concurrency token (PostgreSQL bytea with default value)
+            entity.Property(e => e.Version)
+                .IsRowVersion()
+                .HasDefaultValueSql("'\\x0000000000000001'::bytea")
+                .ValueGeneratedOnAddOrUpdate();
         });
 
         // Configure AuditLog entity (T024)
@@ -100,8 +103,11 @@ public class CustomerDbContext : IdentityDbContext<ApplicationUser>
             // Index on country_id for country-based queries
             entity.HasIndex(e => e.CountryId).HasDatabaseName("ix_address_country_id");
 
-            // Concurrency token
-            entity.Property(e => e.Version).IsRowVersion();
+            // Concurrency token (PostgreSQL bytea with default value)
+            entity.Property(e => e.Version)
+                .IsRowVersion()
+                .HasDefaultValueSql("'\\x0000000000000001'::bytea")
+                .ValueGeneratedOnAddOrUpdate();
         });
 
         // Configure ApplicationUser entity (T050)
@@ -147,8 +153,11 @@ public class CustomerDbContext : IdentityDbContext<ApplicationUser>
             // Index on tier for tier-based filtering
             entity.HasIndex(e => e.Tier).HasDatabaseName("ix_company_tier");
 
-            // Concurrency token
-            entity.Property(e => e.Version).IsRowVersion();
+            // Concurrency token (PostgreSQL bytea with default value)
+            entity.Property(e => e.Version)
+                .IsRowVersion()
+                .HasDefaultValueSql("'\\x0000000000000001'::bytea")
+                .ValueGeneratedOnAddOrUpdate();
         });
 
         // Configure NDARecord entity (T078)
@@ -172,8 +181,11 @@ public class CustomerDbContext : IdentityDbContext<ApplicationUser>
             // Index on expires_at for expiration checking
             entity.HasIndex(e => e.ExpiresAt).HasDatabaseName("ix_ndarecord_expires_at");
 
-            // Concurrency token
-            entity.Property(e => e.Version).IsRowVersion();
+            // Concurrency token (PostgreSQL bytea with default value)
+            entity.Property(e => e.Version)
+                .IsRowVersion()
+                .HasDefaultValueSql("'\\x0000000000000001'::bytea")
+                .ValueGeneratedOnAddOrUpdate();
         });
 
         // Configure DocumentReference entity (T091)
@@ -202,7 +214,10 @@ public class CustomerDbContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(e => e.Status).HasDatabaseName("ix_documentreference_status");
 
             // Concurrency token
-            entity.Property(e => e.RowVersion).IsRowVersion();
+            entity.Property(e => e.RowVersion)
+                .IsRowVersion()
+                .HasDefaultValueSql("'\\x0000000000000001'::bytea")
+                .ValueGeneratedOnAddOrUpdate();
         });
 
         // Configure InternalNote entity (T107)
@@ -227,8 +242,11 @@ public class CustomerDbContext : IdentityDbContext<ApplicationUser>
             // Index on created_by for filtering by author
             entity.HasIndex(e => e.CreatedBy).HasDatabaseName("ix_internalnote_created_by");
 
-            // Concurrency token
-            entity.Property(e => e.Version).IsRowVersion();
+            // Concurrency token (PostgreSQL bytea with default value)
+            entity.Property(e => e.Version)
+                .IsRowVersion()
+                .HasDefaultValueSql("'\\x0000000000000001'::bytea")
+                .ValueGeneratedOnAddOrUpdate();
         });
 
         // Configure snake_case naming convention for all tables and columns
