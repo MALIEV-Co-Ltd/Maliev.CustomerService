@@ -34,15 +34,18 @@ try
         builder.Configuration.AddKeyPerFile(directoryPath: secretsPath, optional: true);
     }
 
-    // Database Context
-    builder.Services.AddDbContext<CustomerDbContext>(options =>
+    // Database Context (skipped in Testing - configured by TestWebApplicationFactory)
+    if (!builder.Environment.IsEnvironment("Testing"))
     {
         var connectionString = builder.Configuration.GetConnectionString("CustomerDbContext")
             ?? builder.Configuration["CustomerDbContext"]  // Alternative for env var format
             ?? throw new InvalidOperationException("Database connection string 'CustomerDbContext' not found.");
 
-        options.UseNpgsql(connectionString);
-    });
+        builder.Services.AddDbContext<CustomerDbContext>(options =>
+        {
+            options.UseNpgsql(connectionString);
+        });
+    }
 
     // ASP.NET Core Identity
     builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -109,24 +112,27 @@ try
     .AddTransientHttpErrorPolicy(policy => policy.WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))))
     .AddTransientHttpErrorPolicy(policy => policy.CircuitBreakerAsync(5, TimeSpan.FromSeconds(30)));
 
-    // Controllers
-    builder.Services.AddControllers();
+    // Controllers - explicitly add this assembly as ApplicationPart
+    builder.Services.AddControllers()
+        .AddApplicationPart(typeof(Program).Assembly)
+        .AddJsonOptions(options =>
+        {
+            options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+        });
 
     // Health Checks (T017)
     builder.Services.AddHealthChecks()
         .AddDbContextCheck<CustomerDbContext>(tags: new[] { "readiness" });
 
     // JWT Bearer Authentication (T013) - RSA Public Key Validation
-    if (!builder.Environment.IsEnvironment("Testing"))
-    {
-        var publicKeyBase64 = builder.Configuration["Jwt:PublicKey"]
-            ?? throw new InvalidOperationException("JWT PublicKey not configured");
-        var issuer = builder.Configuration["Jwt:Issuer"]
-            ?? throw new InvalidOperationException("JWT Issuer not configured");
-        var audience = builder.Configuration["Jwt:Audience"]
-            ?? throw new InvalidOperationException("JWT Audience not configured");
+    // Note: In Testing environment, TestWebApplicationFactory replaces this with FakeAuthenticationHandler
+    var publicKeyBase64 = builder.Configuration["Jwt:PublicKey"] ?? "test-key";
+    var issuer = builder.Configuration["Jwt:Issuer"] ?? "test-issuer";
+    var audience = builder.Configuration["Jwt:Audience"] ?? "test-audience";
 
-        // Decode RSA public key from Base64
+    if (publicKeyBase64 != "test-key")
+    {
+        // Production: Use RSA public key validation
         var publicKeyBytes = Convert.FromBase64String(publicKeyBase64);
         var rsa = System.Security.Cryptography.RSA.Create();
         rsa.ImportSubjectPublicKeyInfo(publicKeyBytes, out _);
@@ -150,14 +156,20 @@ try
 
                 options.MapInboundClaims = false; // Keep original claim names
             });
-
-        builder.Services.AddAuthorization(options =>
-        {
-            // EmployeeOrHigher policy for internal notes (T113)
-            options.AddPolicy("EmployeeOrHigher", policy =>
-                policy.RequireRole("Employee", "Manager", "Admin"));
-        });
     }
+    else
+    {
+        // Testing: Use default authentication (will be replaced by FakeAuthenticationHandler)
+        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer();
+    }
+
+    builder.Services.AddAuthorization(options =>
+    {
+        // EmployeeOrHigher policy for internal notes (T113)
+        options.AddPolicy("EmployeeOrHigher", policy =>
+            policy.RequireRole("Employee", "Manager", "Admin"));
+    });
 
     // Rate Limiting (T014)
     builder.Services.AddRateLimiter(options =>
@@ -245,7 +257,7 @@ try
 
     var app = builder.Build();
 
-    // Path base for routing (all endpoints prefixed with /customers)
+    // Configure base path for all routes
     app.UsePathBase("/customers");
 
     // Middleware Pipeline (EXACT ORDER per CLAUDE.md)
@@ -254,23 +266,28 @@ try
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/customers/swagger/v1/swagger.json", "Maliev Customer Service API v1");
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Maliev Customer Service API v1");
         c.RoutePrefix = "swagger";
     });
 
-    app.UseHttpsRedirection();
-    app.UseRateLimiter();
-
-    if (!builder.Environment.IsEnvironment("Testing"))
+    // Skip HTTPS redirection in test environment (causes "Failed to determine the https port" warning)
+    if (!app.Environment.IsEnvironment("Testing"))
     {
-        app.UseAuthentication();
-        app.UseAuthorization();
+        app.UseHttpsRedirection();
     }
+
+    app.UseRouting(); // Enable endpoint routing
+
+    // Authentication and Authorization middleware (always enabled, uses FakeAuthenticationHandler in Testing)
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    app.UseRateLimiter();
 
     // HTTP metrics middleware (Constitution Principle X)
     app.UseHttpMetrics();
 
-    // Health check endpoints (T017) - simplified routing due to UsePathBase
+    // Health check endpoints (T017) - UsePathBase adds /customers prefix
     app.MapGet("/liveness", () => "Healthy")
         .AllowAnonymous()
         .WithName("Liveness");

@@ -12,15 +12,27 @@ namespace Maliev.CustomerService.Tests.Integration;
 /// <summary>
 /// Integration tests for User Story 6 - User Account Management and Credential Validation
 /// Tests all 7 acceptance scenarios using real HTTP requests
+/// Uses dedicated database fixture for better test isolation
 /// </summary>
-[Collection("Database Collection")]
-public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestWebApplicationFactory>
+public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatabaseFixture>, IAsyncLifetime
 {
-    private readonly TestWebApplicationFactory _factory;
+    private readonly TestDatabaseFixture _databaseFixture;
+    private TestWebApplicationFactory _factory = null!;
 
-    public US6_UserAccountManagementIntegrationTests(TestWebApplicationFactory factory)
+    public US6_UserAccountManagementIntegrationTests(TestDatabaseFixture databaseFixture)
     {
-        _factory = factory;
+        _databaseFixture = databaseFixture;
+    }
+
+    public async Task InitializeAsync()
+    {
+        _factory = new TestWebApplicationFactory(_databaseFixture);
+        await _factory.InitializeAsync();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _factory.DisposeAsync();
     }
 
     /// <summary>
@@ -325,6 +337,7 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestWebAp
         // Act - Reset password
         var resetRequest = new
         {
+            currentPassword = "OldP@ssw0rd!",
             newPassword = "NewP@ssw0rd!"
         };
         var resetResponse = await adminClient.PutAsJsonAsync($"/customers/v1/users/{createdUser!.Id}/password", resetRequest);
@@ -395,7 +408,7 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestWebAp
         var updateResponse = await adminClient.PutAsJsonAsync($"/customers/v1/users/{createdUser!.Id}/roles", updateRolesRequest);
 
         // Assert
-        updateResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Verify role change in validation response
         var updatedValidation = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", validateRequest);

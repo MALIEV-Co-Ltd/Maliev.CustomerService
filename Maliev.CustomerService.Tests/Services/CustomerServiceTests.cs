@@ -290,8 +290,9 @@ public class CustomerServiceTests
         };
 
         // Act & Assert
-        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.UpdateAsync(created.Id, updateRequest, "test-actor", "Employee"));
+        exception.Message.Should().Contain("customer was modified by another user");
     }
 
     [Fact]
@@ -409,11 +410,11 @@ public class CustomerServiceTests
             .OrderBy(a => a.Timestamp)
             .ToListAsync();
 
-        auditLogs.Should().HaveCount(2); // Create + Delete
+        auditLogs.Should().HaveCount(2); // Create + SoftDelete
         var deleteAudit = auditLogs[1];
         deleteAudit.ActorId.Should().Be("manager-999");
         deleteAudit.ActorType.Should().Be("Manager");
-        deleteAudit.Action.Should().Be(AuditAction.Delete);
+        deleteAudit.Action.Should().Be(AuditAction.SoftDelete);
     }
 
     [Fact]

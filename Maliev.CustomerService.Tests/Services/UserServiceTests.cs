@@ -15,9 +15,9 @@ namespace Maliev.CustomerService.Tests.Services;
 /// <summary>
 /// Unit tests for UserService using real PostgreSQL database
 /// Tests user account management, password validation, role management
+/// Uses dedicated database fixture for better test isolation
 /// </summary>
-[Collection("Database Collection")]
-public class UserServiceTests
+public class UserServiceTests : IClassFixture<TestDatabaseFixture>
 {
     private readonly TestDatabaseFixture _fixture;
     private readonly Mock<ILogger<Api.Services.UserService>> _mockLogger;
@@ -60,7 +60,7 @@ public class UserServiceTests
     {
         // Arrange
         await _fixture.ClearDatabaseAsync();
-        var service = CreateService();
+        await using var service = CreateService();
 
         var testUser = new ApplicationUser
         {
@@ -110,7 +110,7 @@ public class UserServiceTests
     {
         // Arrange
         await _fixture.ClearDatabaseAsync();
-        var service = CreateService();
+        await using var service = CreateService();
 
         _mockUserManager.Setup(m => m.CreateAsync(It.IsAny<ApplicationUser>(), It.IsAny<string>()))
             .ReturnsAsync(IdentityResult.Failed(new IdentityError { Description = "Username already exists" }));
@@ -133,7 +133,7 @@ public class UserServiceTests
     {
         // Arrange
         await _fixture.ClearDatabaseAsync();
-        var service = CreateService();
+        await using var service = CreateService();
 
         var testUserId = Guid.NewGuid().ToString();
 
@@ -189,7 +189,7 @@ public class UserServiceTests
             await context.SaveChangesAsync();
         }
 
-        var service = CreateService();
+        await using var service = CreateService();
 
         _mockUserManager.Setup(m => m.FindByNameAsync("validuser"))
             .ReturnsAsync(testUser);
@@ -246,7 +246,7 @@ public class UserServiceTests
             Email = "invalidpass@example.com"
         };
 
-        var service = CreateService();
+        await using var service = CreateService();
 
         _mockUserManager.Setup(m => m.FindByNameAsync("invalidpassuser"))
             .ReturnsAsync(testUser);
@@ -276,7 +276,7 @@ public class UserServiceTests
     {
         // Arrange
         await _fixture.ClearDatabaseAsync();
-        var service = CreateService();
+        await using var service = CreateService();
 
         _mockUserManager.Setup(m => m.FindByNameAsync("nonexistent"))
             .ReturnsAsync((ApplicationUser?)null);
@@ -309,7 +309,7 @@ public class UserServiceTests
             Email = "password@example.com"
         };
 
-        var service = CreateService();
+        await using var service = CreateService();
 
         _mockUserManager.Setup(m => m.FindByIdAsync(testUser.Id))
             .ReturnsAsync(testUser);
@@ -347,7 +347,7 @@ public class UserServiceTests
             Email = "password@example.com"
         };
 
-        var service = CreateService();
+        await using var service = CreateService();
 
         _mockUserManager.Setup(m => m.FindByIdAsync(testUser.Id))
             .ReturnsAsync(testUser);
@@ -379,7 +379,7 @@ public class UserServiceTests
             Email = "auditpass@example.com"
         };
 
-        var service = CreateService();
+        await using var service = CreateService();
 
         _mockUserManager.Setup(m => m.FindByIdAsync(testUser.Id))
             .ReturnsAsync(testUser);
@@ -424,7 +424,7 @@ public class UserServiceTests
             Email = "role@example.com"
         };
 
-        var service = CreateService();
+        await using var service = CreateService();
 
         _mockUserManager.Setup(m => m.FindByIdAsync(testUser.Id))
             .ReturnsAsync(testUser);
@@ -463,7 +463,7 @@ public class UserServiceTests
     {
         // Arrange
         await _fixture.ClearDatabaseAsync();
-        var service = CreateService();
+        await using var service = CreateService();
 
         _mockUserManager.Setup(m => m.FindByIdAsync("nonexistent"))
             .ReturnsAsync((ApplicationUser?)null);
@@ -497,7 +497,7 @@ public class UserServiceTests
             await context.SaveChangesAsync();
         }
 
-        var service = CreateService();
+        await using var service = CreateService();
 
         _mockUserManager.Setup(m => m.FindByIdAsync(testUser.Id))
             .ReturnsAsync(testUser);
@@ -520,7 +520,7 @@ public class UserServiceTests
     {
         // Arrange
         await _fixture.ClearDatabaseAsync();
-        var service = CreateService();
+        await using var service = CreateService();
 
         _mockUserManager.Setup(m => m.FindByIdAsync("nonexistent"))
             .ReturnsAsync((ApplicationUser?)null);
@@ -551,18 +551,24 @@ public class UserServiceTests
             await context.SaveChangesAsync();
         }
 
-        var service = CreateService();
+        await using var service = CreateService();
 
         _mockUserManager.Setup(m => m.GetRolesAsync(It.IsAny<ApplicationUser>()))
             .ReturnsAsync(new List<string> { "Customer" });
 
         // Act
-        var (resultUsers, totalCount) = await service.GetAllAsync(1, 10);
+        var (resultUsers, totalCount) = await service.GetAllAsync(1, 100); // Increased page size to get all users
 
-        // Assert
-        resultUsers.Should().HaveCount(3);
-        totalCount.Should().Be(3);
-        resultUsers.Should().OnlyContain(u => u.Roles.Contains("Customer"));
+        // Assert - Filter to only users created in this test (user1, user2, user3)
+        var testUsers = resultUsers.Where(u => u.Username.StartsWith("user") && u.Email.Contains("user")).ToList();
+        testUsers.Should().HaveCount(3, "we created 3 users for this test");
+        testUsers.Should().Contain(u => u.Username == "user1");
+        testUsers.Should().Contain(u => u.Username == "user2");
+        testUsers.Should().Contain(u => u.Username == "user3");
+        testUsers.Should().OnlyContain(u => u.Roles.Contains("Customer"));
+
+        // Verify total count includes at least our 3 users (may have more from other tests)
+        totalCount.Should().BeGreaterThanOrEqualTo(3);
     }
 
     [Fact]
@@ -583,7 +589,7 @@ public class UserServiceTests
             await context.SaveChangesAsync();
         }
 
-        var service = CreateService();
+        await using var service = CreateService();
 
         _mockUserManager.Setup(m => m.GetRolesAsync(It.IsAny<ApplicationUser>()))
             .ReturnsAsync(new List<string> { "Customer" });

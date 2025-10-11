@@ -14,13 +14,25 @@ namespace Maliev.CustomerService.Tests.Integration;
 /// Tests all 8 acceptance scenarios using real HTTP requests
 /// </summary>
 [Collection("Database Collection")]
-public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApplicationFactory>
+public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
 {
-    private readonly TestWebApplicationFactory _factory;
+    private readonly TestDatabaseFixture _databaseFixture;
+    private TestWebApplicationFactory _factory = null!;
 
-    public US1_CustomerRegistrationIntegrationTests(TestWebApplicationFactory factory)
+    public US1_CustomerRegistrationIntegrationTests(TestDatabaseFixture databaseFixture)
     {
-        _factory = factory;
+        _databaseFixture = databaseFixture;
+    }
+
+    public async Task InitializeAsync()
+    {
+        _factory = new TestWebApplicationFactory(_databaseFixture);
+        await _factory.InitializeAsync();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _factory.DisposeAsync();
     }
 
     /// <summary>
@@ -37,7 +49,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
             firstName = "John",
             lastName = "Doe",
             email = "john.doe@example.com",
-            phone = "+66-2-123-4567",
+            phone = "+6621234567",
             segment = "Retail",
             tier = "Bronze",
             preferredLanguage = "en",
@@ -55,7 +67,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
         customer.FirstName.Should().Be("John");
         customer.LastName.Should().Be("Doe");
         customer.Email.Should().Be("john.doe@example.com");
-        customer.Phone.Should().Be("+66-2-123-4567");
+        customer.Phone.Should().Be("+6621234567");
         customer.Segment.Should().Be("Retail");
         customer.Tier.Should().Be("Bronze");
         customer.PreferredLanguage.Should().Be("en");
@@ -78,7 +90,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
             firstName = "Jane",
             lastName = "Smith",
             email = "jane.smith@example.com",
-            phone = "+66-2-123-4567",
+            phone = "+6621234567",
             segment = "Retail",
             tier = "Bronze",
             preferredLanguage = "en",
@@ -89,7 +101,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
             firstName = "John",
             lastName = "Doe",
             email = "jane.smith@example.com", // Duplicate email
-            phone = "+66-2-999-9999",
+            phone = "+6629999999",
             segment = "Wholesale",
             tier = "Silver",
             preferredLanguage = "th",
@@ -124,7 +136,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
             firstName = "Alice",
             lastName = "Johnson",
             email = "alice.johnson@example.com",
-            phone = "+66-2-555-5555",
+            phone = "+6625555555",
             segment = "Enterprise",
             tier = "Gold",
             preferredLanguage = "th",
@@ -150,7 +162,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
         customer.FirstName.Should().Be("Alice");
         customer.LastName.Should().Be("Johnson");
         customer.Email.Should().Be("alice.johnson@example.com");
-        customer.Phone.Should().Be("+66-2-555-5555");
+        customer.Phone.Should().Be("+6625555555");
         customer.Segment.Should().Be("Enterprise");
         customer.Tier.Should().Be("Gold");
         customer.PreferredLanguage.Should().Be("th");
@@ -175,7 +187,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
             firstName = "Bob",
             lastName = "Wilson",
             email = "bob.wilson@example.com",
-            phone = "+66-2-111-1111",
+            phone = "+6621111111",
             segment = "Retail",
             tier = "Bronze",
             preferredLanguage = "en",
@@ -187,18 +199,19 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
 
         var updateRequest = new
         {
-            phone = "+66-2-222-2222",
-            lastName = "Wilson-Updated"
+            phone = "+6622222222",
+            lastName = "Wilson-Updated",
+            version = createdCustomer!.Version
         };
 
         // Act
-        var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer!.Id}", updateRequest);
+        var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer.Id}", updateRequest);
 
         // Assert
         updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var updatedCustomer = await updateResponse.Content.ReadFromJsonAsync<CustomerResponse>();
         updatedCustomer.Should().NotBeNull();
-        updatedCustomer!.Phone.Should().Be("+66-2-222-2222");
+        updatedCustomer!.Phone.Should().Be("+6622222222");
         updatedCustomer.LastName.Should().Be("Wilson-Updated");
         updatedCustomer.FirstName.Should().Be("Bob"); // Unchanged
         updatedCustomer.UpdatedAt.Should().BeAfter(updatedCustomer.CreatedAt);
@@ -227,7 +240,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
             firstName = "Charlie",
             lastName = "Brown",
             email = "charlie.brown@example.com",
-            phone = "+66-2-333-3333",
+            phone = "+6623333333",
             segment = "Retail",
             tier = "Bronze",
             preferredLanguage = "en",
@@ -241,7 +254,8 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
         var customerClient = _factory.CreateCustomerClient(createdCustomer!.Id.ToString());
         var updateRequest = new
         {
-            phone = "+66-2-444-4444"
+            phone = "+6624444444",
+            version = createdCustomer.Version
         };
 
         // Act
@@ -251,7 +265,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
         updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var updatedCustomer = await updateResponse.Content.ReadFromJsonAsync<CustomerResponse>();
         updatedCustomer.Should().NotBeNull();
-        updatedCustomer!.Phone.Should().Be("+66-2-444-4444");
+        updatedCustomer!.Phone.Should().Be("+6624444444");
 
         // Verify audit log entry exists for customer actor
         using var dbContext = _factory.GetDbContext();
@@ -278,7 +292,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
             firstName = "Diana",
             lastName = "Prince",
             email = "diana.prince@example.com",
-            phone = "+66-2-777-7777",
+            phone = "+6627777777",
             segment = "Wholesale",
             tier = "Silver",
             preferredLanguage = "en",
@@ -291,11 +305,12 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
         var updateRequest = new
         {
             preferredLanguage = "th",
-            timezone = "Asia/Singapore"
+            timezone = "Asia/Singapore",
+            version = createdCustomer!.Version
         };
 
         // Act
-        var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer!.Id}", updateRequest);
+        var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer.Id}", updateRequest);
 
         // Assert
         updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -329,7 +344,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
             firstName = "Edward",
             lastName = "Norton",
             email = "edward.norton@example.com",
-            phone = "+66-2-888-8888",
+            phone = "+6628888888",
             segment = "Government",
             tier = "Platinum",
             preferredLanguage = "en",
@@ -346,11 +361,12 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
                 { "email_opt_in", true },
                 { "sms_opt_in", false },
                 { "marketing_opt_in", true }
-            }
+            },
+            version = createdCustomer!.Version
         };
 
         // Act
-        var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer!.Id}", updateRequest);
+        var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer.Id}", updateRequest);
 
         // Assert
         updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -387,7 +403,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
             firstName = "Frank",
             lastName = "Castle",
             email = "frank.castle@example.com",
-            phone = "+66-2-111-1111",
+            phone = "+6621111111",
             segment = "Retail",
             tier = "Bronze",
             preferredLanguage = "en",
@@ -398,7 +414,7 @@ public class US1_CustomerRegistrationIntegrationTests : IClassFixture<TestWebApp
             firstName = "Grace",
             lastName = "Hopper",
             email = "grace.hopper@example.com",
-            phone = "+66-2-222-2222",
+            phone = "+6622222222",
             segment = "Enterprise",
             tier = "Gold",
             preferredLanguage = "en",

@@ -1,10 +1,13 @@
 using Maliev.CustomerService.Api.Services.External;
 using Maliev.CustomerService.Data;
+using Maliev.CustomerService.Data.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
@@ -23,44 +26,56 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
     public Mock<IUploadServiceClient> MockUploadService { get; }
     public Mock<ICountryServiceClient> MockCountryService { get; }
 
-    public TestWebApplicationFactory()
+    public TestWebApplicationFactory(TestDatabaseFixture databaseFixture)
     {
-        _databaseFixture = new TestDatabaseFixture();
+        _databaseFixture = databaseFixture;
         MockUploadService = new Mock<IUploadServiceClient>();
         MockCountryService = new Mock<ICountryServiceClient>();
     }
 
-    public async Task InitializeAsync()
+    public Task InitializeAsync()
     {
-        await _databaseFixture.InitializeAsync();
+        // Database is already initialized by the collection fixture
+        return Task.CompletedTask;
     }
 
     public new async Task DisposeAsync()
     {
-        await _databaseFixture.DisposeAsync();
+        // Database will be disposed by the collection fixture
         await base.DisposeAsync();
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseEnvironment("Testing");
+
+        // Override connection string via configuration instead of removing services
+        builder.ConfigureAppConfiguration((context, config) =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:CustomerDbContext"] = _databaseFixture.ConnectionString
+            });
+        });
+
         builder.ConfigureTestServices(services =>
         {
-            // Remove existing DbContext registration
-            services.RemoveAll<DbContextOptions<CustomerDbContext>>();
-            services.RemoveAll<CustomerDbContext>();
-
-            // Add test database context
+            // Register DbContext (Program.cs skips this in Testing environment)
             services.AddDbContext<CustomerDbContext>(options =>
             {
                 options.UseNpgsql(_databaseFixture.ConnectionString);
             });
 
-            // Remove real authentication and add fake authentication
-            services.RemoveAll<AuthenticationOptions>();
-            services.AddAuthentication(FakeAuthenticationHandler.SchemeName)
-                .AddScheme<AuthenticationSchemeOptions, FakeAuthenticationHandler>(
-                    FakeAuthenticationHandler.SchemeName,
-                    options => { });
+            // Add FakeAuthenticationHandler and set it as the default authentication scheme
+            services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = FakeAuthenticationHandler.SchemeName;
+                options.DefaultChallengeScheme = FakeAuthenticationHandler.SchemeName;
+                options.DefaultScheme = FakeAuthenticationHandler.SchemeName;
+            })
+            .AddScheme<AuthenticationSchemeOptions, FakeAuthenticationHandler>(
+                FakeAuthenticationHandler.SchemeName,
+                options => { });
 
             // Replace external service clients with mocks
             services.RemoveAll<IUploadServiceClient>();
@@ -69,8 +84,6 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
             services.RemoveAll<ICountryServiceClient>();
             services.AddSingleton(MockCountryService.Object);
         });
-
-        builder.UseEnvironment("Testing");
     }
 
     /// <summary>

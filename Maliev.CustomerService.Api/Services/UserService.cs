@@ -10,7 +10,7 @@ namespace Maliev.CustomerService.Api.Services;
 /// <summary>
 /// Service implementation for user account management operations
 /// </summary>
-public class UserService : IUserService
+public class UserService : IUserService, IAsyncDisposable
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
@@ -343,5 +343,10 @@ public class UserService : IUserService
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt
         };
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _context.DisposeAsync();
     }
 }

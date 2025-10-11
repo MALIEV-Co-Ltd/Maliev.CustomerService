@@ -15,13 +15,25 @@ namespace Maliev.CustomerService.Tests.Integration;
 /// Tests all 5 acceptance scenarios using real HTTP requests
 /// </summary>
 [Collection("Database Collection")]
-public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebApplicationFactory>
+public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
 {
-    private readonly TestWebApplicationFactory _factory;
+    private readonly TestDatabaseFixture _databaseFixture;
+    private TestWebApplicationFactory _factory = null!;
 
-    public US2_MultiAddressManagementIntegrationTests(TestWebApplicationFactory factory)
+    public US2_MultiAddressManagementIntegrationTests(TestDatabaseFixture databaseFixture)
     {
-        _factory = factory;
+        _databaseFixture = databaseFixture;
+    }
+
+    public async Task InitializeAsync()
+    {
+        _factory = new TestWebApplicationFactory(_databaseFixture);
+        await _factory.InitializeAsync();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _factory.DisposeAsync();
     }
 
     /// <summary>
@@ -46,7 +58,7 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
             firstName = "John",
             lastName = "Smith",
             email = "john.smith@example.com",
-            phone = "+66-2-123-4567",
+            phone = "+6621234567",
             segment = "Retail",
             tier = "Bronze",
             preferredLanguage = "en",
@@ -116,7 +128,7 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
             firstName = "Jane",
             lastName = "Doe",
             email = "jane.doe@example.com",
-            phone = "+66-2-555-5555",
+            phone = "+6625555555",
             segment = "Wholesale",
             tier = "Silver",
             preferredLanguage = "en",
@@ -172,7 +184,7 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
         address2.AddressLine1.Should().Be("789 Distribution Center");
 
         // Verify both addresses exist for the same customer
-        var getResponse = await client.GetAsync($"/v1/addresses/Customer/{customer.Id}");
+        var getResponse = await client.GetAsync($"/customers/v1/addresses?ownerType=Customer&ownerId={customer.Id}");
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var addresses = await getResponse.Content.ReadFromJsonAsync<List<AddressResponse>>();
         addresses.Should().NotBeNull();
@@ -202,7 +214,7 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
             firstName = "Bob",
             lastName = "Johnson",
             email = "bob.johnson@example.com",
-            phone = "+66-2-777-7777",
+            phone = "+6627777777",
             segment = "Enterprise",
             tier = "Gold",
             preferredLanguage = "en",
@@ -230,11 +242,12 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
         var updateRequest = new
         {
             postalCode = "10330",
-            province = "Nonthaburi"
+            province = "Nonthaburi",
+            version = createdAddress!.Version
         };
 
         // Act
-        var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/addresses/{createdAddress!.Id}", updateRequest);
+        var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/addresses/{createdAddress.Id}", updateRequest);
 
         // Assert
         updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -268,7 +281,7 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
             firstName = "Alice",
             lastName = "Williams",
             email = "alice.williams@example.com",
-            phone = "+66-2-888-8888",
+            phone = "+6628888888",
             segment = "Government",
             tier = "Platinum",
             preferredLanguage = "en",
@@ -320,7 +333,7 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
         await client.PostAsJsonAsync("/customers/v1/addresses", shipping2Request);
 
         // Act
-        var getResponse = await client.GetAsync($"/v1/addresses/Customer/{customer.Id}");
+        var getResponse = await client.GetAsync($"/customers/v1/addresses?ownerType=Customer&ownerId={customer.Id}");
 
         // Assert
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -360,7 +373,7 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
             firstName = "Charlie",
             lastName = "Brown",
             email = "charlie.brown@example.com",
-            phone = "+66-2-999-9999",
+            phone = "+6629999999",
             segment = "Retail",
             tier = "Bronze",
             preferredLanguage = "en",
@@ -406,7 +419,7 @@ public class US2_MultiAddressManagementIntegrationTests : IClassFixture<TestWebA
         deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Verify address is removed from customer's address list
-        var getResponse = await client.GetAsync($"/v1/addresses/Customer/{customer.Id}");
+        var getResponse = await client.GetAsync($"/customers/v1/addresses?ownerType=Customer&ownerId={customer.Id}");
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var addresses = await getResponse.Content.ReadFromJsonAsync<List<AddressResponse>>();
         addresses.Should().NotBeNull();

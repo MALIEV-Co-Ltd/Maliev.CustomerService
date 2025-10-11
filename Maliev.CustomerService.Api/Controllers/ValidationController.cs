@@ -11,7 +11,7 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for credential validation (used by Auth Service)
 /// </summary>
 [ApiController]
-[Route("customers/v1")]
+[Route("v1")]
 public class ValidationController : ControllerBase
 {
     private readonly IUserService _userService;

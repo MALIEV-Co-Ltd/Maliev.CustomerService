@@ -161,7 +161,7 @@ public class MetricsEndpointTests : IClassFixture<TestWebApplicationFactory>
 
         // Should NOT contain common PII patterns
         content.Should().NotMatchRegex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"); // email
-        content.Should().NotMatchRegex(@"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b"); // phone number
+        content.Should().NotMatchRegex(@"\+\d{10,15}"); // phone number in E.164 format
     }
 
     [Fact]
