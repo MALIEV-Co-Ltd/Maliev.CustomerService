@@ -13,6 +13,7 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Maliev.CustomerService.Api/Maliev.CustomerService.Api.csproj", "Maliev.CustomerService.Api/"]
+COPY ["Maliev.CustomerService.Data/Maliev.CustomerService.Data.csproj", "Maliev.CustomerService.Data/"]
 RUN dotnet restore "./Maliev.CustomerService.Api/Maliev.CustomerService.Api.csproj"
 COPY . .
 WORKDIR "/src/Maliev.CustomerService.Api"

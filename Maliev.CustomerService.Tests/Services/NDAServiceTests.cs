@@ -1,0 +1,535 @@
+using FluentAssertions;
+using Maliev.CustomerService.Api.Models.NDAs;
+using Maliev.CustomerService.Api.Services;
+using Maliev.CustomerService.Data.Models;
+using Maliev.CustomerService.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Moq;
+
+namespace Maliev.CustomerService.Tests.Services;
+
+/// <summary>
+/// Unit tests for NDAService using real PostgreSQL database
+/// Tests business logic, state machine transitions, validation, and audit logging
+/// </summary>
+[Collection("Database Collection")]
+public class NDAServiceTests
+{
+    private readonly TestDatabaseFixture _fixture;
+    private readonly Mock<ILogger<NDAService>> _mockLogger;
+    private readonly Mock<MetricsService> _mockMetricsService;
+
+    public NDAServiceTests(TestDatabaseFixture fixture)
+    {
+        _fixture = fixture;
+        _mockLogger = new Mock<ILogger<NDAService>>();
+        _mockMetricsService = new Mock<MetricsService>(MockBehavior.Loose, new object[] { Mock.Of<IConfiguration>() });
+    }
+
+    private NDAService CreateService()
+    {
+        var context = _fixture.CreateDbContext();
+        return new NDAService(context, _mockLogger.Object, _mockMetricsService.Object);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithValidData_ReturnsNDAInDraftStatus()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var request = new CreateNDARequest
+        {
+            CustomerId = Guid.NewGuid(),
+            DocumentReferenceId = Guid.NewGuid(),
+            ExpiresAt = DateTime.UtcNow.AddYears(1)
+        };
+
+        // Act
+        var result = await service.CreateAsync(request, "test-actor", "Employee");
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Id.Should().NotBeEmpty();
+        result.CustomerId.Should().Be(request.CustomerId);
+        result.DocumentReferenceId.Should().Be(request.DocumentReferenceId);
+        result.Status.Should().Be(NDAStatus.Draft);
+        result.ExpiresAt.Should().Be(request.ExpiresAt);
+        result.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithoutDocumentReference_CreatesDraftNDA()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var request = new CreateNDARequest
+        {
+            CustomerId = Guid.NewGuid(),
+            DocumentReferenceId = null,
+            ExpiresAt = DateTime.UtcNow.AddYears(1)
+        };
+
+        // Act
+        var result = await service.CreateAsync(request, "test-actor", "Employee");
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Status.Should().Be(NDAStatus.Draft);
+        result.DocumentReferenceId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CreateAsync_CreatesAuditLog()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var request = new CreateNDARequest
+        {
+            CustomerId = Guid.NewGuid(),
+            ExpiresAt = DateTime.UtcNow.AddYears(1)
+        };
+
+        // Act
+        var result = await service.CreateAsync(request, "employee-123", "Employee");
+
+        // Assert
+        await using var context = _fixture.CreateDbContext();
+        var auditLog = await context.AuditLogs
+            .Where(a => a.EntityId == result.Id.ToString())
+            .FirstOrDefaultAsync();
+
+        auditLog.Should().NotBeNull();
+        auditLog!.ActorId.Should().Be("employee-123");
+        auditLog.ActorType.Should().Be("Employee");
+        auditLog.Action.Should().Be(AuditAction.Create);
+        auditLog.EntityType.Should().Be("NDARecord");
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithExistingNDA_ReturnsNDAResponse()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateNDARequest
+        {
+            CustomerId = Guid.NewGuid(),
+            ExpiresAt = DateTime.UtcNow.AddYears(1)
+        }, "test-actor", "Employee");
+
+        // Act
+        var result = await service.GetByIdAsync(created.Id);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Id.Should().Be(created.Id);
+        result.CustomerId.Should().Be(created.CustomerId);
+        result.Status.Should().Be(NDAStatus.Draft);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithNonExistentNDA_ReturnsNull()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var nonExistentId = Guid.NewGuid();
+
+        // Act
+        var result = await service.GetByIdAsync(nonExistentId);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_DraftToSigned_WithDocumentReference_Succeeds()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateNDARequest
+        {
+            CustomerId = Guid.NewGuid(),
+            DocumentReferenceId = Guid.NewGuid(),
+            ExpiresAt = DateTime.UtcNow.AddYears(1)
+        }, "test-actor", "Employee");
+
+        var updateRequest = new UpdateNDAStatusRequest
+        {
+            Status = NDAStatus.Signed,
+            SignedBy = "customer-user",
+            SignedAt = DateTime.UtcNow,
+            Version = created.Version
+        };
+
+        // Act
+        var result = await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Employee");
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Status.Should().Be(NDAStatus.Signed);
+        result.SignedBy.Should().Be("customer-user");
+        result.SignedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_DraftToSigned_WithoutDocumentReference_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateNDARequest
+        {
+            CustomerId = Guid.NewGuid(),
+            DocumentReferenceId = null,
+            ExpiresAt = DateTime.UtcNow.AddYears(1)
+        }, "test-actor", "Employee");
+
+        var updateRequest = new UpdateNDAStatusRequest
+        {
+            Status = NDAStatus.Signed,
+            SignedBy = "customer-user",
+            SignedAt = DateTime.UtcNow,
+            Version = created.Version
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Employee"));
+
+        exception.Message.Should().Contain("without a document reference");
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_SignedToRevoked_Succeeds()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateNDARequest
+        {
+            CustomerId = Guid.NewGuid(),
+            DocumentReferenceId = Guid.NewGuid(),
+            ExpiresAt = DateTime.UtcNow.AddYears(1)
+        }, "test-actor", "Employee");
+
+        // First, sign the NDA
+        var signRequest = new UpdateNDAStatusRequest
+        {
+            Status = NDAStatus.Signed,
+            SignedBy = "customer-user",
+            SignedAt = DateTime.UtcNow,
+            Version = created.Version
+        };
+        var signed = await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee");
+
+        // Now revoke it
+        var revokeRequest = new UpdateNDAStatusRequest
+        {
+            Status = NDAStatus.Revoked,
+            RevokedAt = DateTime.UtcNow,
+            Version = signed.Version
+        };
+
+        // Act
+        var result = await service.UpdateStatusAsync(created.Id, revokeRequest, "admin-user", "Admin");
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Status.Should().Be(NDAStatus.Revoked);
+        result.RevokedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_DraftToExpired_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateNDARequest
+        {
+            CustomerId = Guid.NewGuid(),
+            DocumentReferenceId = Guid.NewGuid(),
+            ExpiresAt = DateTime.UtcNow.AddYears(1)
+        }, "test-actor", "Employee");
+
+        var updateRequest = new UpdateNDAStatusRequest
+        {
+            Status = NDAStatus.Expired,
+            Version = created.Version
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Employee"));
+
+        exception.Message.Should().Contain("Cannot transition from 'Draft' to 'Expired'");
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_DraftToRevoked_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateNDARequest
+        {
+            CustomerId = Guid.NewGuid(),
+            DocumentReferenceId = Guid.NewGuid(),
+            ExpiresAt = DateTime.UtcNow.AddYears(1)
+        }, "test-actor", "Employee");
+
+        var updateRequest = new UpdateNDAStatusRequest
+        {
+            Status = NDAStatus.Revoked,
+            RevokedAt = DateTime.UtcNow,
+            Version = created.Version
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Employee"));
+
+        exception.Message.Should().Contain("Cannot transition from 'Draft' to 'Revoked'");
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_FromTerminalState_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateNDARequest
+        {
+            CustomerId = Guid.NewGuid(),
+            DocumentReferenceId = Guid.NewGuid(),
+            ExpiresAt = DateTime.UtcNow.AddYears(1)
+        }, "test-actor", "Employee");
+
+        // Sign and then revoke
+        var signRequest = new UpdateNDAStatusRequest
+        {
+            Status = NDAStatus.Signed,
+            SignedBy = "customer-user",
+            SignedAt = DateTime.UtcNow,
+            Version = created.Version
+        };
+        var signed = await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee");
+
+        var revokeRequest = new UpdateNDAStatusRequest
+        {
+            Status = NDAStatus.Revoked,
+            RevokedAt = DateTime.UtcNow,
+            Version = signed.Version
+        };
+        var revoked = await service.UpdateStatusAsync(created.Id, revokeRequest, "admin-user", "Admin");
+
+        // Try to transition from Revoked to Signed
+        var invalidRequest = new UpdateNDAStatusRequest
+        {
+            Status = NDAStatus.Signed,
+            SignedBy = "customer-user",
+            SignedAt = DateTime.UtcNow,
+            Version = revoked.Version
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await service.UpdateStatusAsync(created.Id, invalidRequest, "test-actor", "Employee"));
+
+        exception.Message.Should().Contain("terminal state");
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_WithNonExistentNDA_ThrowsKeyNotFoundException()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var nonExistentId = Guid.NewGuid();
+        var updateRequest = new UpdateNDAStatusRequest
+        {
+            Status = NDAStatus.Signed,
+            SignedBy = "customer-user",
+            SignedAt = DateTime.UtcNow,
+            Version = new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 }
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            async () => await service.UpdateStatusAsync(nonExistentId, updateRequest, "test-actor", "Employee"));
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_CreatesAuditLog()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateNDARequest
+        {
+            CustomerId = Guid.NewGuid(),
+            DocumentReferenceId = Guid.NewGuid(),
+            ExpiresAt = DateTime.UtcNow.AddYears(1)
+        }, "test-actor", "Employee");
+
+        var updateRequest = new UpdateNDAStatusRequest
+        {
+            Status = NDAStatus.Signed,
+            SignedBy = "customer-user",
+            SignedAt = DateTime.UtcNow,
+            Version = created.Version
+        };
+
+        // Act
+        await service.UpdateStatusAsync(created.Id, updateRequest, "manager-456", "Manager");
+
+        // Assert
+        await using var context = _fixture.CreateDbContext();
+        var auditLogs = await context.AuditLogs
+            .Where(a => a.EntityId == created.Id.ToString())
+            .OrderBy(a => a.Timestamp)
+            .ToListAsync();
+
+        auditLogs.Should().HaveCount(2); // Create + Update
+        var updateAudit = auditLogs[1];
+        updateAudit.ActorId.Should().Be("manager-456");
+        updateAudit.ActorType.Should().Be("Manager");
+        updateAudit.Action.Should().Be(AuditAction.Update);
+    }
+
+    [Fact]
+    public async Task CheckExpiredNDAsAsync_WithExpiredNDAs_TransitionsToExpired()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        // Create a signed NDA that is expired
+        var created = await service.CreateAsync(new CreateNDARequest
+        {
+            CustomerId = Guid.NewGuid(),
+            DocumentReferenceId = Guid.NewGuid(),
+            ExpiresAt = DateTime.UtcNow.AddDays(-1) // Already expired
+        }, "test-actor", "Employee");
+
+        // Sign the NDA
+        var signRequest = new UpdateNDAStatusRequest
+        {
+            Status = NDAStatus.Signed,
+            SignedBy = "customer-user",
+            SignedAt = DateTime.UtcNow.AddDays(-2),
+            Version = created.Version
+        };
+        await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee");
+
+        // Act
+        var expiredCount = await service.CheckExpiredNDAsAsync();
+
+        // Assert
+        expiredCount.Should().Be(1);
+
+        var updated = await service.GetByIdAsync(created.Id);
+        updated.Should().NotBeNull();
+        updated!.Status.Should().Be(NDAStatus.Expired);
+    }
+
+    [Fact]
+    public async Task CheckExpiredNDAsAsync_WithNoExpiredNDAs_ReturnsZero()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        // Create a signed NDA that is not expired
+        var created = await service.CreateAsync(new CreateNDARequest
+        {
+            CustomerId = Guid.NewGuid(),
+            DocumentReferenceId = Guid.NewGuid(),
+            ExpiresAt = DateTime.UtcNow.AddYears(1) // Future expiration
+        }, "test-actor", "Employee");
+
+        var signRequest = new UpdateNDAStatusRequest
+        {
+            Status = NDAStatus.Signed,
+            SignedBy = "customer-user",
+            SignedAt = DateTime.UtcNow,
+            Version = created.Version
+        };
+        await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee");
+
+        // Act
+        var expiredCount = await service.CheckExpiredNDAsAsync();
+
+        // Assert
+        expiredCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task CheckExpiredNDAsAsync_OnlyExpiresSignedNDAs()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        // Create a draft NDA that is expired (should not be transitioned)
+        await service.CreateAsync(new CreateNDARequest
+        {
+            CustomerId = Guid.NewGuid(),
+            DocumentReferenceId = Guid.NewGuid(),
+            ExpiresAt = DateTime.UtcNow.AddDays(-1) // Already expired
+        }, "test-actor", "Employee");
+
+        // Act
+        var expiredCount = await service.CheckExpiredNDAsAsync();
+
+        // Assert
+        expiredCount.Should().Be(0); // Should not expire Draft NDAs
+    }
+
+    [Fact]
+    public async Task CheckExpiredNDAsAsync_CreatesAuditLogForEachExpiredNDA()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        var created = await service.CreateAsync(new CreateNDARequest
+        {
+            CustomerId = Guid.NewGuid(),
+            DocumentReferenceId = Guid.NewGuid(),
+            ExpiresAt = DateTime.UtcNow.AddDays(-1)
+        }, "test-actor", "Employee");
+
+        var signRequest = new UpdateNDAStatusRequest
+        {
+            Status = NDAStatus.Signed,
+            SignedBy = "customer-user",
+            SignedAt = DateTime.UtcNow.AddDays(-2),
+            Version = created.Version
+        };
+        await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee");
+
+        // Act
+        await service.CheckExpiredNDAsAsync();
+
+        // Assert
+        await using var context = _fixture.CreateDbContext();
+        var auditLogs = await context.AuditLogs
+            .Where(a => a.EntityId == created.Id.ToString())
+            .OrderBy(a => a.Timestamp)
+            .ToListAsync();
+
+        auditLogs.Should().HaveCount(3); // Create + Sign + AutoExpire
+        var expireAudit = auditLogs[2];
+        expireAudit.ActorId.Should().Be("System");
+        expireAudit.ActorType.Should().Be("System");
+        expireAudit.Action.Should().Be("AutoExpire");
+    }
+}
