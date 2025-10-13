@@ -135,7 +135,7 @@ try
         // Production: Use RSA public key validation
         var publicKeyBytes = Convert.FromBase64String(publicKeyBase64);
         var rsa = System.Security.Cryptography.RSA.Create();
-        rsa.ImportFromPem(publicKeyBase64.ToCharArray());
+        rsa.ImportSubjectPublicKeyInfo(publicKeyBytes, out _);
         var securityKey = new Microsoft.IdentityModel.Tokens.RsaSecurityKey(rsa);
 
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
