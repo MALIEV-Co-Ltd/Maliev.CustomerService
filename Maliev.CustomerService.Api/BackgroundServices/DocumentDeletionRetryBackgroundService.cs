@@ -20,6 +20,11 @@ public class DocumentDeletionRetryBackgroundService : BackgroundService
     {
         _logger.LogInformation("DocumentDeletionRetryBackgroundService started");
 
+        // Wait for application to fully start before first check
+        // This prevents blocking startup with database queries
+        _logger.LogInformation("Waiting 60 seconds before first document deletion retry");
+        await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken);
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try

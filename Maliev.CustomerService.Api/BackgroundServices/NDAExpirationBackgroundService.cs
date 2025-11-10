@@ -26,6 +26,11 @@ public class NDAExpirationBackgroundService : BackgroundService
     {
         _logger.LogInformation("NDA Expiration Background Service started");
 
+        // Wait for application to fully start before first check
+        // This prevents blocking startup with database queries
+        _logger.LogInformation("Waiting 30 seconds before first NDA expiration check");
+        await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
