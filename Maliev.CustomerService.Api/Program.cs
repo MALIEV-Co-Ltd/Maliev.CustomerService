@@ -1,8 +1,8 @@
 using Serilog;
+using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi.Models;
 using System.Threading.RateLimiting;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -12,6 +12,8 @@ using Maliev.CustomerService.Api.Middleware;
 using FluentValidation;
 using Polly;
 using Prometheus;
+using Scalar.AspNetCore;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +34,71 @@ try
     if (Directory.Exists(secretsPath))
     {
         builder.Configuration.AddKeyPerFile(directoryPath: secretsPath, optional: true);
+    }
+
+    // Redis Distributed Cache Configuration
+    var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
+    var redisEnabled = bool.TryParse(builder.Configuration["Redis:Enabled"], out var isRedisEnabled) && isRedisEnabled;
+
+    if (redisEnabled && !string.IsNullOrEmpty(redisConnectionString) && !builder.Environment.IsEnvironment("Testing"))
+    {
+        try
+        {
+            builder.Services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = redisConnectionString;
+                options.InstanceName = "Customer:";
+            });
+
+            var redis = ConnectionMultiplexer.Connect(redisConnectionString);
+            builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
+
+            Log.Information("Redis distributed cache configured: {RedisConnectionString}", redisConnectionString);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Redis connection failed - will use in-memory cache fallback");
+        }
+    }
+    else
+    {
+        Log.Information("Redis disabled or not configured - using in-memory cache only");
+    }
+
+    builder.Services.AddMemoryCache(); // Fallback in-memory cache
+
+    // RabbitMQ Configuration (MassTransit)
+    var rabbitmqHost = builder.Configuration["RabbitMQ:Host"] ?? "localhost";
+    var rabbitmqPort = int.TryParse(builder.Configuration["RabbitMQ:Port"], out var port) ? port : 5672;
+    var rabbitmqUser = builder.Configuration["RabbitMQ:Username"] ?? "guest";
+    var rabbitmqPassword = builder.Configuration["RabbitMQ:Password"] ?? "guest";
+    var rabbitmqVhost = builder.Configuration["RabbitMQ:VirtualHost"] ?? "/";
+    var rabbitmqEnabled = bool.TryParse(builder.Configuration["RabbitMQ:Enabled"], out var isRabbitmqEnabled) && isRabbitmqEnabled;
+
+    if (rabbitmqEnabled && !builder.Environment.IsEnvironment("Testing"))
+    {
+        builder.Services.AddMassTransit(x =>
+        {
+            // Add consumers here if needed in the future
+            // x.AddConsumer<SomeEventConsumer>();
+
+            x.UsingRabbitMq((context, cfg) =>
+            {
+                cfg.Host(rabbitmqHost, (ushort)rabbitmqPort, rabbitmqVhost, h =>
+                {
+                    h.Username(rabbitmqUser);
+                    h.Password(rabbitmqPassword);
+                });
+
+                cfg.ConfigureEndpoints(context);
+            });
+        });
+
+        Log.Information("MassTransit configured with RabbitMQ: {Host}:{Port}", rabbitmqHost, rabbitmqPort);
+    }
+    else
+    {
+        Log.Information("RabbitMQ/MassTransit disabled by configuration");
     }
 
     // Database Context (skipped in Testing - configured by TestWebApplicationFactory)
@@ -65,9 +132,6 @@ try
     .AddEntityFrameworkStores<CustomerDbContext>()
     .AddDefaultTokenProviders();
 
-    // Memory Cache (simple configuration per CLAUDE.md)
-    builder.Services.AddMemoryCache();
-
     // FluentValidation (T029-T030)
     builder.Services.AddValidatorsFromAssemblyContaining<Maliev.CustomerService.Api.Validators.CreateCustomerRequestValidator>();
 
@@ -96,7 +160,7 @@ try
     {
         var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Maliev.CustomerService.Api.Configuration.CountryServiceOptions>>().Value;
         client.BaseAddress = new Uri(options.BaseUrl);
-        client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
     });
 
     builder.Services.Configure<Maliev.CustomerService.Api.Configuration.UploadServiceOptions>(
@@ -107,7 +171,7 @@ try
     {
         var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Maliev.CustomerService.Api.Configuration.UploadServiceOptions>>().Value;
         client.BaseAddress = new Uri(options.BaseUrl);
-        client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
     })
     .AddTransientHttpErrorPolicy(policy => policy.WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))))
     .AddTransientHttpErrorPolicy(policy => policy.CircuitBreakerAsync(5, TimeSpan.FromSeconds(30)));
@@ -121,8 +185,14 @@ try
         });
 
     // Health Checks (T017)
-    builder.Services.AddHealthChecks()
+    var healthChecksBuilder = builder.Services.AddHealthChecks()
         .AddDbContextCheck<CustomerDbContext>(tags: new[] { "readiness" });
+
+    // Add Redis health check if enabled
+    if (redisEnabled && !string.IsNullOrEmpty(redisConnectionString))
+    {
+        healthChecksBuilder.AddRedis(redisConnectionString, "redis", tags: new[] { "readiness" });
+    }
 
     // JWT Bearer Authentication (T013) - RSA Public Key Validation
     // Note: In Testing environment, TestWebApplicationFactory replaces this with FakeAuthenticationHandler
@@ -232,43 +302,8 @@ try
         };
     });
 
-    // Swagger/OpenAPI (T018)
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen(options =>
-    {
-        options.SwaggerDoc("v1", new OpenApiInfo
-        {
-            Title = "Maliev Customer Service API",
-            Version = "v1",
-            Description = "Customer management microservice with address, user account, company, NDA, document, and notes management"
-        });
-
-        // JWT Bearer configuration for Swagger
-        options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-        {
-            Name = "Authorization",
-            Type = SecuritySchemeType.Http,
-            Scheme = "bearer",
-            BearerFormat = "JWT",
-            In = ParameterLocation.Header,
-            Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\""
-        });
-
-        options.AddSecurityRequirement(new OpenApiSecurityRequirement
-        {
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference
-                    {
-                        Type = ReferenceType.SecurityScheme,
-                        Id = "Bearer"
-                    }
-                },
-                Array.Empty<string>()
-            }
-        });
-    });
+    // OpenAPI (T018)
+    builder.Services.AddOpenApi();
 
     var app = builder.Build();
 
@@ -278,12 +313,21 @@ try
     // Middleware Pipeline (EXACT ORDER per CLAUDE.md)
     app.UseExceptionHandling(); // T016
 
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
+    if (!app.Environment.IsProduction())
     {
-        c.SwaggerEndpoint("./v1/swagger.json", "Maliev Customer Service API v1");
-        c.RoutePrefix = "swagger";
-    });
+        app.MapOpenApi("/customers/openapi/{documentName}.json");
+        app.MapScalarApiReference(options =>
+        {
+            options
+                .WithTitle("Maliev Customer Service API")
+                .WithTheme(Scalar.AspNetCore.ScalarTheme.Saturn)
+                .WithDefaultHttpClient(Scalar.AspNetCore.ScalarTarget.CSharp, Scalar.AspNetCore.ScalarClient.HttpClient)
+                .WithEndpointPrefix("/customers/scalar/{documentName}")
+                .WithOpenApiRoutePattern("/customers/openapi/{documentName}.json");
+        });
+
+        Log.Information("Scalar API documentation enabled at /customers/scalar/v1");
+    }
 
     // Skip HTTPS redirection in test environment (causes "Failed to determine the https port" warning)
     if (!app.Environment.IsEnvironment("Testing"))

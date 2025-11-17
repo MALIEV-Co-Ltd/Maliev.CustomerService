@@ -11,9 +11,9 @@ public abstract class ExternalServiceOptions
     public string BaseUrl { get; set; } = string.Empty;
 
     /// <summary>
-    /// Request timeout in seconds (default: 30 seconds)
+    /// Request timeout in seconds (default: 180 seconds)
     /// </summary>
-    public int TimeoutSeconds { get; set; } = 30;
+    public int TimeoutInSeconds { get; set; } = 180;
 
     /// <summary>
     /// Number of retry attempts for transient failures (default: 3)
@@ -42,9 +42,9 @@ public class UploadServiceOptions : ExternalServiceOptions
     public int MaxFileSizeMB { get; set; } = 50;
 
     /// <summary>
-    /// Upload operation timeout in seconds (default: 300 seconds / 5 minutes)
+    /// Upload operation timeout in seconds (default: 180 seconds)
     /// </summary>
-    public new int TimeoutSeconds { get; set; } = 300;
+    public new int TimeoutInSeconds { get; set; } = 180;
 }
 
 /// <summary>

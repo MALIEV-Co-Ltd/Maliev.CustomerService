@@ -11,8 +11,8 @@ Customer Service microservice manages customer and company master data, user acc
 
 ## Technical Context
 
-**Language/Version**: .NET 9.0 (ASP.NET Core 9.0)
-**Primary Dependencies**: Entity Framework Core 9.0.9, Npgsql 9.0.2, ASP.NET Core Identity 9.0.8, FluentValidation 11.5.1, Polly 8.0.0, Serilog 8.0.2
+**Language/Version**: .NET 10.0 (ASP.NET Core 9.0)
+**Primary Dependencies**: Entity Framework Core 9.0.10, Npgsql 9.0.4, ASP.NET Core Identity 9.0.8, FluentValidation 11.3.0, Polly 8.6.4, Serilog 9.0.0
 **Storage**: PostgreSQL 18 with snake_case naming convention
 **Testing**: xUnit 2.4.2, FluentAssertions 8.6.0, Moq 4.20.72, Microsoft.AspNetCore.Mvc.Testing 9.0.0
 **Target Platform**: Linux containers (Docker) deployed to Google Kubernetes Engine (GKE)
