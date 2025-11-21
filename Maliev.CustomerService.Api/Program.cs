@@ -305,6 +305,9 @@ try
     // OpenAPI (T018)
     builder.Services.AddOpenApi();
 
+    // Add service defaults for .NET Aspire
+    builder.AddServiceDefaults();
+
     var app = builder.Build();
 
     // Configure base path for all routes
