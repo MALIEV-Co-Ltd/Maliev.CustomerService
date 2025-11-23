@@ -10,7 +10,6 @@ using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
 using Maliev.CustomerService.Api.Middleware;
 using FluentValidation;
-using Polly;
 using Prometheus;
 using Scalar.AspNetCore;
 using StackExchange.Redis;
@@ -161,7 +160,8 @@ try
         var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Maliev.CustomerService.Api.Configuration.CountryServiceOptions>>().Value;
         client.BaseAddress = new Uri(options.BaseUrl);
         client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
-    });
+    })
+    .AddStandardResilienceHandler();
 
     builder.Services.Configure<Maliev.CustomerService.Api.Configuration.UploadServiceOptions>(
         builder.Configuration.GetSection("ExternalServices:UploadService"));
@@ -173,8 +173,7 @@ try
         client.BaseAddress = new Uri(options.BaseUrl);
         client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
     })
-    .AddTransientHttpErrorPolicy(policy => policy.WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))))
-    .AddTransientHttpErrorPolicy(policy => policy.CircuitBreakerAsync(5, TimeSpan.FromSeconds(30)));
+    .AddStandardResilienceHandler();
 
     // Controllers - explicitly add this assembly as ApplicationPart
     builder.Services.AddControllers()
@@ -319,15 +318,18 @@ try
     if (!app.Environment.IsProduction())
     {
         app.MapOpenApi("/customers/openapi/{documentName}.json");
-        app.MapScalarApiReference(options =>
+        app.MapScalarApiReference("/customers/scalar/v1", options =>
         {
             options
                 .WithTitle("Maliev Customer Service API")
-                .WithTheme(Scalar.AspNetCore.ScalarTheme.Saturn)
-                .WithDefaultHttpClient(Scalar.AspNetCore.ScalarTarget.CSharp, Scalar.AspNetCore.ScalarClient.HttpClient)
-                .WithEndpointPrefix("/customers/scalar/{documentName}")
+                .WithTheme(ScalarTheme.Saturn)
+                .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient)
                 .WithOpenApiRoutePattern("/customers/openapi/{documentName}.json");
         });
+
+        // Redirect root to Scalar
+        app.MapGet("/", () => Results.Redirect("/customers/scalar/v1")).ExcludeFromDescription();
+        app.MapGet("/customers", () => Results.Redirect("/customers/scalar/v1")).ExcludeFromDescription();
 
         Log.Information("Scalar API documentation enabled at /customers/scalar/v1");
     }
