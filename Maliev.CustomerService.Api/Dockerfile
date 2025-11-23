@@ -1,43 +1,46 @@
-# See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
+# Multi-stage Docker build for Maliev.CustomerService.Api
+# Based on MALIEV Co. Ltd. standard .NET 10 microservice template
 
-# This stage is used when running from VS in fast mode (Default for Debug configuration)
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
-USER $APP_UID
-WORKDIR /app
-EXPOSE 8080
-EXPOSE 8081
-
-
-# This stage is used to build the service project
+# Build stage
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["Maliev.CustomerService.Api/Maliev.CustomerService.Api.csproj", "Maliev.CustomerService.Api/"]
-COPY ["Maliev.CustomerService.Data/Maliev.CustomerService.Data.csproj", "Maliev.CustomerService.Data/"]
-RUN dotnet restore "./Maliev.CustomerService.Api/Maliev.CustomerService.Api.csproj"
+
+# Copy project files and nuget.config (exclude Tests - filtered by .dockerignore)
+COPY nuget.config ./
+COPY Maliev.CustomerService.Api/Maliev.CustomerService.Api.csproj Maliev.CustomerService.Api/
+COPY Maliev.CustomerService.Data/Maliev.CustomerService.Data.csproj Maliev.CustomerService.Data/
+
+# Restore dependencies with private NuGet feed credentials
+RUN --mount=type=secret,id=nuget_username \
+    --mount=type=secret,id=nuget_password \
+    NUGET_USERNAME=$(cat /run/secrets/nuget_username) \
+    NUGET_PASSWORD=$(cat /run/secrets/nuget_password) \
+    dotnet restore Maliev.CustomerService.Api/Maliev.CustomerService.Api.csproj
+
+# Copy all source code
 COPY . .
-WORKDIR "/src/Maliev.CustomerService.Api"
-RUN dotnet build "./Maliev.CustomerService.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
-# This stage is used to publish the service project to be copied to the final stage
-FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./Maliev.CustomerService.Api.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+# Build and publish
+WORKDIR /src/Maliev.CustomerService.Api
+RUN dotnet publish -c Release -o /app/publish --no-restore /p:UseAppHost=false
 
-# This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
-FROM base AS final
+# Runtime stage
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# Ensure 'app' owns the workdir (app user already exists in ASP.NET runtime image)
+# Ensure 'app' user owns the workdir (app user already exists in ASP.NET runtime image)
 RUN chown -R app:app /app
 
 # Switch to non-root user
 USER app
 
 # Copy published application (now owned by app)
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 
-# Set environment variables
+# Expose port
+EXPOSE 8080
+
+# Set ASP.NET Core environment
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
@@ -45,4 +48,5 @@ ENV ASPNETCORE_ENVIRONMENT=Production
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8080/customers/liveness || exit 1
 
+# Entry point
 ENTRYPOINT ["dotnet", "Maliev.CustomerService.Api.dll"]
