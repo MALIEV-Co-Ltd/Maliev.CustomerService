@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Maliev.CustomerService.Api.Models.Users;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Data.Models;
@@ -96,10 +95,10 @@ public class UserServiceTests : IClassFixture<TestDatabaseFixture>
         var result = await service.CreateAsync(request, "admin-actor", "Admin");
 
         // Assert
-        result.Should().NotBeNull();
-        result.Username.Should().Be("testuser");
-        result.Email.Should().Be("test@example.com");
-        result.Roles.Should().Contain("Customer");
+        Assert.NotNull(result);
+        Assert.Equal("testuser", result.Username);
+        Assert.Equal("test@example.com", result.Email);
+        Assert.Contains("Customer", result.Roles);
 
         _mockUserManager.Verify(m => m.CreateAsync(It.IsAny<ApplicationUser>(), "SecureP@ssw0rd!"), Times.Once);
         _mockUserManager.Verify(m => m.AddToRolesAsync(It.IsAny<ApplicationUser>(), It.Is<IEnumerable<string>>(r => r.Contains("Customer"))), Times.Once);
@@ -164,10 +163,10 @@ public class UserServiceTests : IClassFixture<TestDatabaseFixture>
             .Where(a => a.EntityId == testUserId && a.Action == AuditAction.Create)
             .FirstOrDefaultAsync();
 
-        auditLog.Should().NotBeNull();
-        auditLog!.ActorId.Should().Be("admin-123");
-        auditLog.ActorType.Should().Be("Admin");
-        auditLog.EntityType.Should().Be("ApplicationUser");
+        Assert.NotNull(auditLog);
+        Assert.Equal("admin-123", auditLog!.ActorId);
+        Assert.Equal("Admin", auditLog.ActorType);
+        Assert.Equal("ApplicationUser", auditLog.EntityType);
     }
 
     [Fact]
@@ -219,17 +218,17 @@ public class UserServiceTests : IClassFixture<TestDatabaseFixture>
         var result = await service.ValidateCredentialsAsync(request);
 
         // Assert
-        result.Should().NotBeNull();
-        result.IsValid.Should().BeTrue();
-        result.UserId.Should().Be(testUser.Id);
-        result.Username.Should().Be("validuser");
-        result.Roles.Should().Contain("Customer");
+        Assert.NotNull(result);
+        Assert.True(result.IsValid);
+        Assert.Equal(testUser.Id, result.UserId);
+        Assert.Equal("validuser", result.Username);
+        Assert.Contains("Customer", result.Roles);
 
         // Verify last_login_at was updated
         await using (var context = _fixture.CreateDbContext())
         {
             var updatedUser = await context.Users.FindAsync(testUser.Id);
-            updatedUser!.LastLoginAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+            Assert.True(updatedUser!.LastLoginAt > DateTime.UtcNow.AddSeconds(-5) && updatedUser.LastLoginAt <= DateTime.UtcNow.AddSeconds(5));
         }
     }
 
@@ -264,11 +263,11 @@ public class UserServiceTests : IClassFixture<TestDatabaseFixture>
         var result = await service.ValidateCredentialsAsync(request);
 
         // Assert
-        result.Should().NotBeNull();
-        result.IsValid.Should().BeFalse();
-        result.UserId.Should().BeNull();
-        result.Username.Should().BeNull();
-        result.Roles.Should().BeEmpty();
+        Assert.NotNull(result);
+        Assert.False(result.IsValid);
+        Assert.Null(result.UserId);
+        Assert.Null(result.Username);
+        Assert.Empty(result.Roles);
     }
 
     [Fact]
@@ -291,9 +290,9 @@ public class UserServiceTests : IClassFixture<TestDatabaseFixture>
         var result = await service.ValidateCredentialsAsync(request);
 
         // Assert
-        result.Should().NotBeNull();
-        result.IsValid.Should().BeFalse();
-        result.UserId.Should().BeNull();
+        Assert.NotNull(result);
+        Assert.False(result.IsValid);
+        Assert.Null(result.UserId);
     }
 
     [Fact]
@@ -330,7 +329,7 @@ public class UserServiceTests : IClassFixture<TestDatabaseFixture>
         var result = await service.UpdatePasswordAsync(testUser.Id, request, "user-self", "Customer");
 
         // Assert
-        result.Should().BeTrue();
+        Assert.True(result);
         _mockUserManager.Verify(m => m.ChangePasswordAsync(testUser, "OldPass!", "NewPass!"), Times.Once);
     }
 
@@ -405,10 +404,10 @@ public class UserServiceTests : IClassFixture<TestDatabaseFixture>
             .Where(a => a.EntityId == testUser.Id && a.Action == "UpdatePassword")
             .FirstOrDefaultAsync();
 
-        auditLog.Should().NotBeNull();
-        auditLog!.ActorId.Should().Be("admin-789");
-        auditLog.ActorType.Should().Be("Admin");
-        auditLog.EntityType.Should().Be("ApplicationUser");
+        Assert.NotNull(auditLog);
+        Assert.Equal("admin-789", auditLog!.ActorId);
+        Assert.Equal("Admin", auditLog.ActorType);
+        Assert.Equal("ApplicationUser", auditLog.EntityType);
     }
 
     [Fact]
@@ -451,8 +450,8 @@ public class UserServiceTests : IClassFixture<TestDatabaseFixture>
         var result = await service.UpdateRolesAsync(testUser.Id, request, "admin-456", "Admin");
 
         // Assert
-        result.Should().NotBeNull();
-        result.Username.Should().Be("roleuser");
+        Assert.NotNull(result);
+        Assert.Equal("roleuser", result.Username);
 
         _mockUserManager.Verify(m => m.RemoveFromRolesAsync(testUser, It.Is<IEnumerable<string>>(r => r.Contains("Customer"))), Times.Once);
         _mockUserManager.Verify(m => m.AddToRolesAsync(testUser, It.Is<IEnumerable<string>>(r => r.Contains("Employee") && r.Contains("Manager"))), Times.Once);
@@ -509,10 +508,10 @@ public class UserServiceTests : IClassFixture<TestDatabaseFixture>
         var result = await service.GetByIdAsync(testUser.Id);
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Username.Should().Be("getuser");
-        result.Email.Should().Be("get@example.com");
-        result.Roles.Should().Contain("Customer");
+        Assert.NotNull(result);
+        Assert.Equal("getuser", result!.Username);
+        Assert.Equal("get@example.com", result.Email);
+        Assert.Contains("Customer", result.Roles);
     }
 
     [Fact]
@@ -529,7 +528,7 @@ public class UserServiceTests : IClassFixture<TestDatabaseFixture>
         var result = await service.GetByIdAsync("nonexistent");
 
         // Assert
-        result.Should().BeNull();
+        Assert.Null(result);
     }
 
     [Fact]
@@ -561,14 +560,14 @@ public class UserServiceTests : IClassFixture<TestDatabaseFixture>
 
         // Assert - Filter to only users created in this test (user1, user2, user3)
         var testUsers = resultUsers.Where(u => u.Username.StartsWith("user") && u.Email.Contains("user")).ToList();
-        testUsers.Should().HaveCount(3, "we created 3 users for this test");
-        testUsers.Should().Contain(u => u.Username == "user1");
-        testUsers.Should().Contain(u => u.Username == "user2");
-        testUsers.Should().Contain(u => u.Username == "user3");
-        testUsers.Should().OnlyContain(u => u.Roles.Contains("Customer"));
+        Assert.Equal(3, testUsers.Count);
+        Assert.Contains(testUsers, u => u.Username == "user1");
+        Assert.Contains(testUsers, u => u.Username == "user2");
+        Assert.Contains(testUsers, u => u.Username == "user3");
+        Assert.All(testUsers, u => Assert.Contains("Customer", u.Roles));
 
         // Verify total count includes at least our 3 users (may have more from other tests)
-        totalCount.Should().BeGreaterThanOrEqualTo(3);
+        Assert.True(totalCount >= 3);
     }
 
     [Fact]
@@ -598,8 +597,8 @@ public class UserServiceTests : IClassFixture<TestDatabaseFixture>
         var (resultUsers, totalCount) = await service.GetAllAsync(1, 10, lastLoginBefore: DateTime.UtcNow.AddDays(-10));
 
         // Assert
-        resultUsers.Should().HaveCount(1);
-        resultUsers[0].Username.Should().Be("old");
-        totalCount.Should().Be(1);
+        Assert.Single(resultUsers);
+        Assert.Equal("old", resultUsers[0].Username);
+        Assert.Equal(1, totalCount);
     }
 }

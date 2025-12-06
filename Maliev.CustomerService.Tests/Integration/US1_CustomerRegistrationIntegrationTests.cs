@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using FluentAssertions;
 using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Tests.Infrastructure;
@@ -18,6 +17,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
 {
     private readonly TestDatabaseFixture _databaseFixture;
     private TestWebApplicationFactory _factory = null!;
+    private string _testId = null!;
 
     public US1_CustomerRegistrationIntegrationTests(TestDatabaseFixture databaseFixture)
     {
@@ -26,6 +26,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        _testId = Guid.NewGuid().ToString("N")[..8];
         _factory = new TestWebApplicationFactory(_databaseFixture);
         await _factory.InitializeAsync();
     }
@@ -34,6 +35,8 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
     {
         await _factory.DisposeAsync();
     }
+
+    private string UniqueEmail(string prefix) => $"{prefix}.{_testId}@example.com";
 
     /// <summary>
     /// Scenario 1: Create customer with valid data → verify returned data
@@ -44,11 +47,12 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         // Arrange
         await _factory.ClearDatabaseAsync();
         var client = _factory.CreateEmployeeClient();
+        var email = UniqueEmail("john.doe");
         var request = new
         {
             firstName = "John",
             lastName = "Doe",
-            email = "john.doe@example.com",
+            email,
             phone = "+6621234567",
             segment = "Retail",
             tier = "Bronze",
@@ -60,20 +64,20 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync("/customers/v1/customers", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var customer = await response.Content.ReadFromJsonAsync<CustomerResponse>();
-        customer.Should().NotBeNull();
-        customer!.Id.Should().NotBeEmpty();
-        customer.FirstName.Should().Be("John");
-        customer.LastName.Should().Be("Doe");
-        customer.Email.Should().Be("john.doe@example.com");
-        customer.Phone.Should().Be("+6621234567");
-        customer.Segment.Should().Be("Retail");
-        customer.Tier.Should().Be("Bronze");
-        customer.PreferredLanguage.Should().Be("en");
-        customer.Timezone.Should().Be("Asia/Bangkok");
-        customer.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
-        customer.IsDeleted.Should().BeFalse();
+        Assert.NotNull(customer);
+        Assert.NotEqual(Guid.Empty, customer!.Id);
+        Assert.Equal("John", customer.FirstName);
+        Assert.Equal("Doe", customer.LastName);
+        Assert.Equal(email, customer.Email);
+        Assert.Equal("+6621234567", customer.Phone);
+        Assert.Equal("Retail", customer.Segment);
+        Assert.Equal("Bronze", customer.Tier);
+        Assert.Equal("en", customer.PreferredLanguage);
+        Assert.Equal("Asia/Bangkok", customer.Timezone);
+        Assert.True(Math.Abs((customer.CreatedAt - DateTime.UtcNow).TotalSeconds) < 5);
+        Assert.False(customer.IsDeleted);
     }
 
     /// <summary>
@@ -85,11 +89,12 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         // Arrange
         await _factory.ClearDatabaseAsync();
         var client = _factory.CreateEmployeeClient();
+        var duplicateEmail = UniqueEmail("jane.smith");
         var request1 = new
         {
             firstName = "Jane",
             lastName = "Smith",
-            email = "jane.smith@example.com",
+            email = duplicateEmail,
             phone = "+6621234567",
             segment = "Retail",
             tier = "Bronze",
@@ -100,7 +105,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         {
             firstName = "John",
             lastName = "Doe",
-            email = "jane.smith@example.com", // Duplicate email
+            email = duplicateEmail, // Duplicate email
             phone = "+6629999999",
             segment = "Wholesale",
             tier = "Silver",
@@ -113,13 +118,13 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         var response2 = await client.PostAsJsonAsync("/customers/v1/customers", request2);
 
         // Assert
-        response1.StatusCode.Should().Be(HttpStatusCode.Created);
-        response2.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        Assert.Equal(HttpStatusCode.Created, response1.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, response2.StatusCode);
 
         var error = await response2.Content.ReadFromJsonAsync<ErrorResponse>();
-        error.Should().NotBeNull();
-        error!.Code.Should().Be("DUPLICATE_EMAIL");
-        error.Message.Should().Contain("already exists");
+        Assert.NotNull(error);
+        Assert.Equal("DUPLICATE_EMAIL", error!.Code);
+        Assert.Contains("already exists", error.Message);
     }
 
     /// <summary>
@@ -131,11 +136,12 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         // Arrange
         await _factory.ClearDatabaseAsync();
         var client = _factory.CreateEmployeeClient();
+        var email = UniqueEmail("alice.johnson");
         var createRequest = new
         {
             firstName = "Alice",
             lastName = "Johnson",
-            email = "alice.johnson@example.com",
+            email,
             phone = "+6625555555",
             segment = "Enterprise",
             tier = "Gold",
@@ -155,22 +161,22 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         var getResponse = await client.GetAsync($"/customers/v1/customers/{createdCustomer!.Id}");
 
         // Assert
-        getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var customer = await getResponse.Content.ReadFromJsonAsync<CustomerResponse>();
-        customer.Should().NotBeNull();
-        customer!.Id.Should().Be(createdCustomer.Id);
-        customer.FirstName.Should().Be("Alice");
-        customer.LastName.Should().Be("Johnson");
-        customer.Email.Should().Be("alice.johnson@example.com");
-        customer.Phone.Should().Be("+6625555555");
-        customer.Segment.Should().Be("Enterprise");
-        customer.Tier.Should().Be("Gold");
-        customer.PreferredLanguage.Should().Be("th");
-        customer.Timezone.Should().Be("Asia/Bangkok");
-        customer.CommunicationPreferences.Should().NotBeNull();
-        customer.CommunicationPreferences.Should().ContainKey("email_opt_in");
-        customer.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
-        customer.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        Assert.NotNull(customer);
+        Assert.Equal(createdCustomer.Id, customer!.Id);
+        Assert.Equal("Alice", customer.FirstName);
+        Assert.Equal("Johnson", customer.LastName);
+        Assert.Equal(email, customer.Email);
+        Assert.Equal("+6625555555", customer.Phone);
+        Assert.Equal("Enterprise", customer.Segment);
+        Assert.Equal("Gold", customer.Tier);
+        Assert.Equal("th", customer.PreferredLanguage);
+        Assert.Equal("Asia/Bangkok", customer.Timezone);
+        Assert.NotNull(customer.CommunicationPreferences);
+        Assert.True(customer.CommunicationPreferences!.ContainsKey("email_opt_in"));
+        Assert.True(Math.Abs((customer.CreatedAt - DateTime.UtcNow).TotalSeconds) < 5);
+        Assert.True(Math.Abs((customer.UpdatedAt - DateTime.UtcNow).TotalSeconds) < 5);
     }
 
     /// <summary>
@@ -182,11 +188,12 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         // Arrange
         await _factory.ClearDatabaseAsync();
         var client = _factory.CreateEmployeeClient();
+        var email = UniqueEmail("bob.wilson");
         var createRequest = new
         {
             firstName = "Bob",
             lastName = "Wilson",
-            email = "bob.wilson@example.com",
+            email,
             phone = "+6621111111",
             segment = "Retail",
             tier = "Bronze",
@@ -208,13 +215,13 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer.Id}", updateRequest);
 
         // Assert
-        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
         var updatedCustomer = await updateResponse.Content.ReadFromJsonAsync<CustomerResponse>();
-        updatedCustomer.Should().NotBeNull();
-        updatedCustomer!.Phone.Should().Be("+6622222222");
-        updatedCustomer.LastName.Should().Be("Wilson-Updated");
-        updatedCustomer.FirstName.Should().Be("Bob"); // Unchanged
-        updatedCustomer.UpdatedAt.Should().BeAfter(updatedCustomer.CreatedAt);
+        Assert.NotNull(updatedCustomer);
+        Assert.Equal("+6622222222", updatedCustomer!.Phone);
+        Assert.Equal("Wilson-Updated", updatedCustomer.LastName);
+        Assert.Equal("Bob", updatedCustomer.FirstName); // Unchanged
+        Assert.True(updatedCustomer.UpdatedAt > updatedCustomer.CreatedAt);
 
         // Verify audit log entry exists for employee actor
         using var dbContext = _factory.GetDbContext();
@@ -222,8 +229,8 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
             .Where(a => a.EntityId == createdCustomer.Id.ToString() && a.Action == "Update")
             .ToListAsync();
 
-        auditLogs.Should().NotBeEmpty();
-        auditLogs.Should().Contain(a => a.ActorType == "Employee");
+        Assert.NotEmpty(auditLogs);
+        Assert.Contains(auditLogs, a => a.ActorType == "Employee");
     }
 
     /// <summary>
@@ -235,11 +242,12 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         // Arrange
         await _factory.ClearDatabaseAsync();
         var employeeClient = _factory.CreateEmployeeClient();
+        var email = UniqueEmail("charlie.brown");
         var createRequest = new
         {
             firstName = "Charlie",
             lastName = "Brown",
-            email = "charlie.brown@example.com",
+            email,
             phone = "+6623333333",
             segment = "Retail",
             tier = "Bronze",
@@ -262,10 +270,10 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         var updateResponse = await customerClient.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer.Id}", updateRequest);
 
         // Assert
-        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
         var updatedCustomer = await updateResponse.Content.ReadFromJsonAsync<CustomerResponse>();
-        updatedCustomer.Should().NotBeNull();
-        updatedCustomer!.Phone.Should().Be("+6624444444");
+        Assert.NotNull(updatedCustomer);
+        Assert.Equal("+6624444444", updatedCustomer!.Phone);
 
         // Verify audit log entry exists for customer actor
         using var dbContext = _factory.GetDbContext();
@@ -274,8 +282,8 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
             .OrderByDescending(a => a.Timestamp)
             .ToListAsync();
 
-        auditLogs.Should().NotBeEmpty();
-        auditLogs.First().ActorType.Should().Be("Customer");
+        Assert.NotEmpty(auditLogs);
+        Assert.Equal("Customer", auditLogs.First().ActorType);
     }
 
     /// <summary>
@@ -287,11 +295,12 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         // Arrange
         await _factory.ClearDatabaseAsync();
         var client = _factory.CreateEmployeeClient();
+        var email = UniqueEmail("diana.prince");
         var createRequest = new
         {
             firstName = "Diana",
             lastName = "Prince",
-            email = "diana.prince@example.com",
+            email,
             phone = "+6627777777",
             segment = "Wholesale",
             tier = "Silver",
@@ -313,12 +322,12 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer.Id}", updateRequest);
 
         // Assert
-        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
         var updatedCustomer = await updateResponse.Content.ReadFromJsonAsync<CustomerResponse>();
-        updatedCustomer.Should().NotBeNull();
-        updatedCustomer!.PreferredLanguage.Should().Be("th");
-        updatedCustomer.Timezone.Should().Be("Asia/Singapore");
-        updatedCustomer.UpdatedAt.Should().BeAfter(updatedCustomer.CreatedAt);
+        Assert.NotNull(updatedCustomer);
+        Assert.Equal("th", updatedCustomer!.PreferredLanguage);
+        Assert.Equal("Asia/Singapore", updatedCustomer.Timezone);
+        Assert.True(updatedCustomer.UpdatedAt > updatedCustomer.CreatedAt);
 
         // Verify changes in audit log
         using var dbContext = _factory.GetDbContext();
@@ -327,7 +336,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
             .OrderByDescending(a => a.Timestamp)
             .FirstOrDefaultAsync();
 
-        auditLog.Should().NotBeNull();
+        Assert.NotNull(auditLog);
     }
 
     /// <summary>
@@ -339,11 +348,12 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         // Arrange
         await _factory.ClearDatabaseAsync();
         var client = _factory.CreateEmployeeClient();
+        var email = UniqueEmail("edward.norton");
         var createRequest = new
         {
             firstName = "Edward",
             lastName = "Norton",
-            email = "edward.norton@example.com",
+            email,
             phone = "+6628888888",
             segment = "Government",
             tier = "Platinum",
@@ -369,22 +379,22 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer.Id}", updateRequest);
 
         // Assert
-        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
         var updatedCustomer = await updateResponse.Content.ReadFromJsonAsync<CustomerResponse>();
-        updatedCustomer.Should().NotBeNull();
-        updatedCustomer!.CommunicationPreferences.Should().NotBeNull();
-        updatedCustomer.CommunicationPreferences.Should().ContainKey("email_opt_in");
-        updatedCustomer.CommunicationPreferences.Should().ContainKey("sms_opt_in");
-        updatedCustomer.CommunicationPreferences.Should().ContainKey("marketing_opt_in");
-        updatedCustomer.CommunicationPreferences!["email_opt_in"].ToString().Should().Be("True");
-        updatedCustomer.CommunicationPreferences["sms_opt_in"].ToString().Should().Be("False");
-        updatedCustomer.CommunicationPreferences["marketing_opt_in"].ToString().Should().Be("True");
+        Assert.NotNull(updatedCustomer);
+        Assert.NotNull(updatedCustomer!.CommunicationPreferences);
+        Assert.True(updatedCustomer.CommunicationPreferences!.ContainsKey("email_opt_in"));
+        Assert.True(updatedCustomer.CommunicationPreferences.ContainsKey("sms_opt_in"));
+        Assert.True(updatedCustomer.CommunicationPreferences.ContainsKey("marketing_opt_in"));
+        Assert.Equal("True", updatedCustomer.CommunicationPreferences["email_opt_in"]!.ToString());
+        Assert.Equal("False", updatedCustomer.CommunicationPreferences["sms_opt_in"]!.ToString());
+        Assert.Equal("True", updatedCustomer.CommunicationPreferences["marketing_opt_in"]!.ToString());
 
         // Verify the data is persisted in the database
         var getResponse = await client.GetAsync($"/customers/v1/customers/{createdCustomer.Id}");
         var retrievedCustomer = await getResponse.Content.ReadFromJsonAsync<CustomerResponse>();
-        retrievedCustomer!.CommunicationPreferences.Should().NotBeNull();
-        retrievedCustomer.CommunicationPreferences.Should().HaveCount(3);
+        Assert.NotNull(retrievedCustomer!.CommunicationPreferences);
+        Assert.Equal(3, retrievedCustomer.CommunicationPreferences!.Count);
     }
 
     /// <summary>
@@ -402,7 +412,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         {
             firstName = "Frank",
             lastName = "Castle",
-            email = "frank.castle@example.com",
+            email = UniqueEmail("frank.castle"),
             phone = "+6621111111",
             segment = "Retail",
             tier = "Bronze",
@@ -413,7 +423,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         {
             firstName = "Grace",
             lastName = "Hopper",
-            email = "grace.hopper@example.com",
+            email = UniqueEmail("grace.hopper"),
             phone = "+6622222222",
             segment = "Enterprise",
             tier = "Gold",
@@ -431,23 +441,23 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         var deleteResponse = await client.DeleteAsync($"/customers/v1/customers/{customer1!.Id}");
 
         // Assert - Verify deletion was successful
-        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
         // Verify customer is marked as deleted when retrieved directly
         var getDeletedResponse = await client.GetAsync($"/customers/v1/customers/{customer1.Id}");
         if (getDeletedResponse.StatusCode == HttpStatusCode.OK)
         {
             var deletedCustomer = await getDeletedResponse.Content.ReadFromJsonAsync<CustomerResponse>();
-            deletedCustomer!.IsDeleted.Should().BeTrue();
+            Assert.True(deletedCustomer!.IsDeleted);
         }
 
         // Verify deleted customer is excluded from list queries
         var listResponse = await client.GetAsync("/customers/v1/customers");
-        listResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
         var listResult = await listResponse.Content.ReadFromJsonAsync<PaginatedResponse<CustomerResponse>>();
-        listResult.Should().NotBeNull();
-        listResult!.Items.Should().NotContain(c => c.Id == customer1.Id);
-        listResult.Items.Should().Contain(c => c.Id == customer2!.Id);
+        Assert.NotNull(listResult);
+        Assert.DoesNotContain(listResult!.Items, c => c.Id == customer1.Id);
+        Assert.Contains(listResult.Items, c => c.Id == customer2!.Id);
 
         // Verify historical data is preserved in database
         using var dbContext = _factory.GetDbContext();
@@ -455,9 +465,9 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
             .IgnoreQueryFilters() // Include soft-deleted entities
             .FirstOrDefaultAsync(c => c.Id == customer1.Id);
 
-        customerInDb.Should().NotBeNull();
-        customerInDb!.IsDeleted.Should().BeTrue();
-        customerInDb.Segment.Should().Be("Retail");
-        customerInDb.PreferredLanguage.Should().Be("en");
+        Assert.NotNull(customerInDb);
+        Assert.True(customerInDb!.IsDeleted);
+        Assert.Equal("Retail", customerInDb.Segment);
+        Assert.Equal("en", customerInDb.PreferredLanguage);
     }
 }

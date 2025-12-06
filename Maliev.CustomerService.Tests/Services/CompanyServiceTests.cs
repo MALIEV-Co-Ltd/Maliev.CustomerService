@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Maliev.CustomerService.Api.Models.Companies;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Data.Models;
@@ -52,16 +51,16 @@ public class CompanyServiceTests
         var result = await service.CreateAsync(request, "test-actor", "Employee");
 
         // Assert
-        result.Should().NotBeNull();
-        result.Id.Should().NotBeEmpty();
-        result.Name.Should().Be("ACME Corporation");
-        result.VatNumber.Should().Be("TH-1234567890");
-        result.RegistrationNumber.Should().Be("REG-123456");
-        result.ContactEmail.Should().Be("contact@acme.com");
-        result.ContactPhone.Should().Be("+66-2-123-4567");
-        result.Segment.Should().Be("Enterprise");
-        result.Tier.Should().Be("Gold");
-        result.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        Assert.NotNull(result);
+        Assert.NotEqual(Guid.Empty, result.Id);
+        Assert.Equal("ACME Corporation", result.Name);
+        Assert.Equal("TH-1234567890", result.VatNumber);
+        Assert.Equal("REG-123456", result.RegistrationNumber);
+        Assert.Equal("contact@acme.com", result.ContactEmail);
+        Assert.Equal("+66-2-123-4567", result.ContactPhone);
+        Assert.Equal("Enterprise", result.Segment);
+        Assert.Equal("Gold", result.Tier);
+        Assert.True(result.CreatedAt > DateTime.UtcNow.AddSeconds(-5) && result.CreatedAt <= DateTime.UtcNow.AddSeconds(5));
     }
 
     [Fact]
@@ -82,7 +81,7 @@ public class CompanyServiceTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.CreateAsync(request, "test-actor", "Employee"));
 
-        exception.Message.Should().Contain("VAT number must be in format");
+        Assert.Contains("VAT number must be in format", exception.Message);
     }
 
     [Fact]
@@ -103,8 +102,8 @@ public class CompanyServiceTests
         var result = await service.CreateAsync(request, "test-actor", "Employee");
 
         // Assert
-        result.Should().NotBeNull();
-        result.VatNumber.Should().Be("US-987654321");
+        Assert.NotNull(result);
+        Assert.Equal("US-987654321", result.VatNumber);
     }
 
     [Fact]
@@ -125,8 +124,8 @@ public class CompanyServiceTests
         var result = await service.CreateAsync(request, "test-actor", "Employee");
 
         // Assert
-        result.Should().NotBeNull();
-        result.VatNumber.Should().BeNull();
+        Assert.NotNull(result);
+        Assert.Null(result.VatNumber);
     }
 
     [Fact]
@@ -152,11 +151,11 @@ public class CompanyServiceTests
             .Where(a => a.EntityId == result.Id.ToString())
             .FirstOrDefaultAsync();
 
-        auditLog.Should().NotBeNull();
-        auditLog!.ActorId.Should().Be("employee-123");
-        auditLog.ActorType.Should().Be("Employee");
-        auditLog.Action.Should().Be(AuditAction.Create);
-        auditLog.EntityType.Should().Be("Company");
+        Assert.NotNull(auditLog);
+        Assert.Equal("employee-123", auditLog!.ActorId);
+        Assert.Equal("Employee", auditLog.ActorType);
+        Assert.Equal(AuditAction.Create, auditLog.Action);
+        Assert.Equal("Company", auditLog.EntityType);
     }
 
     [Fact]
@@ -177,12 +176,12 @@ public class CompanyServiceTests
         var result = await service.GetByIdAsync(created.Id);
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Id.Should().Be(created.Id);
-        result.Name.Should().Be("Get Test Company");
-        result.VatNumber.Should().Be("TH-1111111111");
-        result.Segment.Should().Be("Enterprise");
-        result.Tier.Should().Be("Gold");
+        Assert.NotNull(result);
+        Assert.Equal(created.Id, result!.Id);
+        Assert.Equal("Get Test Company", result.Name);
+        Assert.Equal("TH-1111111111", result.VatNumber);
+        Assert.Equal("Enterprise", result.Segment);
+        Assert.Equal("Gold", result.Tier);
     }
 
     [Fact]
@@ -197,7 +196,7 @@ public class CompanyServiceTests
         var result = await service.GetByIdAsync(nonExistentId);
 
         // Assert
-        result.Should().BeNull();
+        Assert.Null(result);
     }
 
     [Fact]
@@ -227,13 +226,13 @@ public class CompanyServiceTests
         var result = await service.UpdateAsync(created.Id, updateRequest, "test-actor2", "Employee");
 
         // Assert
-        result.Should().NotBeNull();
-        result.Name.Should().Be("Updated Company Name");
-        result.ContactEmail.Should().Be("new@test.com");
-        result.Tier.Should().Be("Silver");
-        result.VatNumber.Should().Be("TH-2222222222"); // Unchanged
-        result.Segment.Should().Be("Retail"); // Unchanged
-        result.UpdatedAt.Should().BeAfter(created.UpdatedAt);
+        Assert.NotNull(result);
+        Assert.Equal("Updated Company Name", result.Name);
+        Assert.Equal("new@test.com", result.ContactEmail);
+        Assert.Equal("Silver", result.Tier);
+        Assert.Equal("TH-2222222222", result.VatNumber); // Unchanged
+        Assert.Equal("Retail", result.Segment); // Unchanged
+        Assert.True(result.UpdatedAt > created.UpdatedAt);
     }
 
     [Fact]
@@ -260,7 +259,7 @@ public class CompanyServiceTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.UpdateAsync(created.Id, updateRequest, "test-actor", "Employee"));
 
-        exception.Message.Should().Contain("VAT number must be in format");
+        Assert.Contains("VAT number must be in format", exception.Message);
     }
 
     [Fact]
@@ -304,7 +303,7 @@ public class CompanyServiceTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.UpdateAsync(created.Id, updateRequest, "test-actor", "Employee"));
 
-        exception.Message.Should().Contain("modified by another user");
+        Assert.Contains("modified by another user", exception.Message);
     }
 
     [Fact]
@@ -336,11 +335,11 @@ public class CompanyServiceTests
             .OrderBy(a => a.Timestamp)
             .ToListAsync();
 
-        auditLogs.Should().HaveCount(2); // Create + Update
+        Assert.Equal(2, auditLogs.Count); // Create + Update
         var updateAudit = auditLogs[1];
-        updateAudit.ActorId.Should().Be("manager-456");
-        updateAudit.ActorType.Should().Be("Manager");
-        updateAudit.Action.Should().Be(AuditAction.Update);
+        Assert.Equal("manager-456", updateAudit.ActorId);
+        Assert.Equal("Manager", updateAudit.ActorType);
+        Assert.Equal(AuditAction.Update, updateAudit.Action);
     }
 
     [Fact]
@@ -365,9 +364,9 @@ public class CompanyServiceTests
         var (companies, totalCount) = await service.GetAllAsync(page: 1, pageSize: 50);
 
         // Assert
-        companies.Should().NotBeNull();
-        companies.Should().HaveCount(3);
-        totalCount.Should().Be(3);
+        Assert.NotNull(companies);
+        Assert.Equal(3, companies.Count);
+        Assert.Equal(3, totalCount);
     }
 
     [Fact]
@@ -395,10 +394,10 @@ public class CompanyServiceTests
         var (companies, totalCount) = await service.GetAllAsync(page: 1, pageSize: 50, segment: "Enterprise");
 
         // Assert
-        companies.Should().HaveCount(1);
-        totalCount.Should().Be(1);
-        companies[0].Segment.Should().Be("Enterprise");
-        companies[0].Name.Should().Be("Enterprise Company");
+        Assert.Single(companies);
+        Assert.Equal(1, totalCount);
+        Assert.Equal("Enterprise", companies[0].Segment);
+        Assert.Equal("Enterprise Company", companies[0].Name);
     }
 
     [Fact]
@@ -433,9 +432,9 @@ public class CompanyServiceTests
         var (companies, totalCount) = await service.GetAllAsync(page: 1, pageSize: 50, tier: "Gold");
 
         // Assert
-        companies.Should().HaveCount(2);
-        totalCount.Should().Be(2);
-        companies.Should().OnlyContain(c => c.Tier == "Gold");
+        Assert.Equal(2, companies.Count);
+        Assert.Equal(2, totalCount);
+        Assert.All(companies, c => Assert.Equal("Gold", c.Tier));
     }
 
     [Fact]
@@ -461,11 +460,11 @@ public class CompanyServiceTests
         var (page2Companies, page2Total) = await service.GetAllAsync(page: 2, pageSize: 2);
 
         // Assert
-        page1Companies.Should().HaveCount(2);
-        page1Total.Should().Be(5);
+        Assert.Equal(2, page1Companies.Count);
+        Assert.Equal(5, page1Total);
 
-        page2Companies.Should().HaveCount(2);
-        page2Total.Should().Be(5);
+        Assert.Equal(2, page2Companies.Count);
+        Assert.Equal(5, page2Total);
     }
 
     [Fact]
@@ -504,11 +503,11 @@ public class CompanyServiceTests
             tier: "Gold");
 
         // Assert
-        companies.Should().HaveCount(1);
-        totalCount.Should().Be(1);
-        companies[0].Name.Should().Be("Enterprise Gold 1");
-        companies[0].Segment.Should().Be("Enterprise");
-        companies[0].Tier.Should().Be("Gold");
+        Assert.Single(companies);
+        Assert.Equal(1, totalCount);
+        Assert.Equal("Enterprise Gold 1", companies[0].Name);
+        Assert.Equal("Enterprise", companies[0].Segment);
+        Assert.Equal("Gold", companies[0].Tier);
     }
 
     [Fact]
@@ -572,10 +571,10 @@ public class CompanyServiceTests
         var result = await service.GetWithCustomersAsync(company.Id);
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Value.Company.Id.Should().Be(company.Id);
-        result.Value.Customers.Should().HaveCount(2);
-        result.Value.Customers.Should().OnlyContain(c => c.CompanyId == company.Id);
+        Assert.NotNull(result);
+        Assert.Equal(company.Id, result!.Value.Company.Id);
+        Assert.Equal(2, result.Value.Customers.Count);
+        Assert.All(result.Value.Customers, c => Assert.Equal(company.Id, c.CompanyId));
     }
 
     [Fact]
@@ -590,7 +589,7 @@ public class CompanyServiceTests
         var result = await service.GetWithCustomersAsync(nonExistentId);
 
         // Assert
-        result.Should().BeNull();
+        Assert.Null(result);
     }
 
     [Fact]
@@ -654,8 +653,8 @@ public class CompanyServiceTests
         var result = await service.GetWithCustomersAsync(company.Id);
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Value.Customers.Should().HaveCount(1);
-        result.Value.Customers[0].FirstName.Should().Be("Active");
+        Assert.NotNull(result);
+        Assert.Single(result!.Value.Customers);
+        Assert.Equal("Active", result.Value.Customers[0].FirstName);
     }
 }

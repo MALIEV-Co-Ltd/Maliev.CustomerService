@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Maliev.CustomerService.Api.Models.NDAs;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Data.Models;
@@ -51,13 +50,13 @@ public class NDAServiceTests
         var result = await service.CreateAsync(request, "test-actor", "Employee");
 
         // Assert
-        result.Should().NotBeNull();
-        result.Id.Should().NotBeEmpty();
-        result.CustomerId.Should().Be(request.CustomerId);
-        result.DocumentReferenceId.Should().Be(request.DocumentReferenceId);
-        result.Status.Should().Be(NDAStatus.Draft);
-        result.ExpiresAt.Should().Be(request.ExpiresAt);
-        result.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        Assert.NotNull(result);
+        Assert.NotEqual(Guid.Empty, result.Id);
+        Assert.Equal(request.CustomerId, result.CustomerId);
+        Assert.Equal(request.DocumentReferenceId, result.DocumentReferenceId);
+        Assert.Equal(NDAStatus.Draft, result.Status);
+        Assert.Equal(request.ExpiresAt, result.ExpiresAt);
+        Assert.True(result.CreatedAt > DateTime.UtcNow.AddSeconds(-5) && result.CreatedAt <= DateTime.UtcNow.AddSeconds(5));
     }
 
     [Fact]
@@ -77,9 +76,9 @@ public class NDAServiceTests
         var result = await service.CreateAsync(request, "test-actor", "Employee");
 
         // Assert
-        result.Should().NotBeNull();
-        result.Status.Should().Be(NDAStatus.Draft);
-        result.DocumentReferenceId.Should().BeNull();
+        Assert.NotNull(result);
+        Assert.Equal(NDAStatus.Draft, result.Status);
+        Assert.Null(result.DocumentReferenceId);
     }
 
     [Fact]
@@ -103,11 +102,11 @@ public class NDAServiceTests
             .Where(a => a.EntityId == result.Id.ToString())
             .FirstOrDefaultAsync();
 
-        auditLog.Should().NotBeNull();
-        auditLog!.ActorId.Should().Be("employee-123");
-        auditLog.ActorType.Should().Be("Employee");
-        auditLog.Action.Should().Be(AuditAction.Create);
-        auditLog.EntityType.Should().Be("NDARecord");
+        Assert.NotNull(auditLog);
+        Assert.Equal("employee-123", auditLog!.ActorId);
+        Assert.Equal("Employee", auditLog.ActorType);
+        Assert.Equal(AuditAction.Create, auditLog.Action);
+        Assert.Equal("NDARecord", auditLog.EntityType);
     }
 
     [Fact]
@@ -126,10 +125,10 @@ public class NDAServiceTests
         var result = await service.GetByIdAsync(created.Id);
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Id.Should().Be(created.Id);
-        result.CustomerId.Should().Be(created.CustomerId);
-        result.Status.Should().Be(NDAStatus.Draft);
+        Assert.NotNull(result);
+        Assert.Equal(created.Id, result!.Id);
+        Assert.Equal(created.CustomerId, result.CustomerId);
+        Assert.Equal(NDAStatus.Draft, result.Status);
     }
 
     [Fact]
@@ -144,7 +143,7 @@ public class NDAServiceTests
         var result = await service.GetByIdAsync(nonExistentId);
 
         // Assert
-        result.Should().BeNull();
+        Assert.Null(result);
     }
 
     [Fact]
@@ -172,10 +171,10 @@ public class NDAServiceTests
         var result = await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Employee");
 
         // Assert
-        result.Should().NotBeNull();
-        result.Status.Should().Be(NDAStatus.Signed);
-        result.SignedBy.Should().Be("customer-user");
-        result.SignedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        Assert.NotNull(result);
+        Assert.Equal(NDAStatus.Signed, result.Status);
+        Assert.Equal("customer-user", result.SignedBy);
+        Assert.True(result.SignedAt > DateTime.UtcNow.AddSeconds(-5) && result.SignedAt <= DateTime.UtcNow.AddSeconds(5));
     }
 
     [Fact]
@@ -203,7 +202,7 @@ public class NDAServiceTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Employee"));
 
-        exception.Message.Should().Contain("without a document reference");
+        Assert.Contains("without a document reference", exception.Message);
     }
 
     [Fact]
@@ -241,9 +240,9 @@ public class NDAServiceTests
         var result = await service.UpdateStatusAsync(created.Id, revokeRequest, "admin-user", "Admin");
 
         // Assert
-        result.Should().NotBeNull();
-        result.Status.Should().Be(NDAStatus.Revoked);
-        result.RevokedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        Assert.NotNull(result);
+        Assert.Equal(NDAStatus.Revoked, result.Status);
+        Assert.True(result.RevokedAt > DateTime.UtcNow.AddSeconds(-5) && result.RevokedAt <= DateTime.UtcNow.AddSeconds(5));
     }
 
     [Fact]
@@ -269,7 +268,7 @@ public class NDAServiceTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Employee"));
 
-        exception.Message.Should().Contain("Cannot transition from 'Draft' to 'Expired'");
+        Assert.Contains("Cannot transition from 'Draft' to 'Expired'", exception.Message);
     }
 
     [Fact]
@@ -296,7 +295,7 @@ public class NDAServiceTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Employee"));
 
-        exception.Message.Should().Contain("Cannot transition from 'Draft' to 'Revoked'");
+        Assert.Contains("Cannot transition from 'Draft' to 'Revoked'", exception.Message);
     }
 
     [Fact]
@@ -343,7 +342,7 @@ public class NDAServiceTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.UpdateStatusAsync(created.Id, invalidRequest, "test-actor", "Employee"));
 
-        exception.Message.Should().Contain("terminal state");
+        Assert.Contains("terminal state", exception.Message);
     }
 
     [Fact]
@@ -397,11 +396,11 @@ public class NDAServiceTests
             .OrderBy(a => a.Timestamp)
             .ToListAsync();
 
-        auditLogs.Should().HaveCount(2); // Create + Update
+        Assert.Equal(2, auditLogs.Count); // Create + Update
         var updateAudit = auditLogs[1];
-        updateAudit.ActorId.Should().Be("manager-456");
-        updateAudit.ActorType.Should().Be("Manager");
-        updateAudit.Action.Should().Be(AuditAction.Update);
+        Assert.Equal("manager-456", updateAudit.ActorId);
+        Assert.Equal("Manager", updateAudit.ActorType);
+        Assert.Equal(AuditAction.Update, updateAudit.Action);
     }
 
     [Fact]
@@ -433,11 +432,11 @@ public class NDAServiceTests
         var expiredCount = await service.CheckExpiredNDAsAsync();
 
         // Assert
-        expiredCount.Should().Be(1);
+        Assert.Equal(1, expiredCount);
 
         var updated = await service.GetByIdAsync(created.Id);
-        updated.Should().NotBeNull();
-        updated!.Status.Should().Be(NDAStatus.Expired);
+        Assert.NotNull(updated);
+        Assert.Equal(NDAStatus.Expired, updated!.Status);
     }
 
     [Fact]
@@ -468,7 +467,7 @@ public class NDAServiceTests
         var expiredCount = await service.CheckExpiredNDAsAsync();
 
         // Assert
-        expiredCount.Should().Be(0);
+        Assert.Equal(0, expiredCount);
     }
 
     [Fact]
@@ -490,7 +489,7 @@ public class NDAServiceTests
         var expiredCount = await service.CheckExpiredNDAsAsync();
 
         // Assert
-        expiredCount.Should().Be(0); // Should not expire Draft NDAs
+        Assert.Equal(0, expiredCount); // Should not expire Draft NDAs
     }
 
     [Fact]
@@ -526,10 +525,10 @@ public class NDAServiceTests
             .OrderBy(a => a.Timestamp)
             .ToListAsync();
 
-        auditLogs.Should().HaveCount(3); // Create + Sign + AutoExpire
+        Assert.Equal(3, auditLogs.Count); // Create + Sign + AutoExpire
         var expireAudit = auditLogs[2];
-        expireAudit.ActorId.Should().Be("System");
-        expireAudit.ActorType.Should().Be("System");
-        expireAudit.Action.Should().Be("AutoExpire");
+        Assert.Equal("System", expireAudit.ActorId);
+        Assert.Equal("System", expireAudit.ActorType);
+        Assert.Equal("AutoExpire", expireAudit.Action);
     }
 }

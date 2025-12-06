@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using FluentAssertions;
 using Maliev.CustomerService.Api.Models.Users;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Tests.Infrastructure;
@@ -12,12 +11,14 @@ namespace Maliev.CustomerService.Tests.Integration;
 /// <summary>
 /// Integration tests for User Story 6 - User Account Management and Credential Validation
 /// Tests all 7 acceptance scenarios using real HTTP requests
-/// Uses dedicated database fixture for better test isolation
+/// Uses shared database collection for proper test isolation
 /// </summary>
-public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatabaseFixture>, IAsyncLifetime
+[Collection("Database Collection")]
+public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
 {
     private readonly TestDatabaseFixture _databaseFixture;
     private TestWebApplicationFactory _factory = null!;
+    private string _testId = null!;
 
     public US6_UserAccountManagementIntegrationTests(TestDatabaseFixture databaseFixture)
     {
@@ -26,6 +27,7 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
 
     public async Task InitializeAsync()
     {
+        _testId = Guid.NewGuid().ToString("N")[..8];
         _factory = new TestWebApplicationFactory(_databaseFixture);
         await _factory.InitializeAsync();
     }
@@ -34,6 +36,9 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
     {
         await _factory.DisposeAsync();
     }
+
+    private string UniqueUsername(string prefix) => $"{prefix}_{_testId}";
+    private string UniqueEmail(string prefix) => $"{prefix}.{_testId}@example.com";
 
     /// <summary>
     /// Scenario 1: Create user account with hashed password
@@ -44,10 +49,12 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         // Arrange
         await _factory.ClearDatabaseAsync();
         var client = _factory.CreateAdminClient();
+        var username = UniqueUsername("testuser123");
+        var email = UniqueEmail("testuser123");
         var request = new
         {
-            username = "testuser123",
-            email = "testuser123@example.com",
+            username,
+            email,
             password = "SecureP@ssw0rd!",
             roles = new[] { "Customer" }
         };
@@ -56,20 +63,20 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         var response = await client.PostAsJsonAsync("/customers/v1/users", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var user = await response.Content.ReadFromJsonAsync<UserResponse>();
-        user.Should().NotBeNull();
-        user!.Id.Should().NotBeNullOrEmpty();
-        user.Username.Should().Be("testuser123");
-        user.Email.Should().Be("testuser123@example.com");
-        user.Roles.Should().Contain("Customer");
+        Assert.NotNull(user);
+        Assert.False(string.IsNullOrEmpty(user!.Id));
+        Assert.Equal(username, user.Username);
+        Assert.Equal(email, user.Email);
+        Assert.Contains("Customer", user.Roles);
 
         // Verify password is hashed in database (not stored as plain text)
         using var dbContext = _factory.GetDbContext();
-        var userEntity = await dbContext.Users.FirstOrDefaultAsync(u => u.UserName == "testuser123");
-        userEntity.Should().NotBeNull();
-        userEntity!.PasswordHash.Should().NotBeNullOrEmpty();
-        userEntity.PasswordHash.Should().NotBe("SecureP@ssw0rd!"); // Not plain text
+        var userEntity = await dbContext.Users.FirstOrDefaultAsync(u => u.UserName == username);
+        Assert.NotNull(userEntity);
+        Assert.False(string.IsNullOrEmpty(userEntity!.PasswordHash));
+        Assert.NotEqual("SecureP@ssw0rd!", userEntity.PasswordHash); // Not plain text
     }
 
     /// <summary>
@@ -81,12 +88,14 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         // Arrange
         await _factory.ClearDatabaseAsync();
         var adminClient = _factory.CreateAdminClient();
+        var username = UniqueUsername("validuser");
+        var email = UniqueEmail("validuser");
 
         // Create a user first
         var createRequest = new
         {
-            username = "validuser",
-            email = "validuser@example.com",
+            username,
+            email,
             password = "ValidP@ssw0rd!",
             roles = new[] { "Customer" }
         };
@@ -96,7 +105,7 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         var unauthenticatedClient = _factory.CreateClient();
         var validateRequest = new
         {
-            username = "validuser",
+            username,
             password = "ValidP@ssw0rd!"
         };
 
@@ -104,20 +113,20 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         var response = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", validateRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var validationResult = await response.Content.ReadFromJsonAsync<ValidationResponse>();
-        validationResult.Should().NotBeNull();
-        validationResult!.IsValid.Should().BeTrue();
-        validationResult.UserId.Should().NotBeNullOrEmpty();
-        validationResult.Username.Should().Be("validuser");
-        validationResult.Roles.Should().Contain("Customer");
+        Assert.NotNull(validationResult);
+        Assert.True(validationResult!.IsValid);
+        Assert.False(string.IsNullOrEmpty(validationResult.UserId));
+        Assert.Equal(username, validationResult.Username);
+        Assert.Contains("Customer", validationResult.Roles);
 
         // Verify last_login_at is updated
         using var dbContext = _factory.GetDbContext();
-        var userEntity = await dbContext.Users.FirstOrDefaultAsync(u => u.UserName == "validuser");
-        userEntity.Should().NotBeNull();
-        userEntity!.LastLoginAt.Should().NotBeNull();
-        userEntity.LastLoginAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        var userEntity = await dbContext.Users.FirstOrDefaultAsync(u => u.UserName == username);
+        Assert.NotNull(userEntity);
+        Assert.NotNull(userEntity!.LastLoginAt);
+        Assert.True(Math.Abs((userEntity.LastLoginAt.Value - DateTime.UtcNow).TotalSeconds) < 5);
     }
 
     /// <summary>
@@ -129,12 +138,14 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         // Arrange
         await _factory.ClearDatabaseAsync();
         var adminClient = _factory.CreateAdminClient();
+        var username = UniqueUsername("existinguser");
+        var email = UniqueEmail("existinguser");
 
         // Create a user first
         var createRequest = new
         {
-            username = "existinguser",
-            email = "existinguser@example.com",
+            username,
+            email,
             password = "CorrectP@ssw0rd!",
             roles = new[] { "Employee" }
         };
@@ -145,14 +156,14 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         // Test 1: Wrong password
         var wrongPasswordRequest = new
         {
-            username = "existinguser",
+            username,
             password = "WrongP@ssw0rd!"
         };
 
         // Test 2: Non-existent username
         var nonExistentUserRequest = new
         {
-            username = "nonexistentuser",
+            username = UniqueUsername("nonexistentuser"),
             password = "AnyP@ssw0rd!"
         };
 
@@ -161,31 +172,31 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         var nonExistentUserResponse = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", nonExistentUserRequest);
 
         // Assert - Both should return the same generic response (security requirement)
-        wrongPasswordResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        nonExistentUserResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, wrongPasswordResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, nonExistentUserResponse.StatusCode);
 
         var wrongPasswordResult = await wrongPasswordResponse.Content.ReadFromJsonAsync<ValidationResponse>();
         var nonExistentUserResult = await nonExistentUserResponse.Content.ReadFromJsonAsync<ValidationResponse>();
 
-        wrongPasswordResult.Should().NotBeNull();
-        wrongPasswordResult!.IsValid.Should().BeFalse();
-        wrongPasswordResult.UserId.Should().BeNullOrEmpty();
-        wrongPasswordResult.Username.Should().BeNullOrEmpty();
-        wrongPasswordResult.Roles.Should().BeEmpty();
+        Assert.NotNull(wrongPasswordResult);
+        Assert.False(wrongPasswordResult!.IsValid);
+        Assert.True(string.IsNullOrEmpty(wrongPasswordResult.UserId));
+        Assert.True(string.IsNullOrEmpty(wrongPasswordResult.Username));
+        Assert.Empty(wrongPasswordResult.Roles);
 
-        nonExistentUserResult.Should().NotBeNull();
-        nonExistentUserResult!.IsValid.Should().BeFalse();
-        nonExistentUserResult.UserId.Should().BeNullOrEmpty();
-        nonExistentUserResult.Username.Should().BeNullOrEmpty();
-        nonExistentUserResult.Roles.Should().BeEmpty();
+        Assert.NotNull(nonExistentUserResult);
+        Assert.False(nonExistentUserResult!.IsValid);
+        Assert.True(string.IsNullOrEmpty(nonExistentUserResult.UserId));
+        Assert.True(string.IsNullOrEmpty(nonExistentUserResult.Username));
+        Assert.Empty(nonExistentUserResult.Roles);
 
         // Verify no information is revealed about whether username exists
         var wrongPasswordContent = await wrongPasswordResponse.Content.ReadAsStringAsync();
         var nonExistentUserContent = await nonExistentUserResponse.Content.ReadAsStringAsync();
-        wrongPasswordContent.Should().NotContain("username");
-        wrongPasswordContent.Should().NotContain("not found");
-        nonExistentUserContent.Should().NotContain("username");
-        nonExistentUserContent.Should().NotContain("not found");
+        Assert.DoesNotContain("username", wrongPasswordContent);
+        Assert.DoesNotContain("not found", wrongPasswordContent);
+        Assert.DoesNotContain("username", nonExistentUserContent);
+        Assert.DoesNotContain("not found", nonExistentUserContent);
     }
 
     /// <summary>
@@ -197,10 +208,11 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         // Arrange
         await _factory.ClearDatabaseAsync();
         var unauthenticatedClient = _factory.CreateClient();
+        var username = UniqueUsername("testuser");
 
         var validateRequest = new
         {
-            username = "testuser",
+            username,
             password = "TestP@ssw0rd!"
         };
 
@@ -219,14 +231,14 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         // At least some of the later requests should be rate limited
         // Note: Exact behavior depends on rate limiting implementation
         // This test verifies the rate limiting infrastructure is in place
-        (okResponses.Count + rateLimitedResponses.Count).Should().Be(15);
+        Assert.Equal(15, okResponses.Count + rateLimitedResponses.Count);
 
         // If rate limiting is working, we should see some 429 responses
         if (rateLimitedResponses.Any())
         {
             var errorResponse = await rateLimitedResponses.First().Content.ReadFromJsonAsync<ErrorResponse>();
-            errorResponse.Should().NotBeNull();
-            errorResponse!.Code.Should().Contain("RATE_LIMIT");
+            Assert.NotNull(errorResponse);
+            Assert.Contains("RATE_LIMIT", errorResponse!.Code);
         }
 
         // Clean up
@@ -245,12 +257,14 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         // Arrange
         await _factory.ClearDatabaseAsync();
         var adminClient = _factory.CreateAdminClient();
+        var username = UniqueUsername("audituser");
+        var email = UniqueEmail("audituser");
 
         // Create a user first
         var createRequest = new
         {
-            username = "audituser",
-            email = "audituser@example.com",
+            username,
+            email,
             password = "AuditP@ssw0rd!",
             roles = new[] { "Customer" }
         };
@@ -261,14 +275,14 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         // Successful validation
         var successRequest = new
         {
-            username = "audituser",
+            username,
             password = "AuditP@ssw0rd!"
         };
 
         // Failed validation
         var failRequest = new
         {
-            username = "audituser",
+            username,
             password = "WrongP@ssw0rd!"
         };
 
@@ -278,8 +292,8 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         var failResponse = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", failRequest);
 
         // Assert - Both should return 200 OK (security requirement)
-        successResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        failResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, successResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, failResponse.StatusCode);
 
         // Verify audit logs exist in database (implementation-specific)
         // Note: The actual audit logging mechanism depends on implementation
@@ -287,14 +301,14 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         var successResult = await successResponse.Content.ReadFromJsonAsync<ValidationResponse>();
         var failResult = await failResponse.Content.ReadFromJsonAsync<ValidationResponse>();
 
-        successResult!.IsValid.Should().BeTrue();
-        failResult!.IsValid.Should().BeFalse();
+        Assert.True(successResult!.IsValid);
+        Assert.False(failResult!.IsValid);
 
         // Verify that successful validation updated last_login_at
         using var dbContext = _factory.GetDbContext();
-        var userEntity = await dbContext.Users.FirstOrDefaultAsync(u => u.UserName == "audituser");
-        userEntity.Should().NotBeNull();
-        userEntity!.LastLoginAt.Should().NotBeNull();
+        var userEntity = await dbContext.Users.FirstOrDefaultAsync(u => u.UserName == username);
+        Assert.NotNull(userEntity);
+        Assert.NotNull(userEntity!.LastLoginAt);
     }
 
     /// <summary>
@@ -306,12 +320,14 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         // Arrange
         await _factory.ClearDatabaseAsync();
         var adminClient = _factory.CreateAdminClient();
+        var username = UniqueUsername("resetuser");
+        var email = UniqueEmail("resetuser");
 
         // Create a user first
         var createRequest = new
         {
-            username = "resetuser",
-            email = "resetuser@example.com",
+            username,
+            email,
             password = "OldP@ssw0rd!",
             roles = new[] { "Customer" }
         };
@@ -322,12 +338,12 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         var unauthenticatedClient = _factory.CreateClient();
         var oldPasswordValidation = new
         {
-            username = "resetuser",
+            username,
             password = "OldP@ssw0rd!"
         };
         var oldPasswordResponse = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", oldPasswordValidation);
         var oldPasswordResult = await oldPasswordResponse.Content.ReadFromJsonAsync<ValidationResponse>();
-        oldPasswordResult!.IsValid.Should().BeTrue();
+        Assert.True(oldPasswordResult!.IsValid);
 
         // Get old password hash
         using var dbContext1 = _factory.GetDbContext();
@@ -343,27 +359,27 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         var resetResponse = await adminClient.PutAsJsonAsync($"/customers/v1/users/{createdUser!.Id}/password", resetRequest);
 
         // Assert
-        resetResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.Equal(HttpStatusCode.NoContent, resetResponse.StatusCode);
 
         // Verify old password no longer works
         var oldPasswordCheckAfterReset = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", oldPasswordValidation);
         var oldPasswordCheckResult = await oldPasswordCheckAfterReset.Content.ReadFromJsonAsync<ValidationResponse>();
-        oldPasswordCheckResult!.IsValid.Should().BeFalse();
+        Assert.False(oldPasswordCheckResult!.IsValid);
 
         // Verify new password works
         var newPasswordValidation = new
         {
-            username = "resetuser",
+            username,
             password = "NewP@ssw0rd!"
         };
         var newPasswordResponse = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", newPasswordValidation);
         var newPasswordResult = await newPasswordResponse.Content.ReadFromJsonAsync<ValidationResponse>();
-        newPasswordResult!.IsValid.Should().BeTrue();
+        Assert.True(newPasswordResult!.IsValid);
 
         // Verify password hash changed in database
         using var dbContext2 = _factory.GetDbContext();
         var userAfterReset = await dbContext2.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == createdUser.Id);
-        userAfterReset!.PasswordHash.Should().NotBe(oldPasswordHash);
+        Assert.NotEqual(oldPasswordHash, userAfterReset!.PasswordHash);
     }
 
     /// <summary>
@@ -375,12 +391,14 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         // Arrange
         await _factory.ClearDatabaseAsync();
         var adminClient = _factory.CreateAdminClient();
+        var username = UniqueUsername("roleuser");
+        var email = UniqueEmail("roleuser");
 
         // Create a user with Customer role
         var createRequest = new
         {
-            username = "roleuser",
-            email = "roleuser@example.com",
+            username,
+            email,
             password = "RoleP@ssw0rd!",
             roles = new[] { "Customer" }
         };
@@ -391,14 +409,14 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         var unauthenticatedClient = _factory.CreateClient();
         var validateRequest = new
         {
-            username = "roleuser",
+            username,
             password = "RoleP@ssw0rd!"
         };
         var initialValidation = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", validateRequest);
         var initialResult = await initialValidation.Content.ReadFromJsonAsync<ValidationResponse>();
-        initialResult!.IsValid.Should().BeTrue();
-        initialResult.Roles.Should().Contain("Customer");
-        initialResult.Roles.Should().NotContain("Employee");
+        Assert.True(initialResult!.IsValid);
+        Assert.Contains("Customer", initialResult.Roles);
+        Assert.DoesNotContain("Employee", initialResult.Roles);
 
         // Act - Update roles from Customer to Employee
         var updateRolesRequest = new
@@ -408,19 +426,19 @@ public class US6_UserAccountManagementIntegrationTests : IClassFixture<TestDatab
         var updateResponse = await adminClient.PutAsJsonAsync($"/customers/v1/users/{createdUser!.Id}/roles", updateRolesRequest);
 
         // Assert
-        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
 
         // Verify role change in validation response
         var updatedValidation = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", validateRequest);
         var updatedResult = await updatedValidation.Content.ReadFromJsonAsync<ValidationResponse>();
-        updatedResult!.IsValid.Should().BeTrue();
-        updatedResult.Roles.Should().Contain("Employee");
-        updatedResult.Roles.Should().NotContain("Customer");
+        Assert.True(updatedResult!.IsValid);
+        Assert.Contains("Employee", updatedResult.Roles);
+        Assert.DoesNotContain("Customer", updatedResult.Roles);
 
         // Verify role change in user retrieval
         var getUserResponse = await adminClient.GetAsync($"/customers/v1/users/{createdUser.Id}");
         var retrievedUser = await getUserResponse.Content.ReadFromJsonAsync<UserResponse>();
-        retrievedUser!.Roles.Should().Contain("Employee");
-        retrievedUser.Roles.Should().NotContain("Customer");
+        Assert.Contains("Employee", retrievedUser!.Roles);
+        Assert.DoesNotContain("Customer", retrievedUser.Roles);
     }
 }

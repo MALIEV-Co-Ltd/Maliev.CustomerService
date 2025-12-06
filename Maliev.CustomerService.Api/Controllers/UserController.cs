@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Users;
 using Maliev.CustomerService.Api.Services;
-using FluentValidation;
 using System.Security.Claims;
 
 namespace Maliev.CustomerService.Api.Controllers;
@@ -12,28 +11,24 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for user account management operations
 /// </summary>
 [ApiController]
-[Route("v1/users")]
+[Route("customers/v1/users")]
 [Authorize]
 public class UserController : ControllerBase
 {
     private readonly IUserService _userService;
     private readonly ILogger<UserController> _logger;
-    private readonly IValidator<CreateUserRequest> _createValidator;
-    private readonly IValidator<UpdatePasswordRequest> _updatePasswordValidator;
-    private readonly IValidator<UpdateRolesRequest> _updateRolesValidator;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="UserController"/> class
+    /// </summary>
+    /// <param name="userService">User service</param>
+    /// <param name="logger">Logger instance</param>
     public UserController(
         IUserService userService,
-        ILogger<UserController> logger,
-        IValidator<CreateUserRequest> createValidator,
-        IValidator<UpdatePasswordRequest> updatePasswordValidator,
-        IValidator<UpdateRolesRequest> updateRolesValidator)
+        ILogger<UserController> logger)
     {
         _userService = userService;
         _logger = logger;
-        _createValidator = createValidator;
-        _updatePasswordValidator = updatePasswordValidator;
-        _updateRolesValidator = updateRolesValidator;
     }
 
     /// <summary>
@@ -54,22 +49,21 @@ public class UserController : ControllerBase
     {
         try
         {
-            // Validate request using FluentValidation
-            var validationResult = await _createValidator.ValidateAsync(request);
-            if (!validationResult.IsValid)
+            // ModelState validation via DataAnnotations
+            if (!ModelState.IsValid)
             {
                 _logger.LogWarning("Validation failed for user creation: {Errors}",
-                    string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
+                    string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
 
                 var errorResponse = new ErrorResponse
                 {
                     Code = "VALIDATION_ERROR",
                     Message = "One or more validation errors occurred",
-                    Details = validationResult.Errors
-                        .GroupBy(e => e.PropertyName)
+                    Details = ModelState
+                        .Where(ms => ms.Value?.Errors.Count > 0)
                         .ToDictionary(
-                            g => g.Key,
-                            g => g.Select(e => e.ErrorMessage).ToArray()),
+                            kvp => kvp.Key,
+                            kvp => kvp.Value!.Errors.Select(e => e.ErrorMessage).ToArray()),
                     TraceId = HttpContext.TraceIdentifier,
                     Timestamp = DateTime.UtcNow
                 };
@@ -216,22 +210,21 @@ public class UserController : ControllerBase
     {
         try
         {
-            // Validate request using FluentValidation
-            var validationResult = await _updatePasswordValidator.ValidateAsync(request);
-            if (!validationResult.IsValid)
+            // ModelState validation via DataAnnotations
+            if (!ModelState.IsValid)
             {
                 _logger.LogWarning("Validation failed for password update: {Errors}",
-                    string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
+                    string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
 
                 var errorResponse = new ErrorResponse
                 {
                     Code = "VALIDATION_ERROR",
                     Message = "One or more validation errors occurred",
-                    Details = validationResult.Errors
-                        .GroupBy(e => e.PropertyName)
+                    Details = ModelState
+                        .Where(ms => ms.Value?.Errors.Count > 0)
                         .ToDictionary(
-                            g => g.Key,
-                            g => g.Select(e => e.ErrorMessage).ToArray()),
+                            kvp => kvp.Key,
+                            kvp => kvp.Value!.Errors.Select(e => e.ErrorMessage).ToArray()),
                     TraceId = HttpContext.TraceIdentifier,
                     Timestamp = DateTime.UtcNow
                 };
@@ -293,22 +286,21 @@ public class UserController : ControllerBase
     {
         try
         {
-            // Validate request using FluentValidation
-            var validationResult = await _updateRolesValidator.ValidateAsync(request);
-            if (!validationResult.IsValid)
+            // ModelState validation via DataAnnotations
+            if (!ModelState.IsValid)
             {
                 _logger.LogWarning("Validation failed for roles update: {Errors}",
-                    string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
+                    string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
 
                 var errorResponse = new ErrorResponse
                 {
                     Code = "VALIDATION_ERROR",
                     Message = "One or more validation errors occurred",
-                    Details = validationResult.Errors
-                        .GroupBy(e => e.PropertyName)
+                    Details = ModelState
+                        .Where(ms => ms.Value?.Errors.Count > 0)
                         .ToDictionary(
-                            g => g.Key,
-                            g => g.Select(e => e.ErrorMessage).ToArray()),
+                            kvp => kvp.Key,
+                            kvp => kvp.Value!.Errors.Select(e => e.ErrorMessage).ToArray()),
                     TraceId = HttpContext.TraceIdentifier,
                     Timestamp = DateTime.UtcNow
                 };

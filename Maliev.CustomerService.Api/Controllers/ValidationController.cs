@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Users;
 using Maliev.CustomerService.Api.Services;
-using FluentValidation;
 
 namespace Maliev.CustomerService.Api.Controllers;
 
@@ -11,21 +10,23 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for credential validation (used by Auth Service)
 /// </summary>
 [ApiController]
-[Route("v1")]
+[Route("customers/v1")]
 public class ValidationController : ControllerBase
 {
     private readonly IUserService _userService;
     private readonly ILogger<ValidationController> _logger;
-    private readonly IValidator<ValidateCredentialsRequest> _validator;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ValidationController"/> class
+    /// </summary>
+    /// <param name="userService">User service</param>
+    /// <param name="logger">Logger instance</param>
     public ValidationController(
         IUserService userService,
-        ILogger<ValidationController> logger,
-        IValidator<ValidateCredentialsRequest> validator)
+        ILogger<ValidationController> logger)
     {
         _userService = userService;
         _logger = logger;
-        _validator = validator;
     }
 
     /// <summary>
@@ -53,9 +54,8 @@ public class ValidationController : ControllerBase
 
         try
         {
-            // Validate request using FluentValidation
-            var validationResult = await _validator.ValidateAsync(request);
-            if (!validationResult.IsValid)
+            // ModelState validation via DataAnnotations
+            if (!ModelState.IsValid)
             {
                 // Security logging: Log validation attempt failure without password
                 _logger.LogWarning(
@@ -68,11 +68,11 @@ public class ValidationController : ControllerBase
                 {
                     Code = "VALIDATION_ERROR",
                     Message = "One or more validation errors occurred",
-                    Details = validationResult.Errors
-                        .GroupBy(e => e.PropertyName)
+                    Details = ModelState
+                        .Where(ms => ms.Value?.Errors.Count > 0)
                         .ToDictionary(
-                            g => g.Key,
-                            g => g.Select(e => e.ErrorMessage).ToArray()),
+                            kvp => kvp.Key,
+                            kvp => kvp.Value!.Errors.Select(e => e.ErrorMessage).ToArray()),
                     TraceId = HttpContext.TraceIdentifier,
                     Timestamp = timestamp
                 };

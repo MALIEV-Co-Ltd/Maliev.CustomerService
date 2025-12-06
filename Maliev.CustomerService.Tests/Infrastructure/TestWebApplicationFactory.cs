@@ -10,7 +10,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.IdentityModel.Tokens;
 using Moq;
+using System.IdentityModel.Tokens.Jwt;
+using System.Net.Http.Headers;
+using System.Security.Claims;
+using System.Security.Cryptography;
 
 namespace Maliev.CustomerService.Tests.Infrastructure;
 
@@ -18,11 +23,15 @@ namespace Maliev.CustomerService.Tests.Infrastructure;
 /// Custom WebApplicationFactory for integration testing
 /// - Uses PostgreSQL test database via Testcontainers
 /// - Mocks external services (UploadService, CountryService)
-/// - Uses fake authentication for testing authorized endpoints
+/// - Uses dynamic RSA keys for JWT authentication testing
 /// </summary>
 public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private readonly TestDatabaseFixture _databaseFixture;
+    private readonly RSA _testRsa;
+    private const string TestIssuer = "test-issuer";
+    private const string TestAudience = "test-audience";
+
     public Mock<IUploadServiceClient> MockUploadService { get; }
     public Mock<ICountryServiceClient> MockCountryService { get; }
 
@@ -31,6 +40,9 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
         _databaseFixture = databaseFixture;
         MockUploadService = new Mock<IUploadServiceClient>();
         MockCountryService = new Mock<ICountryServiceClient>();
+
+        // Generate ephemeral RSA key for test JWT tokens
+        _testRsa = RSA.Create(2048);
     }
 
     public Task InitializeAsync()
@@ -41,6 +53,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
 
     public new async Task DisposeAsync()
     {
+        _testRsa.Dispose();
         // Database will be disposed by the collection fixture
         await base.DisposeAsync();
     }
@@ -54,7 +67,9 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:CustomerDbContext"] = _databaseFixture.ConnectionString
+                ["ConnectionStrings:CustomerDbContext"] = _databaseFixture.ConnectionString,
+                ["Jwt:Issuer"] = TestIssuer,
+                ["Jwt:Audience"] = TestAudience
             });
         });
 
@@ -66,16 +81,21 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
                 options.UseNpgsql(_databaseFixture.ConnectionString);
             });
 
-            // Add FakeAuthenticationHandler and set it as the default authentication scheme
-            services.AddAuthentication(options =>
+            // PostConfigure JWT Bearer options to use our test RSA key
+            services.PostConfigureAll<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>(options =>
             {
-                options.DefaultAuthenticateScheme = FakeAuthenticationHandler.SchemeName;
-                options.DefaultChallengeScheme = FakeAuthenticationHandler.SchemeName;
-                options.DefaultScheme = FakeAuthenticationHandler.SchemeName;
-            })
-            .AddScheme<AuthenticationSchemeOptions, FakeAuthenticationHandler>(
-                FakeAuthenticationHandler.SchemeName,
-                options => { });
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = TestIssuer,
+                    ValidAudience = TestAudience,
+                    IssuerSigningKey = new RsaSecurityKey(_testRsa),
+                    ClockSkew = TimeSpan.Zero // No clock skew for tests
+                };
+            });
 
             // Replace external service clients with mocks
             services.RemoveAll<IUploadServiceClient>();
@@ -87,40 +107,84 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
     }
 
     /// <summary>
-    /// Creates HTTP client with custom authentication headers
+    /// Creates a test JWT token with specified claims for integration testing.
     /// </summary>
-    public HttpClient CreateAuthenticatedClient(Dictionary<string, string> authHeaders)
+    /// <param name="userId">User ID claim</param>
+    /// <param name="roles">User roles</param>
+    /// <param name="additionalClaims">Additional claims to include</param>
+    /// <returns>JWT token string</returns>
+    public string CreateTestJwtToken(string userId = "test-user", string[]? roles = null, Dictionary<string, string>? additionalClaims = null)
+    {
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, userId),
+            new(JwtRegisteredClaimNames.Sub, userId),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+        };
+
+        // Add roles
+        roles ??= new[] { "Admin" };
+        foreach (var role in roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
+
+        // Add additional claims
+        if (additionalClaims != null)
+        {
+            foreach (var (key, value) in additionalClaims)
+            {
+                claims.Add(new Claim(key, value));
+            }
+        }
+
+        var credentials = new SigningCredentials(
+            new RsaSecurityKey(_testRsa),
+            SecurityAlgorithms.RsaSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: TestIssuer,
+            audience: TestAudience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddHours(1),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    /// <summary>
+    /// Creates HTTP client with JWT Bearer token authentication
+    /// </summary>
+    public HttpClient CreateAuthenticatedClient(string userId = "test-user", string[]? roles = null, Dictionary<string, string>? additionalClaims = null)
     {
         var client = CreateClient();
-        foreach (var (key, value) in authHeaders)
-        {
-            client.DefaultRequestHeaders.Add(key, value);
-        }
+        var token = CreateTestJwtToken(userId, roles, additionalClaims);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
     }
 
     /// <summary>
     /// Creates HTTP client with Employee role
     /// </summary>
-    public HttpClient CreateEmployeeClient()
+    public HttpClient CreateEmployeeClient(string userId = "test-employee")
     {
-        return CreateAuthenticatedClient(TestAuthenticationHelper.CreateEmployeeHeaders());
+        return CreateAuthenticatedClient(userId, new[] { "Employee" });
     }
 
     /// <summary>
     /// Creates HTTP client with Manager role
     /// </summary>
-    public HttpClient CreateManagerClient()
+    public HttpClient CreateManagerClient(string userId = "test-manager")
     {
-        return CreateAuthenticatedClient(TestAuthenticationHelper.CreateManagerHeaders());
+        return CreateAuthenticatedClient(userId, new[] { "Manager" });
     }
 
     /// <summary>
     /// Creates HTTP client with Admin role
     /// </summary>
-    public HttpClient CreateAdminClient()
+    public HttpClient CreateAdminClient(string userId = "test-admin")
     {
-        return CreateAuthenticatedClient(TestAuthenticationHelper.CreateAdminHeaders());
+        return CreateAuthenticatedClient(userId, new[] { "Admin" });
     }
 
     /// <summary>
@@ -128,7 +192,8 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
     /// </summary>
     public HttpClient CreateCustomerClient(string? customerId = null)
     {
-        return CreateAuthenticatedClient(TestAuthenticationHelper.CreateCustomerHeaders(customerId));
+        var claims = customerId != null ? new Dictionary<string, string> { ["customer_id"] = customerId } : null;
+        return CreateAuthenticatedClient(customerId ?? "test-customer", new[] { "Customer" }, claims);
     }
 
     /// <summary>

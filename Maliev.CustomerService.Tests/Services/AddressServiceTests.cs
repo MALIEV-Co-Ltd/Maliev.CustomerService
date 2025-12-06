@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Maliev.CustomerService.Api.Models.Addresses;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Api.Services.External;
@@ -61,18 +60,18 @@ public class AddressServiceTests
         var result = await service.CreateAsync(request, "test-actor", "Employee");
 
         // Assert
-        result.Should().NotBeNull();
-        result.Id.Should().NotBeEmpty();
-        result.OwnerType.Should().Be("Customer");
-        result.OwnerId.Should().Be(request.OwnerId);
-        result.Type.Should().Be("Billing");
-        result.AddressLine1.Should().Be("123 Main Street");
-        result.AddressLine2.Should().Be("Suite 100");
-        result.City.Should().Be("Bangkok");
-        result.Province.Should().Be("Bangkok");
-        result.PostalCode.Should().Be("10110");
-        result.CountryId.Should().Be(countryId);
-        result.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        Assert.NotNull(result);
+        Assert.NotEqual(Guid.Empty, result.Id);
+        Assert.Equal("Customer", result.OwnerType);
+        Assert.Equal(request.OwnerId, result.OwnerId);
+        Assert.Equal("Billing", result.Type);
+        Assert.Equal("123 Main Street", result.AddressLine1);
+        Assert.Equal("Suite 100", result.AddressLine2);
+        Assert.Equal("Bangkok", result.City);
+        Assert.Equal("Bangkok", result.Province);
+        Assert.Equal("10110", result.PostalCode);
+        Assert.Equal(countryId, result.CountryId);
+        Assert.True(result.CreatedAt > DateTime.UtcNow.AddSeconds(-5) && result.CreatedAt <= DateTime.UtcNow.AddSeconds(5));
         _mockCountryServiceClient.Verify(x => x.ValidateCountryIdAsync(countryId), Times.Once);
     }
 
@@ -102,7 +101,7 @@ public class AddressServiceTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.CreateAsync(request, "test-actor", "Employee"));
 
-        exception.Message.Should().Contain("not valid");
+        Assert.Contains("not valid", exception.Message);
         _mockCountryServiceClient.Verify(x => x.ValidateCountryIdAsync(invalidCountryId), Times.Once);
     }
 
@@ -132,7 +131,7 @@ public class AddressServiceTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.CreateAsync(request, "test-actor", "Employee"));
 
-        exception.Message.Should().Contain("unavailable");
+        Assert.Contains("unavailable", exception.Message);
     }
 
     [Fact]
@@ -166,11 +165,11 @@ public class AddressServiceTests
             .Where(a => a.EntityId == result.Id.ToString())
             .FirstOrDefaultAsync();
 
-        auditLog.Should().NotBeNull();
-        auditLog!.ActorId.Should().Be("employee-123");
-        auditLog.ActorType.Should().Be("Employee");
-        auditLog.Action.Should().Be(AuditAction.Create);
-        auditLog.EntityType.Should().Be("Address");
+        Assert.NotNull(auditLog);
+        Assert.Equal("employee-123", auditLog!.ActorId);
+        Assert.Equal("Employee", auditLog.ActorType);
+        Assert.Equal(AuditAction.Create, auditLog.Action);
+        Assert.Equal("Address", auditLog.EntityType);
     }
 
     [Fact]
@@ -213,9 +212,10 @@ public class AddressServiceTests
         var result = await service.GetByOwnerAsync("Customer", ownerId);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Should().HaveCount(2);
-        result.Should().OnlyContain(a => a.OwnerType == "Customer" && a.OwnerId == ownerId);
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Count);
+        Assert.All(result, a => Assert.Equal("Customer", a.OwnerType));
+        Assert.All(result, a => Assert.Equal(ownerId, a.OwnerId));
     }
 
     [Fact]
@@ -230,8 +230,8 @@ public class AddressServiceTests
         var result = await service.GetByOwnerAsync("Customer", ownerId);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Should().BeEmpty();
+        Assert.NotNull(result);
+        Assert.Empty(result);
     }
 
     [Fact]
@@ -277,13 +277,13 @@ public class AddressServiceTests
         var companyAddresses = await service.GetByOwnerAsync("Company", companyId);
 
         // Assert
-        customerAddresses.Should().HaveCount(1);
-        customerAddresses[0].OwnerType.Should().Be("Customer");
-        customerAddresses[0].OwnerId.Should().Be(customerId);
+        Assert.Single(customerAddresses);
+        Assert.Equal("Customer", customerAddresses[0].OwnerType);
+        Assert.Equal(customerId, customerAddresses[0].OwnerId);
 
-        companyAddresses.Should().HaveCount(1);
-        companyAddresses[0].OwnerType.Should().Be("Company");
-        companyAddresses[0].OwnerId.Should().Be(companyId);
+        Assert.Single(companyAddresses);
+        Assert.Equal("Company", companyAddresses[0].OwnerType);
+        Assert.Equal(companyId, companyAddresses[0].OwnerId);
     }
 
     [Fact]
@@ -320,12 +320,12 @@ public class AddressServiceTests
         var result = await service.UpdateAsync(created.Id, updateRequest, "test-actor2", "Employee");
 
         // Assert
-        result.Should().NotBeNull();
-        result.AddressLine1.Should().Be("999 Updated Street");
-        result.City.Should().Be("Chiang Mai");
-        result.PostalCode.Should().Be("50000");
-        result.Province.Should().Be("Bangkok"); // Unchanged
-        result.UpdatedAt.Should().BeAfter(created.UpdatedAt);
+        Assert.NotNull(result);
+        Assert.Equal("999 Updated Street", result.AddressLine1);
+        Assert.Equal("Chiang Mai", result.City);
+        Assert.Equal("50000", result.PostalCode);
+        Assert.Equal("Bangkok", result.Province); // Unchanged
+        Assert.True(result.UpdatedAt > created.UpdatedAt);
     }
 
     [Fact]
@@ -363,7 +363,7 @@ public class AddressServiceTests
         var result = await service.UpdateAsync(created.Id, updateRequest, "test-actor", "Employee");
 
         // Assert
-        result.CountryId.Should().Be(newCountryId);
+        Assert.Equal(newCountryId, result.CountryId);
         _mockCountryServiceClient.Verify(x => x.ValidateCountryIdAsync(newCountryId), Times.Once);
     }
 
@@ -402,7 +402,7 @@ public class AddressServiceTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.UpdateAsync(created.Id, updateRequest, "test-actor", "Employee"));
 
-        exception.Message.Should().Contain("not valid");
+        Assert.Contains("not valid", exception.Message);
     }
 
     [Fact]
@@ -455,7 +455,7 @@ public class AddressServiceTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.UpdateAsync(created.Id, updateRequest, "test-actor", "Employee"));
 
-        exception.Message.Should().Contain("modified by another user");
+        Assert.Contains("modified by another user", exception.Message);
     }
 
     [Fact]
@@ -496,11 +496,11 @@ public class AddressServiceTests
             .OrderBy(a => a.Timestamp)
             .ToListAsync();
 
-        auditLogs.Should().HaveCount(2); // Create + Update
+        Assert.Equal(2, auditLogs.Count); // Create + Update
         var updateAudit = auditLogs[1];
-        updateAudit.ActorId.Should().Be("customer-456");
-        updateAudit.ActorType.Should().Be("Customer");
-        updateAudit.Action.Should().Be(AuditAction.Update);
+        Assert.Equal("customer-456", updateAudit.ActorId);
+        Assert.Equal("Customer", updateAudit.ActorType);
+        Assert.Equal(AuditAction.Update, updateAudit.Action);
     }
 
     [Fact]
@@ -529,12 +529,12 @@ public class AddressServiceTests
         var result = await service.DeleteAsync(created.Id, "admin-789", "Admin");
 
         // Assert
-        result.Should().BeTrue();
+        Assert.True(result);
 
         // Verify address is deleted
         await using var context = _fixture.CreateDbContext();
         var address = await context.Addresses.FindAsync(created.Id);
-        address.Should().BeNull();
+        Assert.Null(address);
     }
 
     [Fact]
@@ -549,7 +549,7 @@ public class AddressServiceTests
         var result = await service.DeleteAsync(nonExistentId, "test-actor", "Employee");
 
         // Assert
-        result.Should().BeFalse();
+        Assert.False(result);
     }
 
     [Fact]
@@ -584,10 +584,10 @@ public class AddressServiceTests
             .OrderBy(a => a.Timestamp)
             .ToListAsync();
 
-        auditLogs.Should().HaveCount(2); // Create + Delete
+        Assert.Equal(2, auditLogs.Count); // Create + Delete
         var deleteAudit = auditLogs[1];
-        deleteAudit.ActorId.Should().Be("manager-999");
-        deleteAudit.ActorType.Should().Be("Manager");
-        deleteAudit.Action.Should().Be(AuditAction.Delete);
+        Assert.Equal("manager-999", deleteAudit.ActorId);
+        Assert.Equal("Manager", deleteAudit.ActorType);
+        Assert.Equal(AuditAction.Delete, deleteAudit.Action);
     }
 }

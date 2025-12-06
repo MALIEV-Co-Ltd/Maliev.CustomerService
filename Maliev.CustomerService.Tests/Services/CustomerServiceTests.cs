@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Data.Models;
@@ -7,7 +6,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
-using System.Text.Json;
 
 namespace Maliev.CustomerService.Tests.Services;
 
@@ -62,18 +60,18 @@ public class CustomerServiceTests
         var result = await service.CreateAsync(request, "test-actor", "Employee");
 
         // Assert
-        result.Should().NotBeNull();
-        result.Id.Should().NotBeEmpty();
-        result.FirstName.Should().Be("John");
-        result.LastName.Should().Be("Doe");
-        result.Email.Should().Be("john.doe@example.com");
-        result.Phone.Should().Be("+66-2-123-4567");
-        result.Segment.Should().Be("Retail");
-        result.Tier.Should().Be("Bronze");
-        result.PreferredLanguage.Should().Be("en");
-        result.Timezone.Should().Be("Asia/Bangkok");
-        result.CommunicationPreferences.Should().NotBeNull();
-        result.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        Assert.NotNull(result);
+        Assert.NotEqual(Guid.Empty, result.Id);
+        Assert.Equal("John", result.FirstName);
+        Assert.Equal("Doe", result.LastName);
+        Assert.Equal("john.doe@example.com", result.Email);
+        Assert.Equal("+66-2-123-4567", result.Phone);
+        Assert.Equal("Retail", result.Segment);
+        Assert.Equal("Bronze", result.Tier);
+        Assert.Equal("en", result.PreferredLanguage);
+        Assert.Equal("Asia/Bangkok", result.Timezone);
+        Assert.NotNull(result.CommunicationPreferences);
+        Assert.True(result.CreatedAt > DateTime.UtcNow.AddSeconds(-5) && result.CreatedAt <= DateTime.UtcNow.AddSeconds(5));
     }
 
     [Fact]
@@ -129,11 +127,11 @@ public class CustomerServiceTests
             .Where(a => a.EntityId == result.Id.ToString())
             .FirstOrDefaultAsync();
 
-        auditLog.Should().NotBeNull();
-        auditLog!.ActorId.Should().Be("employee-123");
-        auditLog.ActorType.Should().Be("Employee");
-        auditLog.Action.Should().Be(AuditAction.Create);
-        auditLog.EntityType.Should().Be("Customer");
+        Assert.NotNull(auditLog);
+        Assert.Equal("employee-123", auditLog!.ActorId);
+        Assert.Equal("Employee", auditLog.ActorType);
+        Assert.Equal(AuditAction.Create, auditLog.Action);
+        Assert.Equal("Customer", auditLog.EntityType);
     }
 
     [Fact]
@@ -158,11 +156,11 @@ public class CustomerServiceTests
         var result = await service.GetByIdAsync(created.Id);
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Id.Should().Be(created.Id);
-        result.Email.Should().Be("get.test@example.com");
-        result.Segment.Should().Be("Enterprise");
-        result.Tier.Should().Be("Gold");
+        Assert.NotNull(result);
+        Assert.Equal(created.Id, result!.Id);
+        Assert.Equal("get.test@example.com", result.Email);
+        Assert.Equal("Enterprise", result.Segment);
+        Assert.Equal("Gold", result.Tier);
     }
 
     [Fact]
@@ -177,7 +175,7 @@ public class CustomerServiceTests
         var result = await service.GetByIdAsync(nonExistentId);
 
         // Assert
-        result.Should().BeNull();
+        Assert.Null(result);
     }
 
     [Fact]
@@ -205,7 +203,7 @@ public class CustomerServiceTests
         var result = await service.GetByIdAsync(created.Id);
 
         // Assert
-        result.Should().BeNull();
+        Assert.Null(result);
     }
 
     [Fact]
@@ -238,13 +236,13 @@ public class CustomerServiceTests
         var result = await service.UpdateAsync(created.Id, updateRequest, "test-actor2", "Employee");
 
         // Assert
-        result.Should().NotBeNull();
-        result.FirstName.Should().Be("Updated");
-        result.Phone.Should().Be("+66-2-999-9999");
-        result.Tier.Should().Be("Silver");
-        result.LastName.Should().Be("Test"); // Unchanged
-        result.Email.Should().Be("update.test@example.com"); // Unchanged
-        result.UpdatedAt.Should().BeAfter(created.UpdatedAt);
+        Assert.NotNull(result);
+        Assert.Equal("Updated", result.FirstName);
+        Assert.Equal("+66-2-999-9999", result.Phone);
+        Assert.Equal("Silver", result.Tier);
+        Assert.Equal("Test", result.LastName); // Unchanged
+        Assert.Equal("update.test@example.com", result.Email); // Unchanged
+        Assert.True(result.UpdatedAt > created.UpdatedAt);
     }
 
     [Fact]
@@ -292,7 +290,7 @@ public class CustomerServiceTests
         // Act & Assert
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.UpdateAsync(created.Id, updateRequest, "test-actor", "Employee"));
-        exception.Message.Should().Contain("customer was modified by another user");
+        Assert.Contains("customer was modified by another user", exception.Message);
     }
 
     [Fact]
@@ -329,11 +327,11 @@ public class CustomerServiceTests
             .OrderBy(a => a.Timestamp)
             .ToListAsync();
 
-        auditLogs.Should().HaveCount(2); // Create + Update
+        Assert.Equal(2, auditLogs.Count); // Create + Update
         var updateAudit = auditLogs[1];
-        updateAudit.ActorId.Should().Be("customer-456");
-        updateAudit.ActorType.Should().Be("Customer");
-        updateAudit.Action.Should().Be(AuditAction.Update);
+        Assert.Equal("customer-456", updateAudit.ActorId);
+        Assert.Equal("Customer", updateAudit.ActorType);
+        Assert.Equal(AuditAction.Update, updateAudit.Action);
     }
 
     [Fact]
@@ -358,13 +356,13 @@ public class CustomerServiceTests
         var result = await service.SoftDeleteAsync(created.Id, "admin-789", "Admin");
 
         // Assert
-        result.Should().BeTrue();
+        Assert.True(result);
 
         // Verify customer is marked as deleted
         await using var context = _fixture.CreateDbContext();
         var customer = await context.Customers.FindAsync(created.Id);
-        customer.Should().NotBeNull();
-        customer!.IsDeleted.Should().BeTrue();
+        Assert.NotNull(customer);
+        Assert.True(customer!.IsDeleted);
     }
 
     [Fact]
@@ -379,7 +377,7 @@ public class CustomerServiceTests
         var result = await service.SoftDeleteAsync(nonExistentId, "test-actor", "Employee");
 
         // Assert
-        result.Should().BeFalse();
+        Assert.False(result);
     }
 
     [Fact]
@@ -410,11 +408,11 @@ public class CustomerServiceTests
             .OrderBy(a => a.Timestamp)
             .ToListAsync();
 
-        auditLogs.Should().HaveCount(2); // Create + SoftDelete
+        Assert.Equal(2, auditLogs.Count); // Create + SoftDelete
         var deleteAudit = auditLogs[1];
-        deleteAudit.ActorId.Should().Be("manager-999");
-        deleteAudit.ActorType.Should().Be("Manager");
-        deleteAudit.Action.Should().Be(AuditAction.SoftDelete);
+        Assert.Equal("manager-999", deleteAudit.ActorId);
+        Assert.Equal("Manager", deleteAudit.ActorType);
+        Assert.Equal(AuditAction.SoftDelete, deleteAudit.Action);
     }
 
     [Fact]
@@ -444,11 +442,11 @@ public class CustomerServiceTests
         var result = await service.GetAllAsync();
 
         // Assert
-        result.Should().NotBeNull();
-        result.TotalCount.Should().Be(3);
-        result.Items.Should().HaveCount(3);
-        result.Page.Should().Be(1);
-        result.PageSize.Should().Be(50);
+        Assert.NotNull(result);
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(3, result.Items.Count);
+        Assert.Equal(1, result.Page);
+        Assert.Equal(50, result.PageSize);
     }
 
     [Fact]
@@ -486,9 +484,9 @@ public class CustomerServiceTests
         var result = await service.GetAllAsync(segment: "Enterprise");
 
         // Assert
-        result.TotalCount.Should().Be(1);
-        result.Items.Should().HaveCount(1);
-        result.Items[0].Segment.Should().Be("Enterprise");
+        Assert.Equal(1, result.TotalCount);
+        Assert.Single(result.Items);
+        Assert.Equal("Enterprise", result.Items[0].Segment);
     }
 
     [Fact]
@@ -519,13 +517,13 @@ public class CustomerServiceTests
         var page2 = await service.GetAllAsync(page: 2, pageSize: 2);
 
         // Assert
-        page1.Items.Should().HaveCount(2);
-        page1.Page.Should().Be(1);
-        page1.TotalCount.Should().Be(5);
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Equal(1, page1.Page);
+        Assert.Equal(5, page1.TotalCount);
 
-        page2.Items.Should().HaveCount(2);
-        page2.Page.Should().Be(2);
-        page2.TotalCount.Should().Be(5);
+        Assert.Equal(2, page2.Items.Count);
+        Assert.Equal(2, page2.Page);
+        Assert.Equal(5, page2.TotalCount);
     }
 
     [Fact]
@@ -553,8 +551,8 @@ public class CustomerServiceTests
         var result = await service.GetAllAsync();
 
         // Assert
-        result.TotalCount.Should().Be(0);
-        result.Items.Should().BeEmpty();
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
     }
 
     [Fact]
@@ -585,13 +583,13 @@ public class CustomerServiceTests
         var result = await service.GetPreferencesAsync();
 
         // Assert
-        result.Should().NotBeNull();
-        result.TotalCount.Should().Be(1);
-        result.Items.Should().HaveCount(1);
+        Assert.NotNull(result);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Single(result.Items);
 
         var pref = result.Items[0];
-        pref.PreferredLanguage.Should().Be("th");
-        pref.Timezone.Should().Be("Asia/Bangkok");
-        pref.CommunicationPreferences.Should().NotBeNull();
+        Assert.Equal("th", pref.PreferredLanguage);
+        Assert.Equal("Asia/Bangkok", pref.Timezone);
+        Assert.NotNull(pref.CommunicationPreferences);
     }
 }

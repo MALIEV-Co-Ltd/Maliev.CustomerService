@@ -12,12 +12,22 @@ public class ExceptionHandlingMiddleware
     private readonly RequestDelegate _next;
     private readonly ILogger<ExceptionHandlingMiddleware> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ExceptionHandlingMiddleware"/> class
+    /// </summary>
+    /// <param name="next">The next middleware in the pipeline</param>
+    /// <param name="logger">Logger instance</param>
     public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
     {
         _next = next;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Invokes the middleware to handle exceptions
+    /// </summary>
+    /// <param name="context">The HTTP context</param>
+    /// <returns>A task representing the asynchronous operation</returns>
     public async Task InvokeAsync(HttpContext context)
     {
         try
@@ -108,6 +118,11 @@ public class ExceptionHandlingMiddleware
 /// </summary>
 public static class ExceptionHandlingMiddlewareExtensions
 {
+    /// <summary>
+    /// Adds the exception handling middleware to the application pipeline
+    /// </summary>
+    /// <param name="builder">The application builder</param>
+    /// <returns>The application builder for method chaining</returns>
     public static IApplicationBuilder UseExceptionHandling(this IApplicationBuilder builder)
     {
         return builder.UseMiddleware<ExceptionHandlingMiddleware>();

@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using FluentAssertions;
 using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Models.Addresses;
 using Maliev.CustomerService.Api.Models;
@@ -19,6 +18,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
 {
     private readonly TestDatabaseFixture _databaseFixture;
     private TestWebApplicationFactory _factory = null!;
+    private string _testId = null!;
 
     public US2_MultiAddressManagementIntegrationTests(TestDatabaseFixture databaseFixture)
     {
@@ -27,6 +27,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        _testId = Guid.NewGuid().ToString("N")[..8];
         _factory = new TestWebApplicationFactory(_databaseFixture);
         await _factory.InitializeAsync();
     }
@@ -35,6 +36,8 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
     {
         await _factory.DisposeAsync();
     }
+
+    private string UniqueEmail(string prefix) => $"{prefix}.{_testId}@example.com";
 
     /// <summary>
     /// Scenario 1: Add billing address with country validation
@@ -57,7 +60,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
         {
             firstName = "John",
             lastName = "Smith",
-            email = "john.smith@example.com",
+            email = UniqueEmail("john.smith"),
             phone = "+6621234567",
             segment = "Retail",
             tier = "Bronze",
@@ -85,20 +88,20 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync("/customers/v1/addresses", addressRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var address = await response.Content.ReadFromJsonAsync<AddressResponse>();
-        address.Should().NotBeNull();
-        address!.Id.Should().NotBeEmpty();
-        address.OwnerType.Should().Be("Customer");
-        address.OwnerId.Should().Be(customer.Id);
-        address.Type.Should().Be("Billing");
-        address.AddressLine1.Should().Be("123 Main Street");
-        address.AddressLine2.Should().Be("Suite 100");
-        address.City.Should().Be("Bangkok");
-        address.Province.Should().Be("Bangkok");
-        address.PostalCode.Should().Be("10110");
-        address.CountryId.Should().Be(mockCountryId);
-        address.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        Assert.NotNull(address);
+        Assert.NotEqual(Guid.Empty, address!.Id);
+        Assert.Equal("Customer", address.OwnerType);
+        Assert.Equal(customer.Id, address.OwnerId);
+        Assert.Equal("Billing", address.Type);
+        Assert.Equal("123 Main Street", address.AddressLine1);
+        Assert.Equal("Suite 100", address.AddressLine2);
+        Assert.Equal("Bangkok", address.City);
+        Assert.Equal("Bangkok", address.Province);
+        Assert.Equal("10110", address.PostalCode);
+        Assert.Equal(mockCountryId, address.CountryId);
+        Assert.True(Math.Abs((address.CreatedAt - DateTime.UtcNow).TotalSeconds) < 5);
 
         // Verify Country Service was called
         _factory.MockCountryService.Verify(
@@ -127,7 +130,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
         {
             firstName = "Jane",
             lastName = "Doe",
-            email = "jane.doe@example.com",
+            email = UniqueEmail("jane.doe"),
             phone = "+6625555555",
             segment = "Wholesale",
             tier = "Silver",
@@ -168,29 +171,29 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
         var response2 = await client.PostAsJsonAsync("/customers/v1/addresses", address2Request);
 
         // Assert
-        response1.StatusCode.Should().Be(HttpStatusCode.Created);
-        response2.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response1.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, response2.StatusCode);
 
         var address1 = await response1.Content.ReadFromJsonAsync<AddressResponse>();
         var address2 = await response2.Content.ReadFromJsonAsync<AddressResponse>();
 
-        address1.Should().NotBeNull();
-        address2.Should().NotBeNull();
-        address1!.Type.Should().Be("Shipping");
-        address2!.Type.Should().Be("Shipping");
-        address1.OwnerId.Should().Be(customer.Id);
-        address2.OwnerId.Should().Be(customer.Id);
-        address1.AddressLine1.Should().Be("456 Warehouse Road");
-        address2.AddressLine1.Should().Be("789 Distribution Center");
+        Assert.NotNull(address1);
+        Assert.NotNull(address2);
+        Assert.Equal("Shipping", address1!.Type);
+        Assert.Equal("Shipping", address2!.Type);
+        Assert.Equal(customer.Id, address1.OwnerId);
+        Assert.Equal(customer.Id, address2.OwnerId);
+        Assert.Equal("456 Warehouse Road", address1.AddressLine1);
+        Assert.Equal("789 Distribution Center", address2.AddressLine1);
 
         // Verify both addresses exist for the same customer
         var getResponse = await client.GetAsync($"/customers/v1/addresses?ownerType=Customer&ownerId={customer.Id}");
-        getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var addresses = await getResponse.Content.ReadFromJsonAsync<List<AddressResponse>>();
-        addresses.Should().NotBeNull();
-        addresses!.Should().HaveCount(2);
-        addresses.Should().Contain(a => a.Id == address1.Id);
-        addresses.Should().Contain(a => a.Id == address2.Id);
+        Assert.NotNull(addresses);
+        Assert.Equal(2, addresses!.Count);
+        Assert.Contains(addresses, a => a.Id == address1.Id);
+        Assert.Contains(addresses, a => a.Id == address2.Id);
     }
 
     /// <summary>
@@ -213,7 +216,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
         {
             firstName = "Bob",
             lastName = "Johnson",
-            email = "bob.johnson@example.com",
+            email = UniqueEmail("bob.johnson"),
             phone = "+6627777777",
             segment = "Enterprise",
             tier = "Gold",
@@ -250,14 +253,14 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
         var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/addresses/{createdAddress.Id}", updateRequest);
 
         // Assert
-        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
         var updatedAddress = await updateResponse.Content.ReadFromJsonAsync<AddressResponse>();
-        updatedAddress.Should().NotBeNull();
-        updatedAddress!.PostalCode.Should().Be("10330");
-        updatedAddress.Province.Should().Be("Nonthaburi");
-        updatedAddress.AddressLine1.Should().Be("100 Business Plaza"); // Unchanged
-        updatedAddress.City.Should().Be("Bangkok"); // Unchanged
-        updatedAddress.UpdatedAt.Should().BeAfter(updatedAddress.CreatedAt);
+        Assert.NotNull(updatedAddress);
+        Assert.Equal("10330", updatedAddress!.PostalCode);
+        Assert.Equal("Nonthaburi", updatedAddress.Province);
+        Assert.Equal("100 Business Plaza", updatedAddress.AddressLine1); // Unchanged
+        Assert.Equal("Bangkok", updatedAddress.City); // Unchanged
+        Assert.True(updatedAddress.UpdatedAt > updatedAddress.CreatedAt);
     }
 
     /// <summary>
@@ -280,7 +283,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
         {
             firstName = "Alice",
             lastName = "Williams",
-            email = "alice.williams@example.com",
+            email = UniqueEmail("alice.williams"),
             phone = "+6628888888",
             segment = "Government",
             tier = "Platinum",
@@ -336,20 +339,20 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
         var getResponse = await client.GetAsync($"/customers/v1/addresses?ownerType=Customer&ownerId={customer.Id}");
 
         // Assert
-        getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var addresses = await getResponse.Content.ReadFromJsonAsync<List<AddressResponse>>();
-        addresses.Should().NotBeNull();
-        addresses!.Should().HaveCount(3);
+        Assert.NotNull(addresses);
+        Assert.Equal(3, addresses!.Count);
 
         var billingAddresses = addresses.Where(a => a.Type == "Billing").ToList();
         var shippingAddresses = addresses.Where(a => a.Type == "Shipping").ToList();
 
-        billingAddresses.Should().HaveCount(1);
-        shippingAddresses.Should().HaveCount(2);
+        Assert.Single(billingAddresses);
+        Assert.Equal(2, shippingAddresses.Count);
 
-        billingAddresses.First().AddressLine1.Should().Be("200 Government Complex");
-        shippingAddresses.Should().Contain(a => a.AddressLine1 == "300 Warehouse A");
-        shippingAddresses.Should().Contain(a => a.AddressLine1 == "400 Warehouse B");
+        Assert.Equal("200 Government Complex", billingAddresses.First().AddressLine1);
+        Assert.Contains(shippingAddresses, a => a.AddressLine1 == "300 Warehouse A");
+        Assert.Contains(shippingAddresses, a => a.AddressLine1 == "400 Warehouse B");
     }
 
     /// <summary>
@@ -372,7 +375,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
         {
             firstName = "Charlie",
             lastName = "Brown",
-            email = "charlie.brown@example.com",
+            email = UniqueEmail("charlie.brown"),
             phone = "+6629999999",
             segment = "Retail",
             tier = "Bronze",
@@ -416,16 +419,16 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
         var deleteResponse = await client.DeleteAsync($"/customers/v1/addresses/{address1!.Id}");
 
         // Assert
-        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
         // Verify address is removed from customer's address list
         var getResponse = await client.GetAsync($"/customers/v1/addresses?ownerType=Customer&ownerId={customer.Id}");
-        getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var addresses = await getResponse.Content.ReadFromJsonAsync<List<AddressResponse>>();
-        addresses.Should().NotBeNull();
-        addresses!.Should().HaveCount(1);
-        addresses.Should().NotContain(a => a.Id == address1.Id);
-        addresses.Should().Contain(a => a.Id == address2!.Id);
-        addresses.First().AddressLine1.Should().Be("600 New Address");
+        Assert.NotNull(addresses);
+        Assert.Single(addresses);
+        Assert.DoesNotContain(addresses!, a => a.Id == address1.Id);
+        Assert.Contains(addresses!, a => a.Id == address2!.Id);
+        Assert.Equal("600 New Address", addresses!.First().AddressLine1);
     }
 }

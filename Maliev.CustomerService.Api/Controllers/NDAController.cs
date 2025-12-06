@@ -4,7 +4,6 @@ using Microsoft.EntityFrameworkCore;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.NDAs;
 using Maliev.CustomerService.Api.Services;
-using FluentValidation;
 using System.Security.Claims;
 
 namespace Maliev.CustomerService.Api.Controllers;
@@ -13,25 +12,24 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for NDA lifecycle management operations
 /// </summary>
 [ApiController]
-[Route("v1/ndas")]
+[Route("customers/v1/ndas")]
 [Authorize]
 public class NDAController : ControllerBase
 {
     private readonly INDAService _ndaService;
     private readonly ILogger<NDAController> _logger;
-    private readonly IValidator<CreateNDARequest> _createValidator;
-    private readonly IValidator<UpdateNDAStatusRequest> _updateStatusValidator;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NDAController"/> class
+    /// </summary>
+    /// <param name="ndaService">NDA service</param>
+    /// <param name="logger">Logger instance</param>
     public NDAController(
         INDAService ndaService,
-        ILogger<NDAController> logger,
-        IValidator<CreateNDARequest> createValidator,
-        IValidator<UpdateNDAStatusRequest> updateStatusValidator)
+        ILogger<NDAController> logger)
     {
         _ndaService = ndaService;
         _logger = logger;
-        _createValidator = createValidator;
-        _updateStatusValidator = updateStatusValidator;
     }
 
     /// <summary>
@@ -50,22 +48,21 @@ public class NDAController : ControllerBase
     {
         try
         {
-            // Validate request using FluentValidation
-            var validationResult = await _createValidator.ValidateAsync(request);
-            if (!validationResult.IsValid)
+            // ModelState validation via DataAnnotations
+            if (!ModelState.IsValid)
             {
                 _logger.LogWarning("Validation failed for NDA creation: {Errors}",
-                    string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
+                    string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
 
                 var errorResponse = new ErrorResponse
                 {
                     Code = "VALIDATION_ERROR",
                     Message = "One or more validation errors occurred",
-                    Details = validationResult.Errors
-                        .GroupBy(e => e.PropertyName)
+                    Details = ModelState
+                        .Where(ms => ms.Value?.Errors.Count > 0)
                         .ToDictionary(
-                            g => g.Key,
-                            g => g.Select(e => e.ErrorMessage).ToArray()),
+                            kvp => kvp.Key,
+                            kvp => kvp.Value!.Errors.Select(e => e.ErrorMessage).ToArray()),
                     TraceId = HttpContext.TraceIdentifier,
                     Timestamp = DateTime.UtcNow
                 };
@@ -148,22 +145,21 @@ public class NDAController : ControllerBase
     {
         try
         {
-            // Validate request using FluentValidation
-            var validationResult = await _updateStatusValidator.ValidateAsync(request);
-            if (!validationResult.IsValid)
+            // ModelState validation via DataAnnotations
+            if (!ModelState.IsValid)
             {
                 _logger.LogWarning("Validation failed for NDA status update: {Errors}",
-                    string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
+                    string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
 
                 var errorResponse = new ErrorResponse
                 {
                     Code = "VALIDATION_ERROR",
                     Message = "One or more validation errors occurred",
-                    Details = validationResult.Errors
-                        .GroupBy(e => e.PropertyName)
+                    Details = ModelState
+                        .Where(ms => ms.Value?.Errors.Count > 0)
                         .ToDictionary(
-                            g => g.Key,
-                            g => g.Select(e => e.ErrorMessage).ToArray()),
+                            kvp => kvp.Key,
+                            kvp => kvp.Value!.Errors.Select(e => e.ErrorMessage).ToArray()),
                     TraceId = HttpContext.TraceIdentifier,
                     Timestamp = DateTime.UtcNow
                 };

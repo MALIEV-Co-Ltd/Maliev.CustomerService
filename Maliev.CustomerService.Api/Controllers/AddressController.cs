@@ -4,7 +4,6 @@ using Microsoft.EntityFrameworkCore;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Addresses;
 using Maliev.CustomerService.Api.Services;
-using FluentValidation;
 using System.Security.Claims;
 
 namespace Maliev.CustomerService.Api.Controllers;
@@ -13,25 +12,24 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for address management operations
 /// </summary>
 [ApiController]
-[Route("v1/addresses")]
+[Route("customers/v1/addresses")]
 [Authorize]
 public class AddressController : ControllerBase
 {
     private readonly IAddressService _addressService;
     private readonly ILogger<AddressController> _logger;
-    private readonly IValidator<CreateAddressRequest> _createValidator;
-    private readonly IValidator<UpdateAddressRequest> _updateValidator;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AddressController"/> class
+    /// </summary>
+    /// <param name="addressService">Address service</param>
+    /// <param name="logger">Logger instance</param>
     public AddressController(
         IAddressService addressService,
-        ILogger<AddressController> logger,
-        IValidator<CreateAddressRequest> createValidator,
-        IValidator<UpdateAddressRequest> updateValidator)
+        ILogger<AddressController> logger)
     {
         _addressService = addressService;
         _logger = logger;
-        _createValidator = createValidator;
-        _updateValidator = updateValidator;
     }
 
     /// <summary>
@@ -52,22 +50,21 @@ public class AddressController : ControllerBase
     {
         try
         {
-            // Validate request using FluentValidation
-            var validationResult = await _createValidator.ValidateAsync(request);
-            if (!validationResult.IsValid)
+            // ModelState validation via DataAnnotations
+            if (!ModelState.IsValid)
             {
                 _logger.LogWarning("Validation failed for address creation: {Errors}",
-                    string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
+                    string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
 
                 var errorResponse = new ErrorResponse
                 {
                     Code = "VALIDATION_ERROR",
                     Message = "One or more validation errors occurred",
-                    Details = validationResult.Errors
-                        .GroupBy(e => e.PropertyName)
+                    Details = ModelState
+                        .Where(ms => ms.Value?.Errors.Count > 0)
                         .ToDictionary(
-                            g => g.Key,
-                            g => g.Select(e => e.ErrorMessage).ToArray()),
+                            kvp => kvp.Key,
+                            kvp => kvp.Value!.Errors.Select(e => e.ErrorMessage).ToArray()),
                     TraceId = HttpContext.TraceIdentifier,
                     Timestamp = DateTime.UtcNow
                 };
@@ -166,22 +163,21 @@ public class AddressController : ControllerBase
     {
         try
         {
-            // Validate request using FluentValidation
-            var validationResult = await _updateValidator.ValidateAsync(request);
-            if (!validationResult.IsValid)
+            // ModelState validation via DataAnnotations
+            if (!ModelState.IsValid)
             {
                 _logger.LogWarning("Validation failed for address update: {Errors}",
-                    string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
+                    string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
 
                 var errorResponse = new ErrorResponse
                 {
                     Code = "VALIDATION_ERROR",
                     Message = "One or more validation errors occurred",
-                    Details = validationResult.Errors
-                        .GroupBy(e => e.PropertyName)
+                    Details = ModelState
+                        .Where(ms => ms.Value?.Errors.Count > 0)
                         .ToDictionary(
-                            g => g.Key,
-                            g => g.Select(e => e.ErrorMessage).ToArray()),
+                            kvp => kvp.Key,
+                            kvp => kvp.Value!.Errors.Select(e => e.ErrorMessage).ToArray()),
                     TraceId = HttpContext.TraceIdentifier,
                     Timestamp = DateTime.UtcNow
                 };

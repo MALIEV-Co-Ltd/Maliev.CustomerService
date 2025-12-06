@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Maliev.CustomerService.Api.Models.InternalNotes;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Data.Models;
@@ -51,15 +50,15 @@ public class InternalNoteServiceTests
         var result = await service.CreateAsync(request, "employee-123");
 
         // Assert
-        result.Should().NotBeNull();
-        result.Id.Should().NotBeEmpty();
-        result.OwnerType.Should().Be("Customer");
-        result.OwnerId.Should().Be(customerId);
-        result.NoteText.Should().Be("Customer has requested priority shipping for all orders");
-        result.CreatedBy.Should().Be("employee-123");
-        result.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
-        result.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
-        result.Version.Should().NotBeEmpty();
+        Assert.NotNull(result);
+        Assert.NotEqual(Guid.Empty, result.Id);
+        Assert.Equal("Customer", result.OwnerType);
+        Assert.Equal(customerId, result.OwnerId);
+        Assert.Equal("Customer has requested priority shipping for all orders", result.NoteText);
+        Assert.Equal("employee-123", result.CreatedBy);
+        Assert.True(result.CreatedAt > DateTime.UtcNow.AddSeconds(-5) && result.CreatedAt <= DateTime.UtcNow.AddSeconds(5));
+        Assert.True(result.UpdatedAt > DateTime.UtcNow.AddSeconds(-5) && result.UpdatedAt <= DateTime.UtcNow.AddSeconds(5));
+        Assert.NotEmpty(result.Version);
     }
 
     [Fact]
@@ -80,15 +79,15 @@ public class InternalNoteServiceTests
         var result = await service.CreateAsync(request, "employee-456");
 
         // Assert
-        result.Should().NotBeNull();
-        result.Id.Should().NotBeEmpty();
-        result.OwnerType.Should().Be("Company");
-        result.OwnerId.Should().Be(companyId);
-        result.NoteText.Should().Be("Company requires 30-day payment terms");
-        result.CreatedBy.Should().Be("employee-456");
-        result.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
-        result.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
-        result.Version.Should().NotBeEmpty();
+        Assert.NotNull(result);
+        Assert.NotEqual(Guid.Empty, result.Id);
+        Assert.Equal("Company", result.OwnerType);
+        Assert.Equal(companyId, result.OwnerId);
+        Assert.Equal("Company requires 30-day payment terms", result.NoteText);
+        Assert.Equal("employee-456", result.CreatedBy);
+        Assert.True(result.CreatedAt > DateTime.UtcNow.AddSeconds(-5) && result.CreatedAt <= DateTime.UtcNow.AddSeconds(5));
+        Assert.True(result.UpdatedAt > DateTime.UtcNow.AddSeconds(-5) && result.UpdatedAt <= DateTime.UtcNow.AddSeconds(5));
+        Assert.NotEmpty(result.Version);
     }
 
     [Fact]
@@ -114,13 +113,13 @@ public class InternalNoteServiceTests
             .Where(a => a.EntityId == result.Id.ToString())
             .FirstOrDefaultAsync();
 
-        auditLog.Should().NotBeNull();
-        auditLog!.ActorId.Should().Be("employee-789");
-        auditLog.ActorType.Should().Be("Employee");
-        auditLog.Action.Should().Be(AuditAction.Create);
-        auditLog.EntityType.Should().Be(nameof(InternalNote));
-        auditLog.ChangedFields.Should().Contain("Customer");
-        auditLog.ChangedFields.Should().Contain("Audit test note");
+        Assert.NotNull(auditLog);
+        Assert.Equal("employee-789", auditLog!.ActorId);
+        Assert.Equal("Employee", auditLog.ActorType);
+        Assert.Equal(AuditAction.Create, auditLog.Action);
+        Assert.Equal(nameof(InternalNote), auditLog.EntityType);
+        Assert.Contains("Customer", auditLog.ChangedFields);
+        Assert.Contains("Audit test note", auditLog.ChangedFields);
     }
 
     #endregion
@@ -163,14 +162,15 @@ public class InternalNoteServiceTests
         var result = await service.GetByOwnerAsync("Customer", customerId);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Should().HaveCount(2);
-        result.Should().AllSatisfy(note =>
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Count);
+        Assert.All(result, note =>
         {
-            note.OwnerType.Should().Be("Customer");
-            note.OwnerId.Should().Be(customerId);
+            Assert.Equal("Customer", note.OwnerType);
+            Assert.Equal(customerId, note.OwnerId);
         });
-        result.Select(n => n.NoteText).Should().Contain(new[] { "Customer note 1", "Customer note 2" });
+        Assert.Contains(result, n => n.NoteText == "Customer note 1");
+        Assert.Contains(result, n => n.NoteText == "Customer note 2");
     }
 
     [Fact]
@@ -209,14 +209,15 @@ public class InternalNoteServiceTests
         var result = await service.GetByOwnerAsync("Company", companyId);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Should().HaveCount(2);
-        result.Should().AllSatisfy(note =>
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Count);
+        Assert.All(result, note =>
         {
-            note.OwnerType.Should().Be("Company");
-            note.OwnerId.Should().Be(companyId);
+            Assert.Equal("Company", note.OwnerType);
+            Assert.Equal(companyId, note.OwnerId);
         });
-        result.Select(n => n.NoteText).Should().Contain(new[] { "Company note 1", "Company note 2" });
+        Assert.Contains(result, n => n.NoteText == "Company note 1");
+        Assert.Contains(result, n => n.NoteText == "Company note 2");
     }
 
     [Fact]
@@ -257,10 +258,10 @@ public class InternalNoteServiceTests
         var result = await service.GetByOwnerAsync("Customer", customerId);
 
         // Assert
-        result.Should().HaveCount(3);
-        result[0].NoteText.Should().Be("Third note");
-        result[1].NoteText.Should().Be("Second note");
-        result[2].NoteText.Should().Be("First note");
+        Assert.Equal(3, result.Count);
+        Assert.Equal("Third note", result[0].NoteText);
+        Assert.Equal("Second note", result[1].NoteText);
+        Assert.Equal("First note", result[2].NoteText);
     }
 
     [Fact]
@@ -275,8 +276,8 @@ public class InternalNoteServiceTests
         var result = await service.GetByOwnerAsync("Customer", customerId);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Should().BeEmpty();
+        Assert.NotNull(result);
+        Assert.Empty(result);
     }
 
     #endregion
@@ -306,13 +307,13 @@ public class InternalNoteServiceTests
         var result = await service.UpdateAsync(created.Id, updateRequest, "employee-2");
 
         // Assert
-        result.Should().NotBeNull();
-        result.Id.Should().Be(created.Id);
-        result.NoteText.Should().Be("Updated note text");
-        result.OwnerType.Should().Be(created.OwnerType);
-        result.OwnerId.Should().Be(created.OwnerId);
-        result.CreatedBy.Should().Be(created.CreatedBy);
-        result.UpdatedAt.Should().BeAfter(created.UpdatedAt);
+        Assert.NotNull(result);
+        Assert.Equal(created.Id, result.Id);
+        Assert.Equal("Updated note text", result.NoteText);
+        Assert.Equal(created.OwnerType, result.OwnerType);
+        Assert.Equal(created.OwnerId, result.OwnerId);
+        Assert.Equal(created.CreatedBy, result.CreatedBy);
+        Assert.True(result.UpdatedAt > created.UpdatedAt);
     }
 
     [Fact]
@@ -356,7 +357,7 @@ public class InternalNoteServiceTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.UpdateAsync(created.Id, updateRequest, "employee-1"));
 
-        exception.Message.Should().Contain("modified by another user");
+        Assert.Contains("modified by another user", exception.Message);
     }
 
     [Fact]
@@ -388,14 +389,14 @@ public class InternalNoteServiceTests
             .OrderBy(a => a.Timestamp)
             .ToListAsync();
 
-        auditLogs.Should().HaveCount(2); // Create + Update
+        Assert.Equal(2, auditLogs.Count); // Create + Update
         var updateAudit = auditLogs[1];
-        updateAudit.ActorId.Should().Be("employee-2");
-        updateAudit.ActorType.Should().Be("Employee");
-        updateAudit.Action.Should().Be(AuditAction.Update);
-        updateAudit.EntityType.Should().Be(nameof(InternalNote));
-        updateAudit.ChangedFields.Should().Contain("Updated note for audit");
-        updateAudit.PreviousValues.Should().Contain("Original note");
+        Assert.Equal("employee-2", updateAudit.ActorId);
+        Assert.Equal("Employee", updateAudit.ActorType);
+        Assert.Equal(AuditAction.Update, updateAudit.Action);
+        Assert.Equal(nameof(InternalNote), updateAudit.EntityType);
+        Assert.Contains("Updated note for audit", updateAudit.ChangedFields);
+        Assert.Contains("Original note", updateAudit.PreviousValues);
     }
 
     #endregion
@@ -421,7 +422,7 @@ public class InternalNoteServiceTests
         // Assert
         await using var context = _fixture.CreateDbContext();
         var deletedNote = await context.InternalNotes.FindAsync(created.Id);
-        deletedNote.Should().BeNull();
+        Assert.Null(deletedNote);
     }
 
     [Fact]
@@ -460,14 +461,14 @@ public class InternalNoteServiceTests
             .OrderBy(a => a.Timestamp)
             .ToListAsync();
 
-        auditLogs.Should().HaveCount(2); // Create + Delete
+        Assert.Equal(2, auditLogs.Count); // Create + Delete
         var deleteAudit = auditLogs[1];
-        deleteAudit.ActorId.Should().Be("System");
-        deleteAudit.ActorType.Should().Be("System");
-        deleteAudit.Action.Should().Be(AuditAction.Delete);
-        deleteAudit.EntityType.Should().Be(nameof(InternalNote));
-        deleteAudit.PreviousValues.Should().Contain("Note for deletion audit");
-        deleteAudit.PreviousValues.Should().Contain("employee-1");
+        Assert.Equal("System", deleteAudit.ActorId);
+        Assert.Equal("System", deleteAudit.ActorType);
+        Assert.Equal(AuditAction.Delete, deleteAudit.Action);
+        Assert.Equal(nameof(InternalNote), deleteAudit.EntityType);
+        Assert.Contains("Note for deletion audit", deleteAudit.PreviousValues);
+        Assert.Contains("employee-1", deleteAudit.PreviousValues);
     }
 
     #endregion
@@ -503,11 +504,11 @@ public class InternalNoteServiceTests
         var companyNotes = await service.GetByOwnerAsync("Company", sharedId);
 
         // Assert
-        customerNotes.Should().HaveCount(1);
-        customerNotes[0].NoteText.Should().Be("Customer-specific note");
+        Assert.Single(customerNotes);
+        Assert.Equal("Customer-specific note", customerNotes[0].NoteText);
 
-        companyNotes.Should().HaveCount(1);
-        companyNotes[0].NoteText.Should().Be("Company-specific note");
+        Assert.Single(companyNotes);
+        Assert.Equal("Company-specific note", companyNotes[0].NoteText);
     }
 
     [Fact]
@@ -557,17 +558,17 @@ public class InternalNoteServiceTests
         var company2Notes = await service.GetByOwnerAsync("Company", companyId2);
 
         // Assert
-        customer1Notes.Should().HaveCount(1);
-        customer1Notes[0].NoteText.Should().Be("Customer 1 note");
+        Assert.Single(customer1Notes);
+        Assert.Equal("Customer 1 note", customer1Notes[0].NoteText);
 
-        customer2Notes.Should().HaveCount(1);
-        customer2Notes[0].NoteText.Should().Be("Customer 2 note");
+        Assert.Single(customer2Notes);
+        Assert.Equal("Customer 2 note", customer2Notes[0].NoteText);
 
-        company1Notes.Should().HaveCount(1);
-        company1Notes[0].NoteText.Should().Be("Company 1 note");
+        Assert.Single(company1Notes);
+        Assert.Equal("Company 1 note", company1Notes[0].NoteText);
 
-        company2Notes.Should().HaveCount(1);
-        company2Notes[0].NoteText.Should().Be("Company 2 note");
+        Assert.Single(company2Notes);
+        Assert.Equal("Company 2 note", company2Notes[0].NoteText);
     }
 
     #endregion

@@ -1,4 +1,3 @@
-using FluentValidation;
 using Maliev.CustomerService.Api.Models.InternalNotes;
 using Maliev.CustomerService.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -7,25 +6,27 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.CustomerService.Api.Controllers;
 
+/// <summary>
+/// Controller for internal note management operations
+/// </summary>
 [ApiController]
-[Route("v1/internal-notes")]
+[Route("customers/v1/internal-notes")]
 [Authorize(Policy = "EmployeeOrHigher")]
 public class InternalNoteController : ControllerBase
 {
     private readonly IInternalNoteService _internalNoteService;
-    private readonly IValidator<CreateInternalNoteRequest> _createValidator;
-    private readonly IValidator<UpdateInternalNoteRequest> _updateValidator;
     private readonly ILogger<InternalNoteController> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="InternalNoteController"/> class
+    /// </summary>
+    /// <param name="internalNoteService">Internal note service</param>
+    /// <param name="logger">Logger instance</param>
     public InternalNoteController(
         IInternalNoteService internalNoteService,
-        IValidator<CreateInternalNoteRequest> createValidator,
-        IValidator<UpdateInternalNoteRequest> updateValidator,
         ILogger<InternalNoteController> logger)
     {
         _internalNoteService = internalNoteService;
-        _createValidator = createValidator;
-        _updateValidator = updateValidator;
         _logger = logger;
     }
 
@@ -46,12 +47,12 @@ public class InternalNoteController : ControllerBase
         _logger.LogInformation("Creating internal note for owner {OwnerType}/{OwnerId} by {CreatedBy}",
             request.OwnerType, request.OwnerId, createdBy);
 
-        var validationResult = await _createValidator.ValidateAsync(request);
-        if (!validationResult.IsValid)
+        // ModelState validation via DataAnnotations
+        if (!ModelState.IsValid)
         {
             _logger.LogWarning("Validation failed for create internal note request: {Errors}",
-                string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
-            return BadRequest(validationResult.Errors);
+                string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
+            return BadRequest(ModelState);
         }
 
         try
@@ -109,12 +110,12 @@ public class InternalNoteController : ControllerBase
 
         _logger.LogInformation("Updating internal note {NoteId} by {ActorId}", id, actorId);
 
-        var validationResult = await _updateValidator.ValidateAsync(request);
-        if (!validationResult.IsValid)
+        // ModelState validation via DataAnnotations
+        if (!ModelState.IsValid)
         {
             _logger.LogWarning("Validation failed for update internal note request: {Errors}",
-                string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
-            return BadRequest(validationResult.Errors);
+                string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
+            return BadRequest(ModelState);
         }
 
         try

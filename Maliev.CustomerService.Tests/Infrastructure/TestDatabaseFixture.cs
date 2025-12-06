@@ -83,118 +83,40 @@ public class TestDatabaseFixture : IAsyncLifetime
 
     /// <summary>
     /// Clears all data from the database (for test isolation)
+    /// Uses EF Core methods instead of raw SQL
     /// </summary>
     public async Task ClearDatabaseAsync()
     {
-        // Force garbage collection to finalize undisposed DbContext instances
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
+        // Clear connection pool to ensure fresh connections
+        Npgsql.NpgsqlConnection.ClearAllPools();
 
-        // Aggressively clear connection pool multiple times to ensure all connections are closed
-        for (int i = 0; i < 3; i++)
-        {
-            Npgsql.NpgsqlConnection.ClearAllPools();
-            await Task.Delay(200); // Increased delay to 200ms per iteration (600ms total)
-        }
+        await using var context = CreateDbContext();
 
-        // First context: terminate blocking connections
-        var terminateOptions = new DbContextOptionsBuilder<CustomerDbContext>()
-            .UseNpgsql(ConnectionString)
-            .Options;
+        // Delete data using EF Core in correct FK order
 
-        await using (var terminateContext = new CustomerDbContext(terminateOptions))
-        {
-            // Force terminate any blocking connections
-            await terminateContext.Database.ExecuteSqlRawAsync(@"
-                SELECT pg_terminate_backend(pid)
-                FROM pg_stat_activity
-                WHERE datname = current_database()
-                AND pid <> pg_backend_pid()
-                AND state IN ('idle in transaction', 'active');
-            ");
-        }
+        // Clear Identity-related data (preserve Roles)
+        context.UserTokens.RemoveRange(await context.UserTokens.ToListAsync());
+        context.UserLogins.RemoveRange(await context.UserLogins.ToListAsync());
+        context.UserClaims.RemoveRange(await context.UserClaims.ToListAsync());
+        context.UserRoles.RemoveRange(await context.UserRoles.ToListAsync());
+        context.Users.RemoveRange(await context.Users.ToListAsync());
 
-        // Small delay after terminating connections
-        await Task.Delay(100);
+        // Clear application data
+        context.InternalNotes.RemoveRange(await context.InternalNotes.ToListAsync());
+        context.DocumentReferences.RemoveRange(await context.DocumentReferences.ToListAsync());
+        context.NDARecords.RemoveRange(await context.NDARecords.ToListAsync());
+        context.Addresses.RemoveRange(await context.Addresses.ToListAsync());
+        context.Customers.RemoveRange(await context.Customers.IgnoreQueryFilters().ToListAsync());
+        context.Companies.RemoveRange(await context.Companies.IgnoreQueryFilters().ToListAsync());
+        context.AuditLogs.RemoveRange(await context.AuditLogs.ToListAsync());
 
-        // Second context: perform DELETE operations (fresh connection)
-        var deleteOptions = new DbContextOptionsBuilder<CustomerDbContext>()
-            .UseNpgsql(ConnectionString)
-            .Options;
+        await context.SaveChangesAsync();
 
-        await using var context = new CustomerDbContext(deleteOptions);
-
-        // Delete data in correct order to avoid FK violations
-        // Use try-catch in C# to handle missing tables (more reliable than DO blocks)
-        async Task TryDeleteAsync(string tableName)
-        {
-            try
-            {
-#pragma warning disable EF1002 // tableName is controlled internally, not from user input
-                await context.Database.ExecuteSqlRawAsync($"DELETE FROM {tableName}");
-#pragma warning restore EF1002
-            }
-            catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P01") // undefined_table
-            {
-                // Table doesn't exist yet, ignore
-            }
-        }
-
-        // Delete Identity-related data (preserve AspNetRoles)
-        await TryDeleteAsync("\"AspNetUserTokens\"");
-        await TryDeleteAsync("\"AspNetUserLogins\"");
-        await TryDeleteAsync("\"AspNetUserClaims\"");
-        await TryDeleteAsync("\"AspNetUserRoles\"");
-        await TryDeleteAsync("\"AspNetUsers\"");
-
-        // Delete application data
-        await TryDeleteAsync("internal_notes");
-        await TryDeleteAsync("document_references");
-        await TryDeleteAsync("nda_records");
-        await TryDeleteAsync("addresses");
-        await TryDeleteAsync("customers");
-        await TryDeleteAsync("companies");
-        await TryDeleteAsync("audit_logs");
-
-        // Ensure EF Core change tracker is cleared
+        // Clear EF Core change tracker
         context.ChangeTracker.Clear();
-        await context.Database.CloseConnectionAsync();
 
-        // Final aggressive cleanup with retry to ensure DELETE is fully committed
-        for (int attempt = 0; attempt < 3; attempt++)
-        {
-            Npgsql.NpgsqlConnection.ClearAllPools();
-            await Task.Delay(200);
-
-            // Verify with fresh context
-            var verifyOptions = new DbContextOptionsBuilder<CustomerDbContext>()
-                .UseNpgsql(ConnectionString)
-                .Options;
-
-            await using var verifyContext = new CustomerDbContext(verifyOptions);
-            try
-            {
-                var remainingUsers = await verifyContext.Users.CountAsync();
-                if (remainingUsers == 0)
-                {
-                    // Success - database is clean
-                    break;
-                }
-
-                if (attempt == 2)
-                {
-                    // Last attempt - force delete again
-                    await verifyContext.Database.ExecuteSqlRawAsync("DELETE FROM \"AspNetUsers\"");
-                    await verifyContext.SaveChangesAsync();
-                }
-            }
-            catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P01")
-            {
-                // Table doesn't exist yet
-                break;
-            }
-        }
+        // Clear connection pool after cleanup
+        Npgsql.NpgsqlConnection.ClearAllPools();
     }
 
     /// <summary>

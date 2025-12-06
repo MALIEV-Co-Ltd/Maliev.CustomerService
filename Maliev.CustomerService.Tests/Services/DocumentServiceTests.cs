@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Maliev.CustomerService.Api.Models.Documents;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Api.Services.External;
@@ -59,16 +58,16 @@ public class DocumentServiceTests
         var result = await service.CreateAsync(request, "test-actor", "Employee");
 
         // Assert
-        result.Should().NotBeNull();
-        result.Id.Should().NotBeEmpty();
-        result.OwnerType.Should().Be("Customer");
-        result.OwnerId.Should().Be(request.OwnerId);
-        result.DocumentType.Should().Be("NDA");
-        result.FileReference.Should().Be("file-ref-123");
-        result.Filename.Should().Be("nda-document.pdf");
-        result.Status.Should().Be(DocumentStatus.Pending);
-        result.Version.Should().Be(1);
-        result.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        Assert.NotNull(result);
+        Assert.NotEqual(Guid.Empty, result.Id);
+        Assert.Equal("Customer", result.OwnerType);
+        Assert.Equal(request.OwnerId, result.OwnerId);
+        Assert.Equal("NDA", result.DocumentType);
+        Assert.Equal("file-ref-123", result.FileReference);
+        Assert.Equal("nda-document.pdf", result.Filename);
+        Assert.Equal(DocumentStatus.Pending, result.Status);
+        Assert.Equal(1, result.Version);
+        Assert.True(result.CreatedAt > DateTime.UtcNow.AddSeconds(-5) && result.CreatedAt <= DateTime.UtcNow.AddSeconds(5));
 
         _mockUploadServiceClient.Verify(x => x.ValidateFileReferenceAsync("file-ref-123"), Times.Once);
     }
@@ -95,7 +94,7 @@ public class DocumentServiceTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.CreateAsync(request, "test-actor", "Employee"));
 
-        exception.Message.Should().Contain("not valid in Upload Service");
+        Assert.Contains("not valid in Upload Service", exception.Message);
         _mockUploadServiceClient.Verify(x => x.ValidateFileReferenceAsync("invalid-ref"), Times.Once);
     }
 
@@ -126,11 +125,11 @@ public class DocumentServiceTests
             .Where(a => a.EntityId == result.Id.ToString())
             .FirstOrDefaultAsync();
 
-        auditLog.Should().NotBeNull();
-        auditLog!.ActorId.Should().Be("employee-123");
-        auditLog.ActorType.Should().Be("Employee");
-        auditLog.Action.Should().Be(AuditAction.Create);
-        auditLog.EntityType.Should().Be("DocumentReference");
+        Assert.NotNull(auditLog);
+        Assert.Equal("employee-123", auditLog!.ActorId);
+        Assert.Equal("Employee", auditLog.ActorType);
+        Assert.Equal(AuditAction.Create, auditLog.Action);
+        Assert.Equal("DocumentReference", auditLog.EntityType);
     }
 
     [Fact]
@@ -177,10 +176,10 @@ public class DocumentServiceTests
         var result = await service.GetByOwnerAsync("Customer", ownerId);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Should().HaveCount(2);
-        result.All(d => d.OwnerId == ownerId).Should().BeTrue();
-        result.All(d => d.OwnerType == "Customer").Should().BeTrue();
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Count);
+        Assert.All(result, d => Assert.Equal(ownerId, d.OwnerId));
+        Assert.All(result, d => Assert.Equal("Customer", d.OwnerType));
     }
 
     [Fact]
@@ -195,8 +194,8 @@ public class DocumentServiceTests
         var result = await service.GetByOwnerAsync("Customer", nonExistentOwnerId);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Should().BeEmpty();
+        Assert.NotNull(result);
+        Assert.Empty(result);
     }
 
     [Fact]
@@ -228,12 +227,12 @@ public class DocumentServiceTests
         var result = await service.UpdateAsync(created.Id, updateRequest, "test-actor", "Employee");
 
         // Assert
-        result.Should().NotBeNull();
-        result.Id.Should().Be(created.Id);
-        result.FileReference.Should().Be("file-ref-2");
-        result.Filename.Should().Be("nda-v2.pdf");
-        result.Version.Should().Be(2);
-        result.UpdatedAt.Should().BeAfter(created.UpdatedAt);
+        Assert.NotNull(result);
+        Assert.Equal(created.Id, result.Id);
+        Assert.Equal("file-ref-2", result.FileReference);
+        Assert.Equal("nda-v2.pdf", result.Filename);
+        Assert.Equal(2, result.Version);
+        Assert.True(result.UpdatedAt > created.UpdatedAt);
 
         _mockUploadServiceClient.Verify(x => x.ValidateFileReferenceAsync("file-ref-2"), Times.Once);
     }
@@ -269,7 +268,7 @@ public class DocumentServiceTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.UpdateAsync(created.Id, updateRequest, "test-actor", "Employee"));
 
-        exception.Message.Should().Contain("not valid in Upload Service");
+        Assert.Contains("not valid in Upload Service", exception.Message);
     }
 
     [Fact]
@@ -326,11 +325,11 @@ public class DocumentServiceTests
             .OrderBy(a => a.Timestamp)
             .ToListAsync();
 
-        auditLogs.Should().HaveCount(2); // Create + Update
+        Assert.Equal(2, auditLogs.Count); // Create + Update
         var updateAudit = auditLogs[1];
-        updateAudit.ActorId.Should().Be("manager-456");
-        updateAudit.ActorType.Should().Be("Manager");
-        updateAudit.Action.Should().Be(AuditAction.Update);
+        Assert.Equal("manager-456", updateAudit.ActorId);
+        Assert.Equal("Manager", updateAudit.ActorType);
+        Assert.Equal(AuditAction.Update, updateAudit.Action);
     }
 
     [Fact]
@@ -355,10 +354,10 @@ public class DocumentServiceTests
         var result = await service.MarkCompleteAsync(created.Id, "customer-user", DateTime.UtcNow, "test-actor", "Employee");
 
         // Assert
-        result.Should().NotBeNull();
-        result.Status.Should().Be(DocumentStatus.Complete);
-        result.SignedBy.Should().Be("customer-user");
-        result.SignedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        Assert.NotNull(result);
+        Assert.Equal(DocumentStatus.Complete, result.Status);
+        Assert.Equal("customer-user", result.SignedBy);
+        Assert.True(result.SignedAt > DateTime.UtcNow.AddSeconds(-5) && result.SignedAt <= DateTime.UtcNow.AddSeconds(5));
     }
 
     [Fact]
@@ -402,11 +401,11 @@ public class DocumentServiceTests
             .OrderBy(a => a.Timestamp)
             .ToListAsync();
 
-        auditLogs.Should().HaveCount(2); // Create + Update
+        Assert.Equal(2, auditLogs.Count); // Create + Update
         var updateAudit = auditLogs[1];
-        updateAudit.ActorId.Should().Be("admin-789");
-        updateAudit.ActorType.Should().Be("Admin");
-        updateAudit.Action.Should().Be(AuditAction.Update);
+        Assert.Equal("admin-789", updateAudit.ActorId);
+        Assert.Equal("Admin", updateAudit.ActorType);
+        Assert.Equal(AuditAction.Update, updateAudit.Action);
     }
 
     [Fact]
@@ -435,7 +434,7 @@ public class DocumentServiceTests
         // Assert
         await using var context = _fixture.CreateDbContext();
         var document = await context.DocumentReferences.FirstOrDefaultAsync(d => d.Id == created.Id);
-        document.Should().BeNull(); // Should be deleted
+        Assert.Null(document); // Should be deleted
 
         _mockUploadServiceClient.Verify(x => x.DeleteFileAsync("file-ref-1"), Times.Once);
     }
@@ -466,8 +465,8 @@ public class DocumentServiceTests
         // Assert
         await using var context = _fixture.CreateDbContext();
         var document = await context.DocumentReferences.FirstOrDefaultAsync(d => d.Id == created.Id);
-        document.Should().NotBeNull();
-        document!.Status.Should().Be(DocumentStatus.PendingDeletion);
+        Assert.NotNull(document);
+        Assert.Equal(DocumentStatus.PendingDeletion, document!.Status);
 
         _mockUploadServiceClient.Verify(x => x.DeleteFileAsync("file-ref-1"), Times.Once);
     }
@@ -515,11 +514,11 @@ public class DocumentServiceTests
             .OrderBy(a => a.Timestamp)
             .ToListAsync();
 
-        auditLogs.Should().HaveCount(2); // Create + Delete
+        Assert.Equal(2, auditLogs.Count); // Create + Delete
         var deleteAudit = auditLogs[1];
-        deleteAudit.ActorId.Should().Be("admin-999");
-        deleteAudit.ActorType.Should().Be("Admin");
-        deleteAudit.Action.Should().Be(AuditAction.Delete);
+        Assert.Equal("admin-999", deleteAudit.ActorId);
+        Assert.Equal("Admin", deleteAudit.ActorType);
+        Assert.Equal(AuditAction.Delete, deleteAudit.Action);
     }
 
     [Fact]
@@ -552,11 +551,11 @@ public class DocumentServiceTests
             .OrderBy(a => a.Timestamp)
             .ToListAsync();
 
-        auditLogs.Should().HaveCount(2); // Create + MarkPendingDeletion
+        Assert.Equal(2, auditLogs.Count); // Create + MarkPendingDeletion
         var markPendingAudit = auditLogs[1];
-        markPendingAudit.ActorId.Should().Be("admin-999");
-        markPendingAudit.ActorType.Should().Be("Admin");
-        markPendingAudit.Action.Should().Be("MarkPendingDeletion");
+        Assert.Equal("admin-999", markPendingAudit.ActorId);
+        Assert.Equal("Admin", markPendingAudit.ActorType);
+        Assert.Equal("MarkPendingDeletion", markPendingAudit.Action);
     }
 
     [Fact]
@@ -586,7 +585,7 @@ public class DocumentServiceTests
         // Verify it's pending deletion
         await using var context1 = _fixture.CreateDbContext();
         var pendingDoc = await context1.DocumentReferences.FirstOrDefaultAsync(d => d.Id == created.Id);
-        pendingDoc!.Status.Should().Be(DocumentStatus.PendingDeletion);
+        Assert.Equal(DocumentStatus.PendingDeletion, pendingDoc!.Status);
 
         // Now setup the retry to succeed
         _mockUploadServiceClient.Setup(x => x.DeleteFileAsync("file-ref-1"))
@@ -596,11 +595,11 @@ public class DocumentServiceTests
         var retryCount = await service.RetryPendingDeletionsAsync();
 
         // Assert
-        retryCount.Should().Be(1);
+        Assert.Equal(1, retryCount);
 
         await using var context2 = _fixture.CreateDbContext();
         var document = await context2.DocumentReferences.FirstOrDefaultAsync(d => d.Id == created.Id);
-        document.Should().BeNull(); // Should be deleted
+        Assert.Null(document); // Should be deleted
 
         _mockUploadServiceClient.Verify(x => x.DeleteFileAsync("file-ref-1"), Times.Exactly(2)); // Original + Retry
     }
@@ -631,12 +630,12 @@ public class DocumentServiceTests
         var retryCount = await service.RetryPendingDeletionsAsync();
 
         // Assert
-        retryCount.Should().Be(0); // No successful retries
+        Assert.Equal(0, retryCount); // No successful retries
 
         await using var context = _fixture.CreateDbContext();
         var document = await context.DocumentReferences.FirstOrDefaultAsync(d => d.Id == created.Id);
-        document.Should().NotBeNull();
-        document!.Status.Should().Be(DocumentStatus.PendingDeletion);
+        Assert.NotNull(document);
+        Assert.Equal(DocumentStatus.PendingDeletion, document!.Status);
 
         _mockUploadServiceClient.Verify(x => x.DeleteFileAsync("file-ref-1"), Times.Exactly(2)); // Original + Retry
     }
@@ -652,7 +651,7 @@ public class DocumentServiceTests
         var retryCount = await service.RetryPendingDeletionsAsync();
 
         // Assert
-        retryCount.Should().Be(0);
+        Assert.Equal(0, retryCount);
     }
 
     [Fact]
@@ -693,11 +692,11 @@ public class DocumentServiceTests
             .OrderBy(a => a.Timestamp)
             .ToListAsync();
 
-        auditLogs.Should().HaveCount(3); // Create + MarkPendingDeletion + RetryDeletion
+        Assert.Equal(3, auditLogs.Count); // Create + MarkPendingDeletion + RetryDeletion
         var retryAudit = auditLogs[2];
-        retryAudit.ActorId.Should().Be("System");
-        retryAudit.ActorType.Should().Be("System");
-        retryAudit.Action.Should().Be("RetryDeletion");
+        Assert.Equal("System", retryAudit.ActorId);
+        Assert.Equal("System", retryAudit.ActorType);
+        Assert.Equal("RetryDeletion", retryAudit.Action);
     }
 
     [Fact]
@@ -744,14 +743,14 @@ public class DocumentServiceTests
         var retryCount = await service.RetryPendingDeletionsAsync();
 
         // Assert
-        retryCount.Should().Be(1); // Only one succeeded
+        Assert.Equal(1, retryCount); // Only one succeeded
 
         await using var context = _fixture.CreateDbContext();
         var doc1AfterRetry = await context.DocumentReferences.FirstOrDefaultAsync(d => d.Id == doc1.Id);
         var doc2AfterRetry = await context.DocumentReferences.FirstOrDefaultAsync(d => d.Id == doc2.Id);
 
-        doc1AfterRetry.Should().BeNull(); // Successfully deleted
-        doc2AfterRetry.Should().NotBeNull(); // Still pending
-        doc2AfterRetry!.Status.Should().Be(DocumentStatus.PendingDeletion);
+        Assert.Null(doc1AfterRetry); // Successfully deleted
+        Assert.NotNull(doc2AfterRetry); // Still pending
+        Assert.Equal(DocumentStatus.PendingDeletion, doc2AfterRetry!.Status);
     }
 }
