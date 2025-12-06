@@ -32,7 +32,7 @@ public interface ICustomerService
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
     /// <returns>Updated customer response</returns>
     /// <exception cref="KeyNotFoundException">Customer not found</exception>
-    /// <exception cref="DbUpdateConcurrencyException">Version conflict</exception>
+    /// <exception cref="InvalidOperationException">Version conflict</exception>
     Task<CustomerResponse> UpdateAsync(Guid id, UpdateCustomerRequest request, string actorId, string actorType);
 
     /// <summary>

@@ -10,5 +10,6 @@ public interface ICountryServiceClient
     /// </summary>
     /// <param name="countryId">Country ID to validate</param>
     /// <returns>True if the country ID is valid, false otherwise</returns>
+    /// <exception cref="InvalidOperationException">Thrown when Country Service is unavailable or request times out</exception>
     Task<bool> ValidateCountryIdAsync(Guid countryId);
 }

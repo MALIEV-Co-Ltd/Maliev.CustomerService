@@ -12,6 +12,12 @@ public class UploadServiceClient : IUploadServiceClient
     private readonly HttpClient _httpClient;
     private readonly ILogger<UploadServiceClient> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the UploadServiceClient class
+    /// </summary>
+    /// <param name="httpClient">HTTP client for Upload Service communication</param>
+    /// <param name="options">Upload Service configuration options</param>
+    /// <param name="logger">Logger instance</param>
     public UploadServiceClient(HttpClient httpClient, IOptions<UploadServiceOptions> options, ILogger<UploadServiceClient> logger)
     {
         _httpClient = httpClient;
@@ -23,6 +29,11 @@ public class UploadServiceClient : IUploadServiceClient
     /// <summary>
     /// Validates that a file reference exists in the Upload Service
     /// </summary>
+    /// <param name="fileReference">File reference ID from Upload Service</param>
+    /// <returns>True if the file reference is valid, false otherwise</returns>
+    /// <remarks>
+    /// Returns false if the Upload Service is unavailable, the file is not found, or any error occurs
+    /// </remarks>
     public async Task<bool> ValidateFileReferenceAsync(string fileReference)
     {
         try
@@ -67,6 +78,11 @@ public class UploadServiceClient : IUploadServiceClient
     /// <summary>
     /// Deletes a file from the Upload Service
     /// </summary>
+    /// <param name="fileReference">File reference ID to delete</param>
+    /// <returns>True if deletion was successful or file was already deleted, false if deletion failed</returns>
+    /// <remarks>
+    /// Returns false if the Upload Service is unavailable or any error occurs
+    /// </remarks>
     public async Task<bool> DeleteFileAsync(string fileReference)
     {
         try

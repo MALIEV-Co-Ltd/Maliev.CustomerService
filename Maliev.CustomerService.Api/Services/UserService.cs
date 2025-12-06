@@ -1,3 +1,4 @@
+using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.Users;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
@@ -18,6 +19,14 @@ public class UserService : IUserService, IAsyncDisposable
     private readonly ILogger<UserService> _logger;
     private readonly MetricsService _metricsService;
 
+    /// <summary>
+    /// Initializes a new instance of the UserService class
+    /// </summary>
+    /// <param name="userManager">ASP.NET Identity UserManager</param>
+    /// <param name="signInManager">ASP.NET Identity SignInManager</param>
+    /// <param name="context">Database context for Customer Service</param>
+    /// <param name="logger">Logger instance</param>
+    /// <param name="metricsService">Metrics service for recording auth operations</param>
     public UserService(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
@@ -32,6 +41,14 @@ public class UserService : IUserService, IAsyncDisposable
         _metricsService = metricsService;
     }
 
+    /// <summary>
+    /// Creates a new user account with audit logging
+    /// </summary>
+    /// <param name="request">User creation request</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>Created user response</returns>
+    /// <exception cref="InvalidOperationException">Username or email already exists, or role assignment fails</exception>
     public async Task<UserResponse> CreateAsync(CreateUserRequest request, string actorId, string actorType)
     {
         _logger.LogInformation("Creating user {Username} by actor {ActorId} ({ActorType})",
@@ -97,9 +114,19 @@ public class UserService : IUserService, IAsyncDisposable
         _logger.LogInformation("User {UserId} created successfully with username {Username}",
             user.Id, user.UserName);
 
-        return await MapToResponseAsync(user);
+        return await user.ToUserResponseAsync(_userManager);
     }
 
+    /// <summary>
+    /// Updates a user's password with audit logging
+    /// </summary>
+    /// <param name="userId">User ID</param>
+    /// <param name="request">Password update request</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>True if successful</returns>
+    /// <exception cref="KeyNotFoundException">User not found</exception>
+    /// <exception cref="InvalidOperationException">Current password is incorrect or password update fails</exception>
     public async Task<bool> UpdatePasswordAsync(string userId, UpdatePasswordRequest request, string actorId, string actorType)
     {
         _logger.LogInformation("Updating password for user {UserId} by actor {ActorId} ({ActorType})",
@@ -145,6 +172,16 @@ public class UserService : IUserService, IAsyncDisposable
         return true;
     }
 
+    /// <summary>
+    /// Updates a user's roles with audit logging
+    /// </summary>
+    /// <param name="userId">User ID</param>
+    /// <param name="request">Roles update request</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>Updated user response</returns>
+    /// <exception cref="KeyNotFoundException">User not found</exception>
+    /// <exception cref="InvalidOperationException">Role update fails</exception>
     public async Task<UserResponse> UpdateRolesAsync(string userId, UpdateRolesRequest request, string actorId, string actorType)
     {
         _logger.LogInformation("Updating roles for user {UserId} by actor {ActorId} ({ActorType})",
@@ -206,20 +243,26 @@ public class UserService : IUserService, IAsyncDisposable
 
         _logger.LogInformation("Roles updated successfully for user {UserId}", userId);
 
-        return await MapToResponseAsync(user);
+        return await user.ToUserResponseAsync(_userManager);
     }
 
+    /// <summary>
+    /// Validates user credentials and updates last_login_at on success
+    /// </summary>
+    /// <param name="request">Credential validation request</param>
+    /// <returns>Validation response with user details if valid</returns>
     public async Task<ValidationResponse> ValidateCredentialsAsync(ValidateCredentialsRequest request)
     {
         _logger.LogDebug("Validating credentials for username {Username}", request.Username);
 
         // Measure auth validation duration
-        using var timer = _metricsService.MeasureAuthValidationDuration();
+        var stopwatch = _metricsService.MeasureAuthValidationDuration();
 
         var user = await _userManager.FindByNameAsync(request.Username);
         if (user == null)
         {
             _logger.LogWarning("User {Username} not found for credential validation", request.Username);
+            _metricsService.CompleteAuthValidationMeasurement(stopwatch);
             _metricsService.RecordAuthValidation(false);
             return new ValidationResponse { IsValid = false };
         }
@@ -228,6 +271,7 @@ public class UserService : IUserService, IAsyncDisposable
         if (!user.IsActive)
         {
             _logger.LogWarning("Inactive user {Username} attempted to login", request.Username);
+            _metricsService.CompleteAuthValidationMeasurement(stopwatch);
             _metricsService.RecordAuthValidation(false);
             return new ValidationResponse { IsValid = false };
         }
@@ -246,6 +290,7 @@ public class UserService : IUserService, IAsyncDisposable
                 _logger.LogWarning("Invalid password for user {Username}", request.Username);
             }
 
+            _metricsService.CompleteAuthValidationMeasurement(stopwatch);
             _metricsService.RecordAuthValidation(false);
             return new ValidationResponse { IsValid = false };
         }
@@ -261,6 +306,7 @@ public class UserService : IUserService, IAsyncDisposable
             request.Username, user.Id);
 
         // Record successful auth validation
+        _metricsService.CompleteAuthValidationMeasurement(stopwatch);
         _metricsService.RecordAuthValidation(true);
 
         return new ValidationResponse
@@ -272,6 +318,11 @@ public class UserService : IUserService, IAsyncDisposable
         };
     }
 
+    /// <summary>
+    /// Retrieves a user by ID
+    /// </summary>
+    /// <param name="userId">User ID</param>
+    /// <returns>User response or null if not found</returns>
     public async Task<UserResponse?> GetByIdAsync(string userId)
     {
         _logger.LogDebug("Retrieving user {UserId}", userId);
@@ -283,9 +334,17 @@ public class UserService : IUserService, IAsyncDisposable
             return null;
         }
 
-        return await MapToResponseAsync(user);
+        return await user.ToUserResponseAsync(_userManager);
     }
 
+    /// <summary>
+    /// Retrieves all users with pagination and optional filtering by last_login_at
+    /// </summary>
+    /// <param name="page">Page number (1-based)</param>
+    /// <param name="pageSize">Page size</param>
+    /// <param name="lastLoginBefore">Optional filter: users who last logged in before this date</param>
+    /// <param name="lastLoginAfter">Optional filter: users who last logged in after this date</param>
+    /// <returns>Tuple containing list of users and total count</returns>
     public async Task<(List<UserResponse> Users, int TotalCount)> GetAllAsync(
         int page,
         int pageSize,
@@ -319,7 +378,7 @@ public class UserService : IUserService, IAsyncDisposable
         var responses = new List<UserResponse>();
         foreach (var user in users)
         {
-            responses.Add(await MapToResponseAsync(user));
+            responses.Add(await user.ToUserResponseAsync(_userManager));
         }
 
         _logger.LogDebug("Retrieved {Count} users out of {Total}", users.Count, totalCount);
@@ -327,24 +386,10 @@ public class UserService : IUserService, IAsyncDisposable
         return (responses, totalCount);
     }
 
-    private async Task<UserResponse> MapToResponseAsync(ApplicationUser user)
-    {
-        var roles = await _userManager.GetRolesAsync(user);
-
-        return new UserResponse
-        {
-            Id = user.Id,
-            Username = user.UserName ?? string.Empty,
-            Email = user.Email ?? string.Empty,
-            Roles = roles.ToList(),
-            LinkedCustomerId = user.LinkedCustomerId,
-            IsActive = user.IsActive,
-            LastLoginAt = user.LastLoginAt,
-            CreatedAt = user.CreatedAt,
-            UpdatedAt = user.UpdatedAt
-        };
-    }
-
+    /// <summary>
+    /// Disposes the database context asynchronously
+    /// </summary>
+    /// <returns>A task representing the async disposal operation</returns>
     public async ValueTask DisposeAsync()
     {
         await _context.DisposeAsync();

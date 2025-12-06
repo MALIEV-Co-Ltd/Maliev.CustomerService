@@ -5,17 +5,30 @@ using Microsoft.Extensions.Logging;
 
 namespace Maliev.CustomerService.Api.BackgroundServices;
 
+/// <summary>
+/// Background service that periodically retries pending document deletions
+/// </summary>
 public class DocumentDeletionRetryBackgroundService : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<DocumentDeletionRetryBackgroundService> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DocumentDeletionRetryBackgroundService"/> class
+    /// </summary>
+    /// <param name="serviceProvider">Service provider for creating scoped services</param>
+    /// <param name="logger">Logger instance</param>
     public DocumentDeletionRetryBackgroundService(IServiceProvider serviceProvider, ILogger<DocumentDeletionRetryBackgroundService> logger)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Executes the background task that runs daily to retry pending document deletions
+    /// </summary>
+    /// <param name="stoppingToken">Cancellation token</param>
+    /// <returns>A task representing the asynchronous operation</returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("DocumentDeletionRetryBackgroundService started");

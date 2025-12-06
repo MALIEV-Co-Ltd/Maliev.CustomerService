@@ -1,3 +1,4 @@
+using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
@@ -15,6 +16,12 @@ public class CustomerService : ICustomerService
     private readonly ILogger<CustomerService> _logger;
     private readonly MetricsService _metricsService;
 
+    /// <summary>
+    /// Initializes a new instance of the CustomerService class
+    /// </summary>
+    /// <param name="context">Database context for Customer Service</param>
+    /// <param name="logger">Logger instance</param>
+    /// <param name="metricsService">Metrics service for recording customer operations</param>
     public CustomerService(CustomerDbContext context, ILogger<CustomerService> logger, MetricsService metricsService)
     {
         _context = context;
@@ -22,6 +29,14 @@ public class CustomerService : ICustomerService
         _metricsService = metricsService;
     }
 
+    /// <summary>
+    /// Creates a new customer with audit logging
+    /// </summary>
+    /// <param name="request">Customer creation request</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>Created customer response</returns>
+    /// <exception cref="InvalidOperationException">Thrown when duplicate email is found for active customer</exception>
     public async Task<CustomerResponse> CreateAsync(CreateCustomerRequest request, string actorId, string actorType)
     {
         _logger.LogInformation("Creating customer with email {Email} by actor {ActorId} ({ActorType})",
@@ -93,9 +108,14 @@ public class CustomerService : ICustomerService
         // Record metrics
         _metricsService.RecordCustomerRegistration(customer.Segment);
 
-        return MapToResponse(customer);
+        return customer.ToCustomerResponse();
     }
 
+    /// <summary>
+    /// Retrieves a customer by ID
+    /// </summary>
+    /// <param name="id">Customer ID</param>
+    /// <returns>Customer response or null if not found</returns>
     public async Task<CustomerResponse?> GetByIdAsync(Guid id)
     {
         _logger.LogDebug("Retrieving customer {CustomerId}", id);
@@ -110,9 +130,19 @@ public class CustomerService : ICustomerService
             return null;
         }
 
-        return MapToResponse(customer);
+        return customer.ToCustomerResponse();
     }
 
+    /// <summary>
+    /// Updates an existing customer with optimistic concurrency control and audit logging
+    /// </summary>
+    /// <param name="id">Customer ID</param>
+    /// <param name="request">Customer update request</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>Updated customer response</returns>
+    /// <exception cref="KeyNotFoundException">Customer not found</exception>
+    /// <exception cref="InvalidOperationException">Version conflict or duplicate email</exception>
     public async Task<CustomerResponse> UpdateAsync(Guid id, UpdateCustomerRequest request, string actorId, string actorType)
     {
         _logger.LogInformation("Updating customer {CustomerId} by actor {ActorId} ({ActorType})",
@@ -264,9 +294,16 @@ public class CustomerService : ICustomerService
             _logger.LogInformation("No changes detected for customer {CustomerId}", id);
         }
 
-        return MapToResponse(customer);
+        return customer.ToCustomerResponse();
     }
 
+    /// <summary>
+    /// Soft deletes a customer with audit logging
+    /// </summary>
+    /// <param name="id">Customer ID</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>True if deleted, false if not found</returns>
     public async Task<bool> SoftDeleteAsync(Guid id, string actorId, string actorType)
     {
         _logger.LogInformation("Soft deleting customer {CustomerId} by actor {ActorId} ({ActorType})",
@@ -305,6 +342,22 @@ public class CustomerService : ICustomerService
         return true;
     }
 
+    /// <summary>
+    /// Gets all customers with optional filtering and pagination
+    /// </summary>
+    /// <param name="segment">Optional segment filter</param>
+    /// <param name="tier">Optional tier filter</param>
+    /// <param name="preferredLanguage">Optional preferred language filter</param>
+    /// <param name="lastLoginAtFrom">Optional filter for users who last logged in after this date</param>
+    /// <param name="lastLoginAtTo">Optional filter for users who last logged in before this date</param>
+    /// <param name="email">Optional email partial match filter</param>
+    /// <param name="companyId">Optional company ID filter</param>
+    /// <param name="createdFrom">Optional filter for customers created after this date</param>
+    /// <param name="createdTo">Optional filter for customers created before this date</param>
+    /// <param name="includeDeleted">Include soft-deleted customers in results</param>
+    /// <param name="page">Page number (1-based)</param>
+    /// <param name="pageSize">Number of items per page</param>
+    /// <returns>Paginated response containing customer list and pagination metadata</returns>
     public async Task<PaginatedResponse<CustomerResponse>> GetAllAsync(
         string? segment = null,
         string? tier = null,
@@ -402,7 +455,7 @@ public class CustomerService : ICustomerService
 
         return new PaginatedResponse<CustomerResponse>
         {
-            Items = customers.Select(MapToResponse).ToList(),
+            Items = customers.Select(c => c.ToCustomerResponse()).ToList(),
             TotalCount = totalCount,
             Page = page,
             PageSize = pageSize,
@@ -410,6 +463,12 @@ public class CustomerService : ICustomerService
         };
     }
 
+    /// <summary>
+    /// Gets customer preferences for compliance/audit purposes
+    /// </summary>
+    /// <param name="page">Page number (1-based)</param>
+    /// <param name="pageSize">Number of items per page</param>
+    /// <returns>Paginated response containing customer preferences</returns>
     public async Task<PaginatedResponse<GetCustomerPreferencesResponse>> GetPreferencesAsync(
         int page = 1,
         int pageSize = 100)
@@ -456,30 +515,6 @@ public class CustomerService : ICustomerService
             Page = page,
             PageSize = pageSize,
             TotalPages = totalPages
-        };
-    }
-
-    private CustomerResponse MapToResponse(Customer customer)
-    {
-        return new CustomerResponse
-        {
-            Id = customer.Id,
-            FirstName = customer.FirstName,
-            LastName = customer.LastName,
-            Email = customer.Email,
-            Phone = customer.Phone,
-            Segment = customer.Segment,
-            Tier = customer.Tier,
-            PreferredLanguage = customer.PreferredLanguage,
-            Timezone = customer.Timezone,
-            CommunicationPreferences = !string.IsNullOrEmpty(customer.CommunicationPreferences)
-                ? JsonSerializer.Deserialize<Dictionary<string, object>>(customer.CommunicationPreferences)
-                : null,
-            CompanyId = customer.CompanyId,
-            IsDeleted = customer.IsDeleted,
-            CreatedAt = customer.CreatedAt,
-            UpdatedAt = customer.UpdatedAt,
-            Version = customer.Version
         };
     }
 }

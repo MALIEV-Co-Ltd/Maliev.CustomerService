@@ -9,27 +9,48 @@ namespace Maliev.CustomerService.Api.Services;
 public interface ICompanyService
 {
     /// <summary>
-    /// Creates a new company
+    /// Creates a new company with audit logging
     /// </summary>
+    /// <param name="request">Company creation request</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>Created company response</returns>
+    /// <exception cref="InvalidOperationException">Thrown when VAT number format is invalid</exception>
     Task<CompanyResponse> CreateAsync(CreateCompanyRequest request, string actorId, string actorType);
 
     /// <summary>
     /// Retrieves a company by ID
     /// </summary>
+    /// <param name="id">Company ID</param>
+    /// <returns>Company response or null if not found</returns>
     Task<CompanyResponse?> GetByIdAsync(Guid id);
 
     /// <summary>
-    /// Updates an existing company
+    /// Updates an existing company with optimistic concurrency control and audit logging
     /// </summary>
+    /// <param name="id">Company ID</param>
+    /// <param name="request">Company update request</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>Updated company response</returns>
+    /// <exception cref="KeyNotFoundException">Thrown when company is not found</exception>
+    /// <exception cref="InvalidOperationException">Thrown when VAT number format is invalid or version conflict occurs</exception>
     Task<CompanyResponse> UpdateAsync(Guid id, UpdateCompanyRequest request, string actorId, string actorType);
 
     /// <summary>
-    /// Retrieves a company with its associated customers
+    /// Retrieves a company with its associated active customers
     /// </summary>
+    /// <param name="id">Company ID</param>
+    /// <returns>Tuple containing company response and list of associated customer responses, or null if company not found</returns>
     Task<(CompanyResponse Company, List<CustomerResponse> Customers)?> GetWithCustomersAsync(Guid id);
 
     /// <summary>
-    /// Retrieves all companies with pagination and optional filtering
+    /// Retrieves all companies with pagination and optional filtering by segment and tier
     /// </summary>
+    /// <param name="page">Page number (1-based)</param>
+    /// <param name="pageSize">Number of items per page</param>
+    /// <param name="segment">Optional segment filter</param>
+    /// <param name="tier">Optional tier filter</param>
+    /// <returns>Tuple containing list of company responses and total count</returns>
     Task<(List<CompanyResponse> Companies, int TotalCount)> GetAllAsync(int page, int pageSize, string? segment = null, string? tier = null);
 }

@@ -11,6 +11,11 @@ public class NDAExpirationBackgroundService : BackgroundService
     private readonly ILogger<NDAExpirationBackgroundService> _logger;
     private readonly TimeSpan _checkInterval = TimeSpan.FromHours(24);
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NDAExpirationBackgroundService"/> class
+    /// </summary>
+    /// <param name="serviceProvider">Service provider for creating scoped services</param>
+    /// <param name="logger">Logger instance</param>
     public NDAExpirationBackgroundService(
         IServiceProvider serviceProvider,
         ILogger<NDAExpirationBackgroundService> logger)

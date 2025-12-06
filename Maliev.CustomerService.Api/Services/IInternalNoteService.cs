@@ -8,22 +8,36 @@ namespace Maliev.CustomerService.Api.Services;
 public interface IInternalNoteService
 {
     /// <summary>
-    /// Creates a new internal note
+    /// Creates a new internal note with audit logging
     /// </summary>
+    /// <param name="request">Internal note creation request</param>
+    /// <param name="createdBy">ID of the employee creating the note</param>
+    /// <returns>Created internal note response</returns>
     Task<InternalNoteResponse> CreateAsync(CreateInternalNoteRequest request, string createdBy);
 
     /// <summary>
-    /// Retrieves internal notes by owner
+    /// Retrieves all internal notes for a specific owner
     /// </summary>
+    /// <param name="ownerType">Type of owner (Customer or Company)</param>
+    /// <param name="ownerId">Owner ID</param>
+    /// <returns>List of internal notes ordered by creation date descending</returns>
     Task<List<InternalNoteResponse>> GetByOwnerAsync(string ownerType, Guid ownerId);
 
     /// <summary>
-    /// Updates an internal note
+    /// Updates an existing internal note with optimistic concurrency control
     /// </summary>
+    /// <param name="id">Internal note ID</param>
+    /// <param name="request">Update request containing new note text and version</param>
+    /// <param name="actorId">ID of the employee updating the note</param>
+    /// <returns>Updated internal note response</returns>
+    /// <exception cref="KeyNotFoundException">Thrown when internal note is not found</exception>
+    /// <exception cref="InvalidOperationException">Thrown when version conflict occurs</exception>
     Task<InternalNoteResponse> UpdateAsync(Guid id, UpdateInternalNoteRequest request, string actorId);
 
     /// <summary>
-    /// Deletes an internal note
+    /// Deletes an internal note with audit logging
     /// </summary>
+    /// <param name="id">Internal note ID</param>
+    /// <exception cref="KeyNotFoundException">Thrown when internal note is not found</exception>
     Task DeleteAsync(Guid id);
 }

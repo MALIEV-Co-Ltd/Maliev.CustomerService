@@ -1,3 +1,4 @@
+using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.Documents;
 using Maliev.CustomerService.Api.Services.External;
 using Maliev.CustomerService.Data;
@@ -7,6 +8,9 @@ using System.Text.Json;
 
 namespace Maliev.CustomerService.Api.Services;
 
+/// <summary>
+/// Service implementation for document reference management operations
+/// </summary>
 public class DocumentService : IDocumentService
 {
     private readonly CustomerDbContext _context;
@@ -14,6 +18,13 @@ public class DocumentService : IDocumentService
     private readonly ILogger<DocumentService> _logger;
     private readonly MetricsService _metricsService;
 
+    /// <summary>
+    /// Initializes a new instance of the DocumentService class
+    /// </summary>
+    /// <param name="context">Database context for Customer Service</param>
+    /// <param name="uploadServiceClient">Client for Upload Service integration</param>
+    /// <param name="logger">Logger instance</param>
+    /// <param name="metricsService">Metrics service for recording operations</param>
     public DocumentService(
         CustomerDbContext context,
         IUploadServiceClient uploadServiceClient,
@@ -26,6 +37,14 @@ public class DocumentService : IDocumentService
         _metricsService = metricsService;
     }
 
+    /// <summary>
+    /// Creates a new document reference with Upload Service validation
+    /// </summary>
+    /// <param name="request">Document creation request containing owner details and file reference</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>Created document response</returns>
+    /// <exception cref="InvalidOperationException">Thrown when file reference is invalid in Upload Service</exception>
     public async Task<DocumentResponse> CreateAsync(CreateDocumentRequest request, string actorId, string actorType)
     {
         _logger.LogInformation("Creating document for owner {OwnerType}/{OwnerId} by actor {ActorId} ({ActorType})",
@@ -83,9 +102,15 @@ public class DocumentService : IDocumentService
         // Record metrics
         _metricsService.RecordDocumentOperation("create");
 
-        return MapToResponse(document);
+        return document.ToDocumentResponse();
     }
 
+    /// <summary>
+    /// Retrieves all document references for a specific owner
+    /// </summary>
+    /// <param name="ownerType">Type of owner (Customer or Company)</param>
+    /// <param name="ownerId">Owner ID</param>
+    /// <returns>List of document responses ordered by creation date descending</returns>
     public async Task<List<DocumentResponse>> GetByOwnerAsync(string ownerType, Guid ownerId)
     {
         _logger.LogDebug("Retrieving documents for owner {OwnerType}/{OwnerId}", ownerType, ownerId);
@@ -95,9 +120,19 @@ public class DocumentService : IDocumentService
             .OrderByDescending(d => d.CreatedAt)
             .ToListAsync();
 
-        return documents.Select(MapToResponse).ToList();
+        return documents.Select(d => d.ToDocumentResponse()).ToList();
     }
 
+    /// <summary>
+    /// Updates a document reference with a new file (creates new version)
+    /// </summary>
+    /// <param name="id">Document ID</param>
+    /// <param name="request">Update request containing new file reference and filename</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>Updated document response with incremented version</returns>
+    /// <exception cref="KeyNotFoundException">Thrown when document is not found</exception>
+    /// <exception cref="InvalidOperationException">Thrown when file reference is invalid or version conflict occurs</exception>
     public async Task<DocumentResponse> UpdateAsync(Guid id, UpdateDocumentRequest request, string actorId, string actorType)
     {
         _logger.LogInformation("Updating document {DocumentId} with new file reference by actor {ActorId} ({ActorType})",
@@ -163,9 +198,19 @@ public class DocumentService : IDocumentService
             throw new InvalidOperationException("The document was modified by another user. Please refresh and try again.");
         }
 
-        return MapToResponse(document);
+        return document.ToDocumentResponse();
     }
 
+    /// <summary>
+    /// Marks a document as complete with optional signature information
+    /// </summary>
+    /// <param name="id">Document ID</param>
+    /// <param name="signedBy">Optional name of the person who signed the document</param>
+    /// <param name="signedAt">Optional timestamp when the document was signed</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>Updated document response with Complete status</returns>
+    /// <exception cref="KeyNotFoundException">Thrown when document is not found</exception>
     public async Task<DocumentResponse> MarkCompleteAsync(Guid id, string? signedBy, DateTime? signedAt, string actorId, string actorType)
     {
         _logger.LogInformation("Marking document {DocumentId} as complete by actor {ActorId} ({ActorType})",
@@ -215,9 +260,19 @@ public class DocumentService : IDocumentService
         // Record metrics
         _metricsService.RecordDocumentOperation("complete");
 
-        return MapToResponse(document);
+        return document.ToDocumentResponse();
     }
 
+    /// <summary>
+    /// Deletes a document reference and associated file from Upload Service
+    /// </summary>
+    /// <param name="id">Document ID</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <exception cref="KeyNotFoundException">Thrown when document is not found</exception>
+    /// <remarks>
+    /// If deletion from Upload Service fails, the document is marked as PendingDeletion for retry
+    /// </remarks>
     public async Task DeleteAsync(Guid id, string actorId, string actorType)
     {
         _logger.LogInformation("Deleting document {DocumentId} by actor {ActorId} ({ActorType})",
@@ -289,6 +344,10 @@ public class DocumentService : IDocumentService
         _metricsService.RecordDocumentOperation("delete");
     }
 
+    /// <summary>
+    /// Retries deletion of documents marked as PendingDeletion (for background job processing)
+    /// </summary>
+    /// <returns>Count of successfully deleted documents</returns>
     public async Task<int> RetryPendingDeletionsAsync()
     {
         _logger.LogInformation("Retrying pending document deletions");
@@ -357,25 +416,5 @@ public class DocumentService : IDocumentService
             successCount, pendingDeletions.Count);
 
         return successCount;
-    }
-
-    private DocumentResponse MapToResponse(DocumentReference document)
-    {
-        return new DocumentResponse
-        {
-            Id = document.Id,
-            OwnerType = document.OwnerType,
-            OwnerId = document.OwnerId,
-            DocumentType = document.DocumentType,
-            FileReference = document.FileReference,
-            Filename = document.Filename,
-            Status = document.Status,
-            Version = document.Version,
-            SignedBy = document.SignedBy,
-            SignedAt = document.SignedAt,
-            CreatedAt = document.CreatedAt,
-            UpdatedAt = document.UpdatedAt,
-            RowVersion = document.RowVersion
-        };
     }
 }

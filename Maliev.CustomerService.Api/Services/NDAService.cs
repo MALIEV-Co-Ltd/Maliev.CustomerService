@@ -1,3 +1,4 @@
+using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.NDAs;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
@@ -6,12 +7,21 @@ using System.Text.Json;
 
 namespace Maliev.CustomerService.Api.Services;
 
+/// <summary>
+/// Service implementation for NDA lifecycle management operations
+/// </summary>
 public class NDAService : INDAService
 {
     private readonly CustomerDbContext _context;
     private readonly ILogger<NDAService> _logger;
     private readonly MetricsService _metricsService;
 
+    /// <summary>
+    /// Initializes a new instance of the NDAService class
+    /// </summary>
+    /// <param name="context">Database context for Customer Service</param>
+    /// <param name="logger">Logger instance</param>
+    /// <param name="metricsService">Metrics service for recording NDA operations</param>
     public NDAService(CustomerDbContext context, ILogger<NDAService> logger, MetricsService metricsService)
     {
         _context = context;
@@ -19,6 +29,13 @@ public class NDAService : INDAService
         _metricsService = metricsService;
     }
 
+    /// <summary>
+    /// Creates a new NDA record in Draft status with audit logging
+    /// </summary>
+    /// <param name="request">NDA creation request</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>Created NDA response</returns>
     public async Task<NDAResponse> CreateAsync(CreateNDARequest request, string actorId, string actorType)
     {
         _logger.LogInformation("Creating NDA for customer {CustomerId} by actor {ActorId} ({ActorType})",
@@ -58,9 +75,14 @@ public class NDAService : INDAService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("NDA {NDAId} created successfully", nda.Id);
-        return MapToResponse(nda);
+        return nda.ToNDAResponse();
     }
 
+    /// <summary>
+    /// Retrieves an NDA record by ID
+    /// </summary>
+    /// <param name="id">NDA ID</param>
+    /// <returns>NDA response or null if not found</returns>
     public async Task<NDAResponse?> GetByIdAsync(Guid id)
     {
         _logger.LogDebug("Retrieving NDA {NDAId}", id);
@@ -74,9 +96,19 @@ public class NDAService : INDAService
             return null;
         }
 
-        return MapToResponse(nda);
+        return nda.ToNDAResponse();
     }
 
+    /// <summary>
+    /// Updates NDA status with lifecycle validation and audit logging
+    /// </summary>
+    /// <param name="id">NDA ID</param>
+    /// <param name="request">Status update request</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>Updated NDA response</returns>
+    /// <exception cref="KeyNotFoundException">Thrown when NDA is not found</exception>
+    /// <exception cref="InvalidOperationException">Thrown when lifecycle transition is invalid or version conflict occurs</exception>
     public async Task<NDAResponse> UpdateStatusAsync(Guid id, UpdateNDAStatusRequest request, string actorId, string actorType)
     {
         _logger.LogInformation("Updating NDA {NDAId} status to {Status} by actor {ActorId} ({ActorType})",
@@ -153,9 +185,13 @@ public class NDAService : INDAService
             throw new InvalidOperationException("The NDA was modified by another user. Please refresh and try again.");
         }
 
-        return MapToResponse(nda);
+        return nda.ToNDAResponse();
     }
 
+    /// <summary>
+    /// Checks for expired NDAs and transitions them to Expired status (for background job processing)
+    /// </summary>
+    /// <returns>Count of NDAs that were expired</returns>
     public async Task<int> CheckExpiredNDAsAsync()
     {
         _logger.LogInformation("Checking for expired NDAs");
@@ -226,23 +262,5 @@ public class NDAService : INDAService
             throw new InvalidOperationException(
                 $"Cannot transition from '{nda.Status}' to '{request.Status}'. Valid transitions from Draft: Signed only.");
         }
-    }
-
-    private NDAResponse MapToResponse(NDARecord nda)
-    {
-        return new NDAResponse
-        {
-            Id = nda.Id,
-            CustomerId = nda.CustomerId,
-            DocumentReferenceId = nda.DocumentReferenceId,
-            Status = nda.Status,
-            SignedBy = nda.SignedBy,
-            SignedAt = nda.SignedAt,
-            RevokedAt = nda.RevokedAt,
-            ExpiresAt = nda.ExpiresAt,
-            CreatedAt = nda.CreatedAt,
-            UpdatedAt = nda.UpdatedAt,
-            Version = nda.Version
-        };
     }
 }

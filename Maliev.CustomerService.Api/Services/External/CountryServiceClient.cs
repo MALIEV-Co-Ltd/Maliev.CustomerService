@@ -17,6 +17,12 @@ public class CountryServiceClient : ICountryServiceClient
     private readonly ResiliencePipeline<HttpResponseMessage> _retryPipeline;
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromHours(24);
 
+    /// <summary>
+    /// Initializes a new instance of the CountryServiceClient class
+    /// </summary>
+    /// <param name="httpClient">HTTP client for Country Service communication</param>
+    /// <param name="logger">Logger instance</param>
+    /// <param name="cache">Memory cache for caching validation results</param>
     public CountryServiceClient(
         HttpClient httpClient,
         ILogger<CountryServiceClient> logger,
@@ -55,6 +61,15 @@ public class CountryServiceClient : ICountryServiceClient
             .Build();
     }
 
+    /// <summary>
+    /// Validates if a country ID exists in the Country Service with retry logic and caching
+    /// </summary>
+    /// <param name="countryId">Country ID to validate</param>
+    /// <returns>True if the country ID is valid, false otherwise</returns>
+    /// <exception cref="InvalidOperationException">Thrown when Country Service is unavailable or request times out</exception>
+    /// <remarks>
+    /// Valid country IDs are cached for 24 hours. The method implements exponential backoff retry with up to 3 attempts.
+    /// </remarks>
     public async Task<bool> ValidateCountryIdAsync(Guid countryId)
     {
         var cacheKey = $"country_valid_{countryId}";

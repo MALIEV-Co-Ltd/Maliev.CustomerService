@@ -1,3 +1,4 @@
+using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.Companies;
 using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Data;
@@ -19,12 +20,25 @@ public class CompanyService : ICompanyService
     // VAT format: Country code (2 letters) followed by hyphen and digits
     private static readonly Regex VatFormatRegex = new Regex(@"^[A-Z]{2}-\d+$", RegexOptions.Compiled);
 
+    /// <summary>
+    /// Initializes a new instance of the CompanyService class
+    /// </summary>
+    /// <param name="context">Database context for Customer Service</param>
+    /// <param name="logger">Logger instance</param>
     public CompanyService(CustomerDbContext context, ILogger<CompanyService> logger)
     {
         _context = context;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Creates a new company with audit logging
+    /// </summary>
+    /// <param name="request">Company creation request</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>Created company response</returns>
+    /// <exception cref="InvalidOperationException">Thrown when VAT number format is invalid</exception>
     public async Task<CompanyResponse> CreateAsync(CreateCompanyRequest request, string actorId, string actorType)
     {
         _logger.LogInformation("Creating company with name {Name} by actor {ActorId} ({ActorType})",
@@ -80,9 +94,14 @@ public class CompanyService : ICompanyService
 
         _logger.LogInformation("Company {CompanyId} created successfully", company.Id);
 
-        return MapToResponse(company);
+        return company.ToCompanyResponse();
     }
 
+    /// <summary>
+    /// Retrieves a company by ID
+    /// </summary>
+    /// <param name="id">Company ID</param>
+    /// <returns>Company response or null if not found</returns>
     public async Task<CompanyResponse?> GetByIdAsync(Guid id)
     {
         _logger.LogDebug("Retrieving company {CompanyId}", id);
@@ -97,9 +116,19 @@ public class CompanyService : ICompanyService
             return null;
         }
 
-        return MapToResponse(company);
+        return company.ToCompanyResponse();
     }
 
+    /// <summary>
+    /// Updates an existing company with optimistic concurrency control and audit logging
+    /// </summary>
+    /// <param name="id">Company ID</param>
+    /// <param name="request">Company update request</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>Updated company response</returns>
+    /// <exception cref="KeyNotFoundException">Thrown when company is not found</exception>
+    /// <exception cref="InvalidOperationException">Thrown when VAT number format is invalid or version conflict occurs</exception>
     public async Task<CompanyResponse> UpdateAsync(Guid id, UpdateCompanyRequest request, string actorId, string actorType)
     {
         _logger.LogInformation("Updating company {CompanyId} by actor {ActorId} ({ActorType})",
@@ -219,9 +248,14 @@ public class CompanyService : ICompanyService
             _logger.LogInformation("No changes detected for company {CompanyId}", id);
         }
 
-        return MapToResponse(company);
+        return company.ToCompanyResponse();
     }
 
+    /// <summary>
+    /// Retrieves a company with its associated active customers
+    /// </summary>
+    /// <param name="id">Company ID</param>
+    /// <returns>Tuple containing company response and list of associated customer responses, or null if company not found</returns>
     public async Task<(CompanyResponse Company, List<CustomerResponse> Customers)?> GetWithCustomersAsync(Guid id)
     {
         _logger.LogDebug("Retrieving company {CompanyId} with customers", id);
@@ -240,32 +274,21 @@ public class CompanyService : ICompanyService
             .Where(c => c.CompanyId == id && !c.IsDeleted)
             .ToListAsync();
 
-        var customerResponses = customers.Select(customer => new CustomerResponse
-        {
-            Id = customer.Id,
-            FirstName = customer.FirstName,
-            LastName = customer.LastName,
-            Email = customer.Email,
-            Phone = customer.Phone,
-            Segment = customer.Segment,
-            Tier = customer.Tier,
-            PreferredLanguage = customer.PreferredLanguage,
-            Timezone = customer.Timezone,
-            CommunicationPreferences = !string.IsNullOrEmpty(customer.CommunicationPreferences)
-                ? JsonSerializer.Deserialize<Dictionary<string, object>>(customer.CommunicationPreferences)
-                : null,
-            CompanyId = customer.CompanyId,
-            IsDeleted = customer.IsDeleted,
-            CreatedAt = customer.CreatedAt,
-            UpdatedAt = customer.UpdatedAt,
-            Version = customer.Version
-        }).ToList();
+        var customerResponses = customers.Select(c => c.ToCustomerResponse()).ToList();
 
         _logger.LogDebug("Found {CustomerCount} customers for company {CompanyId}", customerResponses.Count, id);
 
-        return (MapToResponse(company), customerResponses);
+        return (company.ToCompanyResponse(), customerResponses);
     }
 
+    /// <summary>
+    /// Retrieves all companies with pagination and optional filtering by segment and tier
+    /// </summary>
+    /// <param name="page">Page number (1-based)</param>
+    /// <param name="pageSize">Number of items per page</param>
+    /// <param name="segment">Optional segment filter</param>
+    /// <param name="tier">Optional tier filter</param>
+    /// <returns>Tuple containing list of company responses and total count</returns>
     public async Task<(List<CompanyResponse> Companies, int TotalCount)> GetAllAsync(int page, int pageSize, string? segment = null, string? tier = null)
     {
         _logger.LogDebug("Retrieving companies - Page: {Page}, PageSize: {PageSize}, Segment: {Segment}, Tier: {Tier}",
@@ -294,28 +317,10 @@ public class CompanyService : ICompanyService
             .Take(pageSize)
             .ToListAsync();
 
-        var companyResponses = companies.Select(MapToResponse).ToList();
+        var companyResponses = companies.Select(c => c.ToCompanyResponse()).ToList();
 
         _logger.LogDebug("Retrieved {Count} companies out of {TotalCount}", companyResponses.Count, totalCount);
 
         return (companyResponses, totalCount);
-    }
-
-    private CompanyResponse MapToResponse(Company company)
-    {
-        return new CompanyResponse
-        {
-            Id = company.Id,
-            Name = company.Name,
-            VatNumber = company.VatNumber,
-            RegistrationNumber = company.RegistrationNumber,
-            ContactEmail = company.ContactEmail,
-            ContactPhone = company.ContactPhone,
-            Segment = company.Segment,
-            Tier = company.Tier,
-            CreatedAt = company.CreatedAt,
-            UpdatedAt = company.UpdatedAt,
-            Version = company.Version
-        };
     }
 }

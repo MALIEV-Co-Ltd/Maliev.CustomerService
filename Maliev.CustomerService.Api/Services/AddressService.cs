@@ -1,3 +1,4 @@
+using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.Addresses;
 using Maliev.CustomerService.Api.Services.External;
 using Maliev.CustomerService.Data;
@@ -16,6 +17,12 @@ public class AddressService : IAddressService
     private readonly ICountryServiceClient _countryServiceClient;
     private readonly ILogger<AddressService> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the AddressService class
+    /// </summary>
+    /// <param name="context">Database context for Customer Service</param>
+    /// <param name="countryServiceClient">Client for Country Service validation</param>
+    /// <param name="logger">Logger instance</param>
     public AddressService(
         CustomerDbContext context,
         ICountryServiceClient countryServiceClient,
@@ -26,6 +33,14 @@ public class AddressService : IAddressService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Creates a new address with country validation and audit logging
+    /// </summary>
+    /// <param name="request">Address creation request</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>Created address response</returns>
+    /// <exception cref="InvalidOperationException">Country Service unavailable or invalid country ID</exception>
     public async Task<AddressResponse> CreateAsync(CreateAddressRequest request, string actorId, string actorType)
     {
         _logger.LogInformation("Creating address for {OwnerType} {OwnerId} by actor {ActorId} ({ActorType})",
@@ -96,9 +111,15 @@ public class AddressService : IAddressService
 
         _logger.LogInformation("Address {AddressId} created successfully", address.Id);
 
-        return MapToResponse(address);
+        return address.ToAddressResponse();
     }
 
+    /// <summary>
+    /// Retrieves all addresses for a specific owner
+    /// </summary>
+    /// <param name="ownerType">Type of owner (Customer or Company)</param>
+    /// <param name="ownerId">Owner ID</param>
+    /// <returns>List of addresses</returns>
     public async Task<List<AddressResponse>> GetByOwnerAsync(string ownerType, Guid ownerId)
     {
         _logger.LogDebug("Retrieving addresses for {OwnerType} {OwnerId}", ownerType, ownerId);
@@ -112,9 +133,19 @@ public class AddressService : IAddressService
         _logger.LogDebug("Found {Count} addresses for {OwnerType} {OwnerId}",
             addresses.Count, ownerType, ownerId);
 
-        return addresses.Select(MapToResponse).ToList();
+        return addresses.Select(a => a.ToAddressResponse()).ToList();
     }
 
+    /// <summary>
+    /// Updates an existing address with optimistic concurrency control, country validation, and audit logging
+    /// </summary>
+    /// <param name="id">Address ID</param>
+    /// <param name="request">Address update request</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>Updated address response</returns>
+    /// <exception cref="KeyNotFoundException">Address not found</exception>
+    /// <exception cref="InvalidOperationException">Country Service unavailable or invalid country ID, or version conflict</exception>
     public async Task<AddressResponse> UpdateAsync(Guid id, UpdateAddressRequest request, string actorId, string actorType)
     {
         _logger.LogInformation("Updating address {AddressId} by actor {ActorId} ({ActorType})",
@@ -244,9 +275,16 @@ public class AddressService : IAddressService
             _logger.LogInformation("No changes detected for address {AddressId}", id);
         }
 
-        return MapToResponse(address);
+        return address.ToAddressResponse();
     }
 
+    /// <summary>
+    /// Deletes an address with audit logging
+    /// </summary>
+    /// <param name="id">Address ID</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <returns>True if deleted, false if not found</returns>
     public async Task<bool> DeleteAsync(Guid id, string actorId, string actorType)
     {
         _logger.LogInformation("Deleting address {AddressId} by actor {ActorId} ({ActorType})",
@@ -293,25 +331,5 @@ public class AddressService : IAddressService
         _logger.LogInformation("Address {AddressId} deleted successfully", id);
 
         return true;
-    }
-
-    private AddressResponse MapToResponse(Address address)
-    {
-        return new AddressResponse
-        {
-            Id = address.Id,
-            OwnerType = address.OwnerType,
-            OwnerId = address.OwnerId,
-            Type = address.Type,
-            AddressLine1 = address.AddressLine1,
-            AddressLine2 = address.AddressLine2,
-            City = address.City,
-            Province = address.Province,
-            PostalCode = address.PostalCode,
-            CountryId = address.CountryId,
-            CreatedAt = address.CreatedAt,
-            UpdatedAt = address.UpdatedAt,
-            Version = address.Version
-        };
     }
 }
