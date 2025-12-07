@@ -40,7 +40,7 @@ public class NDAExpirationBackgroundService : BackgroundService
         {
             try
             {
-                _logger.LogInformation("Starting NDA expiration check");
+                _logger.LogDebug("Starting NDA expiration check");
 
                 // Create a scope to resolve scoped services
                 using (var scope = _serviceProvider.CreateScope())
@@ -49,7 +49,14 @@ public class NDAExpirationBackgroundService : BackgroundService
 
                     var expiredCount = await ndaService.CheckExpiredNDAsAsync();
 
-                    _logger.LogInformation("NDA expiration check completed. {ExpiredCount} NDAs expired", expiredCount);
+                    if (expiredCount > 0)
+                    {
+                         _logger.LogInformation("NDA expiration check completed. {ExpiredCount} NDAs expired", expiredCount);
+                    }
+                    else
+                    {
+                        _logger.LogDebug("NDA expiration check completed. No NDAs expired");
+                    }
                 }
             }
             catch (Exception ex)

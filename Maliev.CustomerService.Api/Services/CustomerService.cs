@@ -372,13 +372,13 @@ public class CustomerService : ICustomerService
         int page = 1,
         int pageSize = 50)
     {
-        _logger.LogInformation("Querying customers with filters: segment={Segment}, tier={Tier}, language={Language}, email={Email}, companyId={CompanyId}, page={Page}, pageSize={PageSize}",
+        _logger.LogDebug("Querying customers with filters: segment={Segment}, tier={Tier}, language={Language}, email={Email}, companyId={CompanyId}, page={Page}, pageSize={PageSize}",
             segment, tier, preferredLanguage, email, companyId, page, pageSize);
 
         // Log for integration tracking (T125)
         if (!string.IsNullOrEmpty(segment) || !string.IsNullOrEmpty(tier))
         {
-            _logger.LogInformation("Segmentation query: segment={Segment}, tier={Tier} (potential downstream service usage)",
+            _logger.LogDebug("Segmentation query: segment={Segment}, tier={Tier} (potential downstream service usage)",
                 segment, tier);
         }
 
@@ -450,7 +450,7 @@ public class CustomerService : ICustomerService
             .Take(pageSize)
             .ToListAsync();
 
-        _logger.LogInformation("Retrieved {Count} customers (page {Page}/{TotalPages}, total {TotalCount})",
+        _logger.LogDebug("Retrieved {Count} customers (page {Page}/{TotalPages}, total {TotalCount})",
             customers.Count, page, totalPages, totalCount);
 
         return new PaginatedResponse<CustomerResponse>
@@ -473,7 +473,7 @@ public class CustomerService : ICustomerService
         int page = 1,
         int pageSize = 100)
     {
-        _logger.LogInformation("Querying customer preferences for compliance/audit: page={Page}, pageSize={PageSize}",
+        _logger.LogDebug("Querying customer preferences for compliance/audit: page={Page}, pageSize={PageSize}",
             page, pageSize);
 
         var query = _context.Customers
@@ -494,7 +494,7 @@ public class CustomerService : ICustomerService
             .Take(pageSize)
             .ToListAsync();
 
-        _logger.LogInformation("Retrieved {Count} customer preferences (page {Page}/{TotalPages}, total {TotalCount})",
+        _logger.LogDebug("Retrieved {Count} customer preferences (page {Page}/{TotalPages}, total {TotalCount})",
             customers.Count, page, totalPages, totalCount);
 
         return new PaginatedResponse<GetCustomerPreferencesResponse>

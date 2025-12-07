@@ -46,7 +46,14 @@ public class DocumentDeletionRetryBackgroundService : BackgroundService
                 {
                     var documentService = scope.ServiceProvider.GetRequiredService<IDocumentService>();
                     var count = await documentService.RetryPendingDeletionsAsync();
-                    _logger.LogInformation("Retried {Count} pending document deletions", count);
+                    if (count > 0)
+                    {
+                        _logger.LogInformation("Retried {Count} pending document deletions", count);
+                    }
+                    else
+                    {
+                        _logger.LogDebug("No pending document deletions to retry");
+                    }
                 }
             }
             catch (Exception ex)
