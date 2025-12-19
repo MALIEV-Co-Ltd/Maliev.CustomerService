@@ -20,6 +20,8 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
     private TestWebApplicationFactory _factory = null!;
     private string _testId = null!;
 
+    private static readonly string[] AdminRoles = { "admin" };
+
     public US6_UserAccountManagementIntegrationTests(TestDatabaseFixture databaseFixture)
     {
         _databaseFixture = databaseFixture;
@@ -28,7 +30,7 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         _testId = Guid.NewGuid().ToString("N")[..8];
-        _factory = new TestWebApplicationFactory(_databaseFixture);
+        _factory = new TestWebApplicationFactory();
         await _factory.InitializeAsync();
     }
 
@@ -48,7 +50,7 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateAdminClient();
+        var client = _factory.CreateAuthenticatedClient("test-admin", AdminRoles);
         var username = UniqueUsername("testuser123");
         var email = UniqueEmail("testuser123");
         var request = new
@@ -60,7 +62,7 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
         };
 
         // Act
-        var response = await client.PostAsJsonAsync("/customers/v1/users", request);
+        var response = await client.PostAsJsonAsync("/customer/v1/users", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -87,7 +89,7 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var adminClient = _factory.CreateAdminClient();
+        var adminClient = _factory.CreateAuthenticatedClient("test-admin", AdminRoles);
         var username = UniqueUsername("validuser");
         var email = UniqueEmail("validuser");
 
@@ -99,7 +101,7 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
             password = "ValidP@ssw0rd!",
             roles = new[] { "Customer" }
         };
-        await adminClient.PostAsJsonAsync("/customers/v1/users", createRequest);
+        await adminClient.PostAsJsonAsync("/customer/v1/users", createRequest);
 
         // Create unauthenticated client for validation endpoint
         var unauthenticatedClient = _factory.CreateClient();
@@ -110,7 +112,7 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
         };
 
         // Act
-        var response = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", validateRequest);
+        var response = await unauthenticatedClient.PostAsJsonAsync("/customer/v1/validate", validateRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -137,7 +139,7 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var adminClient = _factory.CreateAdminClient();
+        var adminClient = _factory.CreateAuthenticatedClient("test-admin", AdminRoles);
         var username = UniqueUsername("existinguser");
         var email = UniqueEmail("existinguser");
 
@@ -149,7 +151,7 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
             password = "CorrectP@ssw0rd!",
             roles = new[] { "Employee" }
         };
-        await adminClient.PostAsJsonAsync("/customers/v1/users", createRequest);
+        await adminClient.PostAsJsonAsync("/customer/v1/users", createRequest);
 
         var unauthenticatedClient = _factory.CreateClient();
 
@@ -168,8 +170,8 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
         };
 
         // Act
-        var wrongPasswordResponse = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", wrongPasswordRequest);
-        var nonExistentUserResponse = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", nonExistentUserRequest);
+        var wrongPasswordResponse = await unauthenticatedClient.PostAsJsonAsync("/customer/v1/validate", wrongPasswordRequest);
+        var nonExistentUserResponse = await unauthenticatedClient.PostAsJsonAsync("/customer/v1/validate", nonExistentUserRequest);
 
         // Assert - Both should return the same generic response (security requirement)
         Assert.Equal(HttpStatusCode.OK, wrongPasswordResponse.StatusCode);
@@ -199,56 +201,56 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
         Assert.DoesNotContain("not found", nonExistentUserContent);
     }
 
-    /// <summary>
-    /// Scenario 4: Rate limiting on /validate endpoint (test 10+ requests)
-    /// </summary>
-    [Fact]
-    public async Task Scenario4_ValidateCredentials_ExceedingRateLimit_Returns429TooManyRequests()
-    {
-        // Arrange
-        await _factory.ClearDatabaseAsync();
-        var unauthenticatedClient = _factory.CreateClient();
-        var username = UniqueUsername("testuser");
-
-        var validateRequest = new
-        {
-            username,
-            password = "TestP@ssw0rd!"
-        };
-
-        // Act - Send 15 requests rapidly (rate limit is 10 per minute)
-        var responses = new List<HttpResponseMessage>();
-        for (int i = 0; i < 15; i++)
-        {
-            var response = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", validateRequest);
-            responses.Add(response);
-        }
-
-        // Assert - Some requests should be rate limited
-        var okResponses = responses.Where(r => r.StatusCode == HttpStatusCode.OK).ToList();
-        var rateLimitedResponses = responses.Where(r => r.StatusCode == HttpStatusCode.TooManyRequests).ToList();
-
-        // At least some of the later requests should be rate limited
-        // Note: Exact behavior depends on rate limiting implementation
-        // This test verifies the rate limiting infrastructure is in place
-        Assert.Equal(15, okResponses.Count + rateLimitedResponses.Count);
-
-        // If rate limiting is working, we should see some 429 responses
-        if (rateLimitedResponses.Any())
-        {
-            var errorResponse = await rateLimitedResponses.First().Content.ReadFromJsonAsync<ErrorResponse>();
-            Assert.NotNull(errorResponse);
-            Assert.Contains("RATE_LIMIT", errorResponse!.Code);
-        }
-
-        // Clean up
-        foreach (var response in responses)
-        {
-            response.Dispose();
-        }
-    }
-
-    /// <summary>
+            /// <summary>
+            /// Scenario 4: Rate limiting on /validate endpoint (test 10+ requests)
+            /// </summary>
+            [Fact]
+            public async Task Scenario4_ValidateCredentials_ExceedingRateLimit_Returns429TooManyRequests()
+            {
+                // Arrange
+                await _factory.ClearDatabaseAsync();
+                var client = _factory.CreateClient(); // Create a single client instance
+                client.DefaultRequestHeaders.Add("X-Test-ID", _testId); // Add unique header
+                var username = UniqueUsername("testuser");
+        
+                var validateRequest = new
+                {
+                    username,
+                    password = "TestP@ssw0rd!"
+                };
+        
+                // Act - Send 15 requests rapidly (rate limit is 10 per minute)
+                var responses = new List<HttpResponseMessage>();
+                for (int i = 0; i < 15; i++)
+                {
+                    var response = await client.PostAsJsonAsync("/customer/v1/validate", validateRequest);
+                    responses.Add(response);
+                    await Task.Delay(50); // Small delay to simulate some network latency but still hit rate limit
+                }
+        
+                // Assert - Some requests should be rate limited
+                var okResponses = responses.Where(r => r.StatusCode == HttpStatusCode.OK).ToList();
+                var rateLimitedResponses = responses.Where(r => r.StatusCode == HttpStatusCode.TooManyRequests).ToList();
+        
+                // At least some of the later requests should be rate limited
+                // Note: Exact behavior depends on rate limiting implementation
+                // This test verifies the rate limiting infrastructure is in place
+                Assert.Equal(15, responses.Count); // Total requests sent
+                Assert.True(rateLimitedResponses.Any(), "Expected at least one request to be rate limited.");
+        
+                if (rateLimitedResponses.Any())
+                {
+                    var errorResponse = await rateLimitedResponses.First().Content.ReadFromJsonAsync<ErrorResponse>();
+                    Assert.NotNull(errorResponse);
+                    Assert.Contains("RATE_LIMIT", errorResponse!.Code);
+                }
+        
+                // Clean up
+                foreach (var response in responses)
+                {
+                    response.Dispose();
+                }
+            }    /// <summary>
     /// Scenario 5: Audit logging for validation attempts
     /// </summary>
     [Fact]
@@ -256,7 +258,7 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var adminClient = _factory.CreateAdminClient();
+        var adminClient = _factory.CreateAuthenticatedClient("test-admin", AdminRoles);
         var username = UniqueUsername("audituser");
         var email = UniqueEmail("audituser");
 
@@ -268,7 +270,7 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
             password = "AuditP@ssw0rd!",
             roles = new[] { "Customer" }
         };
-        await adminClient.PostAsJsonAsync("/customers/v1/users", createRequest);
+        await adminClient.PostAsJsonAsync("/customer/v1/users", createRequest);
 
         var unauthenticatedClient = _factory.CreateClient();
 
@@ -287,9 +289,9 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
         };
 
         // Act
-        var successResponse = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", successRequest);
+        var successResponse = await unauthenticatedClient.PostAsJsonAsync("/customer/v1/validate", successRequest);
         await Task.Delay(100); // Small delay to ensure distinct timestamps
-        var failResponse = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", failRequest);
+        var failResponse = await unauthenticatedClient.PostAsJsonAsync("/customer/v1/validate", failRequest);
 
         // Assert - Both should return 200 OK (security requirement)
         Assert.Equal(HttpStatusCode.OK, successResponse.StatusCode);
@@ -319,7 +321,7 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var adminClient = _factory.CreateAdminClient();
+        var adminClient = _factory.CreateAuthenticatedClient("test-admin", AdminRoles);
         var username = UniqueUsername("resetuser");
         var email = UniqueEmail("resetuser");
 
@@ -331,7 +333,7 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
             password = "OldP@ssw0rd!",
             roles = new[] { "Customer" }
         };
-        var createResponse = await adminClient.PostAsJsonAsync("/customers/v1/users", createRequest);
+        var createResponse = await adminClient.PostAsJsonAsync("/customer/v1/users", createRequest);
         var createdUser = await createResponse.Content.ReadFromJsonAsync<UserResponse>();
 
         // Verify old password works
@@ -341,7 +343,7 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
             username,
             password = "OldP@ssw0rd!"
         };
-        var oldPasswordResponse = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", oldPasswordValidation);
+        var oldPasswordResponse = await unauthenticatedClient.PostAsJsonAsync("/customer/v1/validate", oldPasswordValidation);
         var oldPasswordResult = await oldPasswordResponse.Content.ReadFromJsonAsync<ValidationResponse>();
         Assert.True(oldPasswordResult!.IsValid);
 
@@ -356,13 +358,13 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
             currentPassword = "OldP@ssw0rd!",
             newPassword = "NewP@ssw0rd!"
         };
-        var resetResponse = await adminClient.PutAsJsonAsync($"/customers/v1/users/{createdUser!.Id}/password", resetRequest);
+        var resetResponse = await adminClient.PutAsJsonAsync($"/customer/v1/users/{createdUser!.Id}/password", resetRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.NoContent, resetResponse.StatusCode);
 
         // Verify old password no longer works
-        var oldPasswordCheckAfterReset = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", oldPasswordValidation);
+        var oldPasswordCheckAfterReset = await unauthenticatedClient.PostAsJsonAsync("/customer/v1/validate", oldPasswordValidation);
         var oldPasswordCheckResult = await oldPasswordCheckAfterReset.Content.ReadFromJsonAsync<ValidationResponse>();
         Assert.False(oldPasswordCheckResult!.IsValid);
 
@@ -372,7 +374,7 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
             username,
             password = "NewP@ssw0rd!"
         };
-        var newPasswordResponse = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", newPasswordValidation);
+        var newPasswordResponse = await unauthenticatedClient.PostAsJsonAsync("/customer/v1/validate", newPasswordValidation);
         var newPasswordResult = await newPasswordResponse.Content.ReadFromJsonAsync<ValidationResponse>();
         Assert.True(newPasswordResult!.IsValid);
 
@@ -390,7 +392,7 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var adminClient = _factory.CreateAdminClient();
+        var adminClient = _factory.CreateAuthenticatedClient("test-admin", AdminRoles);
         var username = UniqueUsername("roleuser");
         var email = UniqueEmail("roleuser");
 
@@ -402,7 +404,7 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
             password = "RoleP@ssw0rd!",
             roles = new[] { "Customer" }
         };
-        var createResponse = await adminClient.PostAsJsonAsync("/customers/v1/users", createRequest);
+        var createResponse = await adminClient.PostAsJsonAsync("/customer/v1/users", createRequest);
         var createdUser = await createResponse.Content.ReadFromJsonAsync<UserResponse>();
 
         // Verify initial role
@@ -412,7 +414,7 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
             username,
             password = "RoleP@ssw0rd!"
         };
-        var initialValidation = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", validateRequest);
+        var initialValidation = await unauthenticatedClient.PostAsJsonAsync("/customer/v1/validate", validateRequest);
         var initialResult = await initialValidation.Content.ReadFromJsonAsync<ValidationResponse>();
         Assert.True(initialResult!.IsValid);
         Assert.Contains("Customer", initialResult.Roles);
@@ -423,20 +425,20 @@ public class US6_UserAccountManagementIntegrationTests : IAsyncLifetime
         {
             roles = new[] { "Employee" }
         };
-        var updateResponse = await adminClient.PutAsJsonAsync($"/customers/v1/users/{createdUser!.Id}/roles", updateRolesRequest);
+        var updateResponse = await adminClient.PutAsJsonAsync($"/customer/v1/users/{createdUser!.Id}/roles", updateRolesRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
 
         // Verify role change in validation response
-        var updatedValidation = await unauthenticatedClient.PostAsJsonAsync("/customers/v1/validate", validateRequest);
+        var updatedValidation = await unauthenticatedClient.PostAsJsonAsync("/customer/v1/validate", validateRequest);
         var updatedResult = await updatedValidation.Content.ReadFromJsonAsync<ValidationResponse>();
         Assert.True(updatedResult!.IsValid);
         Assert.Contains("Employee", updatedResult.Roles);
         Assert.DoesNotContain("Customer", updatedResult.Roles);
 
         // Verify role change in user retrieval
-        var getUserResponse = await adminClient.GetAsync($"/customers/v1/users/{createdUser.Id}");
+        var getUserResponse = await adminClient.GetAsync($"/customer/v1/users/{createdUser.Id}");
         var retrievedUser = await getUserResponse.Content.ReadFromJsonAsync<UserResponse>();
         Assert.Contains("Employee", retrievedUser!.Roles);
         Assert.DoesNotContain("Customer", retrievedUser.Roles);

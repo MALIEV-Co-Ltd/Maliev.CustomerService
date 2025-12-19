@@ -27,7 +27,7 @@ public class MetricsEndpointTests : IClassFixture<TestWebApplicationFactory>
         var client = _factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/customers/metrics");
+        var response = await client.GetAsync("/customer/metrics");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -40,7 +40,7 @@ public class MetricsEndpointTests : IClassFixture<TestWebApplicationFactory>
         var client = _factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/customers/metrics");
+        var response = await client.GetAsync("/customer/metrics");
         var content = await response.Content.ReadAsStringAsync();
 
         // Assert
@@ -62,7 +62,7 @@ public class MetricsEndpointTests : IClassFixture<TestWebApplicationFactory>
         var client = _factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/customers/metrics");
+        var response = await client.GetAsync("/customer/metrics");
         var content = await response.Content.ReadAsStringAsync();
 
         // Assert
@@ -70,9 +70,6 @@ public class MetricsEndpointTests : IClassFixture<TestWebApplicationFactory>
 
         // Customer metrics (gauges are always present via ObservableGauge)
         Assert.Contains("customer_total", content);
-
-        // Note: Counter metrics (customer_registrations_total, customer_updates_total)
-        // only appear after being recorded with actual operations
     }
 
     [Fact]
@@ -87,10 +84,10 @@ public class MetricsEndpointTests : IClassFixture<TestWebApplicationFactory>
             username = "nonexistent@test.com",
             password = "TestPassword123!"
         };
-        await client.PostAsJsonAsync("/customers/v1/validate", validationRequest);
+        await client.PostAsJsonAsync("/customer/v1/validate", validationRequest);
 
         // Act
-        var response = await client.GetAsync("/customers/metrics");
+        var response = await client.GetAsync("/customer/metrics");
         var content = await response.Content.ReadAsStringAsync();
 
         // Assert
@@ -109,7 +106,7 @@ public class MetricsEndpointTests : IClassFixture<TestWebApplicationFactory>
         var client = _factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/customers/metrics");
+        var response = await client.GetAsync("/customer/metrics");
         var content = await response.Content.ReadAsStringAsync();
 
         // Assert
@@ -117,8 +114,6 @@ public class MetricsEndpointTests : IClassFixture<TestWebApplicationFactory>
 
         // NDA metrics (gauges are always present via ObservableGauge)
         Assert.Contains("nda_total", content);
-
-        // Note: Counter metrics (nda_transitions_total) only appear after being recorded
     }
 
     [Fact]
@@ -128,7 +123,7 @@ public class MetricsEndpointTests : IClassFixture<TestWebApplicationFactory>
         var client = _factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/customers/metrics");
+        var response = await client.GetAsync("/customer/metrics");
         var content = await response.Content.ReadAsStringAsync();
 
         // Assert
@@ -136,9 +131,6 @@ public class MetricsEndpointTests : IClassFixture<TestWebApplicationFactory>
 
         // Document metrics (gauges are always present via ObservableGauge)
         Assert.Contains("document_total", content);
-
-        // Note: Counter metrics (document_operations_total, document_deletion_retry_total)
-        // only appear after being recorded with actual operations
     }
 
     [Fact]
@@ -148,19 +140,19 @@ public class MetricsEndpointTests : IClassFixture<TestWebApplicationFactory>
         var client = _factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/customers/metrics");
+        var response = await client.GetAsync("/customer/metrics");
         var content = await response.Content.ReadAsStringAsync();
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         // OpenTelemetry automatically adds scope labels
-        Assert.Contains("otel_scope_name=\"customer-service\"", content);
+        Assert.Contains("otel_scope_name=\"customers-meter\"", content);
         Assert.Contains("otel_scope_version=\"1.0.0\"", content);
 
         // Custom labels from MetricsService
         Assert.Contains("environment=", content);
-        Assert.Contains("service=\"customer-service\"", content);
+        Assert.Contains("service=\"customers-meter\"", content);
     }
 
     [Fact]
@@ -170,7 +162,7 @@ public class MetricsEndpointTests : IClassFixture<TestWebApplicationFactory>
         var client = _factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/customers/metrics");
+        var response = await client.GetAsync("/customer/metrics");
         var content = await response.Content.ReadAsStringAsync();
 
         // Assert
@@ -189,7 +181,7 @@ public class MetricsEndpointTests : IClassFixture<TestWebApplicationFactory>
         var client = _factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/customers/metrics");
+        var response = await client.GetAsync("/customer/metrics");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

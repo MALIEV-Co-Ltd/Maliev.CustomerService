@@ -19,6 +19,9 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
     private TestWebApplicationFactory _factory = null!;
     private string _testId = null!;
 
+    private static readonly string[] EmployeeRoles = { "employee" };
+    private static readonly string[] CustomerRoles = { "customer" };
+
     public US1_CustomerRegistrationIntegrationTests(TestDatabaseFixture databaseFixture)
     {
         _databaseFixture = databaseFixture;
@@ -27,7 +30,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         _testId = Guid.NewGuid().ToString("N")[..8];
-        _factory = new TestWebApplicationFactory(_databaseFixture);
+        _factory = new TestWebApplicationFactory();
         await _factory.InitializeAsync();
     }
 
@@ -46,7 +49,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateEmployeeClient();
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
         var email = UniqueEmail("john.doe");
         var request = new
         {
@@ -61,7 +64,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         };
 
         // Act
-        var response = await client.PostAsJsonAsync("/customers/v1/customers", request);
+        var response = await client.PostAsJsonAsync("/customer/v1/customers", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -88,7 +91,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateEmployeeClient();
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
         var duplicateEmail = UniqueEmail("jane.smith");
         var request1 = new
         {
@@ -113,9 +116,8 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
             timezone = "Asia/Bangkok"
         };
 
-        // Act
-        var response1 = await client.PostAsJsonAsync("/customers/v1/customers", request1);
-        var response2 = await client.PostAsJsonAsync("/customers/v1/customers", request2);
+        var response1 = await client.PostAsJsonAsync("/customer/v1/customers", request1);
+        var response2 = await client.PostAsJsonAsync("/customer/v1/customers", request2);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response1.StatusCode);
@@ -135,7 +137,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateEmployeeClient();
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
         var email = UniqueEmail("alice.johnson");
         var createRequest = new
         {
@@ -154,11 +156,11 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
             }
         };
 
-        var createResponse = await client.PostAsJsonAsync("/customers/v1/customers", createRequest);
+        var createResponse = await client.PostAsJsonAsync("/customer/v1/customers", createRequest);
         var createdCustomer = await createResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Act
-        var getResponse = await client.GetAsync($"/customers/v1/customers/{createdCustomer!.Id}");
+        var getResponse = await client.GetAsync($"/customer/v1/customers/{createdCustomer!.Id}");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
@@ -187,7 +189,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateEmployeeClient();
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
         var email = UniqueEmail("bob.wilson");
         var createRequest = new
         {
@@ -201,7 +203,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
             timezone = "Asia/Bangkok"
         };
 
-        var createResponse = await client.PostAsJsonAsync("/customers/v1/customers", createRequest);
+        var createResponse = await client.PostAsJsonAsync("/customer/v1/customers", createRequest);
         var createdCustomer = await createResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         var updateRequest = new
@@ -212,7 +214,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         };
 
         // Act
-        var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer.Id}", updateRequest);
+        var updateResponse = await client.PatchAsJsonAsync($"/customer/v1/customers/{createdCustomer.Id}", updateRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
@@ -241,7 +243,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var employeeClient = _factory.CreateEmployeeClient();
+        var employeeClient = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
         var email = UniqueEmail("charlie.brown");
         var createRequest = new
         {
@@ -255,11 +257,11 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
             timezone = "Asia/Bangkok"
         };
 
-        var createResponse = await employeeClient.PostAsJsonAsync("/customers/v1/customers", createRequest);
+        var createResponse = await employeeClient.PostAsJsonAsync("/customer/v1/customers", createRequest);
         var createdCustomer = await createResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Create customer client with the customer's ID
-        var customerClient = _factory.CreateCustomerClient(createdCustomer!.Id.ToString());
+        var customerClient = _factory.CreateAuthenticatedClient(createdCustomer!.Id.ToString(), CustomerRoles);
         var updateRequest = new
         {
             phone = "+6624444444",
@@ -267,7 +269,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         };
 
         // Act
-        var updateResponse = await customerClient.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer.Id}", updateRequest);
+        var updateResponse = await customerClient.PatchAsJsonAsync($"/customer/v1/customers/{createdCustomer.Id}", updateRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
@@ -294,7 +296,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateEmployeeClient();
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
         var email = UniqueEmail("diana.prince");
         var createRequest = new
         {
@@ -308,7 +310,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
             timezone = "Asia/Bangkok"
         };
 
-        var createResponse = await client.PostAsJsonAsync("/customers/v1/customers", createRequest);
+        var createResponse = await client.PostAsJsonAsync("/customer/v1/customers", createRequest);
         var createdCustomer = await createResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         var updateRequest = new
@@ -319,7 +321,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         };
 
         // Act
-        var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer.Id}", updateRequest);
+        var updateResponse = await client.PatchAsJsonAsync($"/customer/v1/customers/{createdCustomer.Id}", updateRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
@@ -347,7 +349,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateEmployeeClient();
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
         var email = UniqueEmail("edward.norton");
         var createRequest = new
         {
@@ -361,7 +363,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
             timezone = "Asia/Bangkok"
         };
 
-        var createResponse = await client.PostAsJsonAsync("/customers/v1/customers", createRequest);
+        var createResponse = await client.PostAsJsonAsync("/customer/v1/customers", createRequest);
         var createdCustomer = await createResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         var updateRequest = new
@@ -376,7 +378,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         };
 
         // Act
-        var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/customers/{createdCustomer.Id}", updateRequest);
+        var updateResponse = await client.PatchAsJsonAsync($"/customer/v1/customers/{createdCustomer.Id}", updateRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
@@ -391,7 +393,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         Assert.Equal("True", updatedCustomer.CommunicationPreferences["marketing_opt_in"]!.ToString());
 
         // Verify the data is persisted in the database
-        var getResponse = await client.GetAsync($"/customers/v1/customers/{createdCustomer.Id}");
+        var getResponse = await client.GetAsync($"/customer/v1/customers/{createdCustomer.Id}");
         var retrievedCustomer = await getResponse.Content.ReadFromJsonAsync<CustomerResponse>();
         Assert.NotNull(retrievedCustomer!.CommunicationPreferences);
         Assert.Equal(3, retrievedCustomer.CommunicationPreferences!.Count);
@@ -405,7 +407,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateEmployeeClient();
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
 
         // Create two customers
         var request1 = new
@@ -431,20 +433,20 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
             timezone = "Asia/Bangkok"
         };
 
-        var response1 = await client.PostAsJsonAsync("/customers/v1/customers", request1);
+        var response1 = await client.PostAsJsonAsync("/customer/v1/customers", request1);
         var customer1 = await response1.Content.ReadFromJsonAsync<CustomerResponse>();
 
-        var response2 = await client.PostAsJsonAsync("/customers/v1/customers", request2);
+        var response2 = await client.PostAsJsonAsync("/customer/v1/customers", request2);
         var customer2 = await response2.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Act - Soft delete the first customer
-        var deleteResponse = await client.DeleteAsync($"/customers/v1/customers/{customer1!.Id}");
+        var deleteResponse = await client.DeleteAsync($"/customer/v1/customers/{customer1!.Id}");
 
         // Assert - Verify deletion was successful
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
         // Verify customer is marked as deleted when retrieved directly
-        var getDeletedResponse = await client.GetAsync($"/customers/v1/customers/{customer1.Id}");
+        var getDeletedResponse = await client.GetAsync($"/customer/v1/customers/{customer1.Id}");
         if (getDeletedResponse.StatusCode == HttpStatusCode.OK)
         {
             var deletedCustomer = await getDeletedResponse.Content.ReadFromJsonAsync<CustomerResponse>();
@@ -452,7 +454,7 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         }
 
         // Verify deleted customer is excluded from list queries
-        var listResponse = await client.GetAsync("/customers/v1/customers");
+        var listResponse = await client.GetAsync("/customer/v1/customers");
         Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
         var listResult = await listResponse.Content.ReadFromJsonAsync<PaginatedResponse<CustomerResponse>>();
         Assert.NotNull(listResult);

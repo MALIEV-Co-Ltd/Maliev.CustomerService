@@ -20,6 +20,8 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
     private TestWebApplicationFactory _factory = null!;
     private string _testId = null!;
 
+    private static readonly string[] EmployeeRoles = { "employee" };
+
     public US2_MultiAddressManagementIntegrationTests(TestDatabaseFixture databaseFixture)
     {
         _databaseFixture = databaseFixture;
@@ -28,7 +30,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         _testId = Guid.NewGuid().ToString("N")[..8];
-        _factory = new TestWebApplicationFactory(_databaseFixture);
+        _factory = new TestWebApplicationFactory();
         await _factory.InitializeAsync();
     }
 
@@ -47,7 +49,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateEmployeeClient();
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
 
         // Mock Country Service to validate country ID
         var mockCountryId = Guid.NewGuid();
@@ -67,7 +69,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
             preferredLanguage = "en",
             timezone = "Asia/Bangkok"
         };
-        var customerResponse = await client.PostAsJsonAsync("/customers/v1/customers", customerRequest);
+        var customerResponse = await client.PostAsJsonAsync("/customer/v1/customers", customerRequest);
         var customer = await customerResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Create billing address
@@ -85,7 +87,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
         };
 
         // Act
-        var response = await client.PostAsJsonAsync("/customers/v1/addresses", addressRequest);
+        var response = await client.PostAsJsonAsync("/customer/v1/addresses", addressRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -117,7 +119,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateEmployeeClient();
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
 
         var mockCountryId1 = Guid.NewGuid();
         var mockCountryId2 = Guid.NewGuid();
@@ -137,7 +139,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
             preferredLanguage = "en",
             timezone = "Asia/Bangkok"
         };
-        var customerResponse = await client.PostAsJsonAsync("/customers/v1/customers", customerRequest);
+        var customerResponse = await client.PostAsJsonAsync("/customer/v1/customers", customerRequest);
         var customer = await customerResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Create first shipping address
@@ -167,8 +169,8 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
         };
 
         // Act
-        var response1 = await client.PostAsJsonAsync("/customers/v1/addresses", address1Request);
-        var response2 = await client.PostAsJsonAsync("/customers/v1/addresses", address2Request);
+        var response1 = await client.PostAsJsonAsync("/customer/v1/addresses", address1Request);
+        var response2 = await client.PostAsJsonAsync("/customer/v1/addresses", address2Request);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response1.StatusCode);
@@ -187,7 +189,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
         Assert.Equal("789 Distribution Center", address2.AddressLine1);
 
         // Verify both addresses exist for the same customer
-        var getResponse = await client.GetAsync($"/customers/v1/addresses?ownerType=Customer&ownerId={customer.Id}");
+        var getResponse = await client.GetAsync($"/customer/v1/addresses?ownerType=Customer&ownerId={customer.Id}");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var addresses = await getResponse.Content.ReadFromJsonAsync<List<AddressResponse>>();
         Assert.NotNull(addresses);
@@ -204,7 +206,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateEmployeeClient();
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
 
         var mockCountryId = Guid.NewGuid();
         _factory.MockCountryService
@@ -223,7 +225,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
             preferredLanguage = "en",
             timezone = "Asia/Bangkok"
         };
-        var customerResponse = await client.PostAsJsonAsync("/customers/v1/customers", customerRequest);
+        var customerResponse = await client.PostAsJsonAsync("/customer/v1/customers", customerRequest);
         var customer = await customerResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Create address
@@ -238,7 +240,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
             postalCode = "10100",
             countryId = mockCountryId
         };
-        var createResponse = await client.PostAsJsonAsync("/customers/v1/addresses", addressRequest);
+        var createResponse = await client.PostAsJsonAsync("/customer/v1/addresses", addressRequest);
         var createdAddress = await createResponse.Content.ReadFromJsonAsync<AddressResponse>();
 
         // Update postal code and province
@@ -250,7 +252,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
         };
 
         // Act
-        var updateResponse = await client.PatchAsJsonAsync($"/customers/v1/addresses/{createdAddress.Id}", updateRequest);
+        var updateResponse = await client.PatchAsJsonAsync($"/customer/v1/addresses/{createdAddress.Id}", updateRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
@@ -271,7 +273,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateEmployeeClient();
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
 
         var mockCountryId = Guid.NewGuid();
         _factory.MockCountryService
@@ -290,7 +292,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
             preferredLanguage = "en",
             timezone = "Asia/Bangkok"
         };
-        var customerResponse = await client.PostAsJsonAsync("/customers/v1/customers", customerRequest);
+        var customerResponse = await client.PostAsJsonAsync("/customer/v1/customers", customerRequest);
         var customer = await customerResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Create billing address
@@ -331,12 +333,12 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
             countryId = mockCountryId
         };
 
-        await client.PostAsJsonAsync("/customers/v1/addresses", billingRequest);
-        await client.PostAsJsonAsync("/customers/v1/addresses", shipping1Request);
-        await client.PostAsJsonAsync("/customers/v1/addresses", shipping2Request);
+        await client.PostAsJsonAsync("/customer/v1/addresses", billingRequest);
+        await client.PostAsJsonAsync("/customer/v1/addresses", shipping1Request);
+        await client.PostAsJsonAsync("/customer/v1/addresses", shipping2Request);
 
         // Act
-        var getResponse = await client.GetAsync($"/customers/v1/addresses?ownerType=Customer&ownerId={customer.Id}");
+        var getResponse = await client.GetAsync($"/customer/v1/addresses?ownerType=Customer&ownerId={customer.Id}");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
@@ -363,7 +365,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateEmployeeClient();
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
 
         var mockCountryId = Guid.NewGuid();
         _factory.MockCountryService
@@ -382,7 +384,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
             preferredLanguage = "en",
             timezone = "Asia/Bangkok"
         };
-        var customerResponse = await client.PostAsJsonAsync("/customers/v1/customers", customerRequest);
+        var customerResponse = await client.PostAsJsonAsync("/customer/v1/customers", customerRequest);
         var customer = await customerResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Create two addresses
@@ -410,19 +412,19 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
             countryId = mockCountryId
         };
 
-        var response1 = await client.PostAsJsonAsync("/customers/v1/addresses", address1Request);
-        var response2 = await client.PostAsJsonAsync("/customers/v1/addresses", address2Request);
+        var response1 = await client.PostAsJsonAsync("/customer/v1/addresses", address1Request);
+        var response2 = await client.PostAsJsonAsync("/customer/v1/addresses", address2Request);
         var address1 = await response1.Content.ReadFromJsonAsync<AddressResponse>();
         var address2 = await response2.Content.ReadFromJsonAsync<AddressResponse>();
 
         // Act - Delete the first address
-        var deleteResponse = await client.DeleteAsync($"/customers/v1/addresses/{address1!.Id}");
+        var deleteResponse = await client.DeleteAsync($"/customer/v1/addresses/{address1!.Id}");
 
         // Assert
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
         // Verify address is removed from customer's address list
-        var getResponse = await client.GetAsync($"/customers/v1/addresses?ownerType=Customer&ownerId={customer.Id}");
+        var getResponse = await client.GetAsync($"/customer/v1/addresses?ownerType=Customer&ownerId={customer.Id}");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var addresses = await getResponse.Content.ReadFromJsonAsync<List<AddressResponse>>();
         Assert.NotNull(addresses);

@@ -2,30 +2,58 @@ using Maliev.CustomerService.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
+using Testcontainers.Redis;
+using Testcontainers.RabbitMq;
 
 namespace Maliev.CustomerService.Tests.Infrastructure;
 
 /// <summary>
-/// Manages PostgreSQL test database lifecycle using Testcontainers
-/// Provides clean database for each test class
+/// Manages PostgreSQL, Redis, and RabbitMQ test containers using Testcontainers
+/// Provides clean infrastructure for each test class
 /// </summary>
 public class TestDatabaseFixture : IAsyncLifetime
 {
     private PostgreSqlContainer? _postgresContainer;
+    private RedisContainer? _redisContainer;
+    private RabbitMqContainer? _rabbitmqContainer;
     public string ConnectionString { get; private set; } = string.Empty;
+    public string RedisConnectionString { get; private set; } = string.Empty;
+    public string RabbitMqConnectionString { get; private set; } = string.Empty;
 
     public async Task InitializeAsync()
     {
-        // Start PostgreSQL container
+        // Initialize containers
         _postgresContainer = new PostgreSqlBuilder()
-            .WithImage("postgres:16")
+            .WithImage("postgres:18-alpine")
             .WithDatabase("customer_test_db")
             .WithUsername("postgres")
             .WithPassword("test_password")
             .Build();
 
-        await _postgresContainer.StartAsync();
+        _redisContainer = new RedisBuilder()
+            .WithImage("redis:7-alpine")
+            .Build();
+
+        _rabbitmqContainer = new RabbitMqBuilder()
+            .WithImage("rabbitmq:4.2.1-alpine")
+            .Build();
+
+        // Start all containers in parallel
+        await Task.WhenAll(
+            _postgresContainer.StartAsync(),
+            _redisContainer.StartAsync(),
+            _rabbitmqContainer.StartAsync()
+        );
+
         ConnectionString = _postgresContainer.GetConnectionString();
+        RedisConnectionString = _redisContainer.GetConnectionString();
+        RabbitMqConnectionString = _rabbitmqContainer.GetConnectionString();
+
+        // Wait for Redis to be ready
+        using (var connection = await StackExchange.Redis.ConnectionMultiplexer.ConnectAsync(RedisConnectionString))
+        {
+            await connection.GetDatabase().PingAsync();
+        }
 
         // Apply migrations to test database
         await using var context = CreateDbContext();
@@ -66,6 +94,14 @@ public class TestDatabaseFixture : IAsyncLifetime
         if (_postgresContainer != null)
         {
             await _postgresContainer.DisposeAsync();
+        }
+        if (_redisContainer != null)
+        {
+            await _redisContainer.DisposeAsync();
+        }
+        if (_rabbitmqContainer != null)
+        {
+            await _rabbitmqContainer.DisposeAsync();
         }
     }
 
