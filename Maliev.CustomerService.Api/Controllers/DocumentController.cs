@@ -10,7 +10,7 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for document management operations
 /// </summary>
 [ApiController]
-[Route("customers/v1/documents")]
+[Route("customer/v1/documents")]
 [Authorize]
 public class DocumentController : ControllerBase
 {

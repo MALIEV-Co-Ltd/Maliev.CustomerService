@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Users;
 using Maliev.CustomerService.Api.Services;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Maliev.CustomerService.Api.Controllers;
 
@@ -10,7 +11,7 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for credential validation (used by Auth Service)
 /// </summary>
 [ApiController]
-[Route("customers/v1")]
+[Route("customer/v1")]
 public class ValidationController : ControllerBase
 {
     private readonly IUserService _userService;
@@ -43,6 +44,7 @@ public class ValidationController : ControllerBase
     /// </remarks>
     [HttpPost("validate")]
     [AllowAnonymous]
+    [EnableRateLimiting("sliding-validation-policy")]
     [ProducesResponseType(typeof(ValidationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]

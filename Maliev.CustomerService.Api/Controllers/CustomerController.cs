@@ -12,7 +12,7 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for customer management operations
 /// </summary>
 [ApiController]
-[Route("customers/v1/customers")]
+[Route("customer/v1/customers")]
 [Authorize]
 public class CustomerController : ControllerBase
 {

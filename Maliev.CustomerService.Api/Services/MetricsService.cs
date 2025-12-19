@@ -9,7 +9,7 @@ namespace Maliev.CustomerService.Api.Services;
 public class MetricsService : IDisposable
 {
     private readonly Meter _meter;
-    private readonly string _serviceName;
+    private readonly string _serviceName = "customers-meter";
     private readonly string _environment;
 
     // Counters (monotonic - only increase)
@@ -35,7 +35,6 @@ public class MetricsService : IDisposable
     /// <param name="configuration">Application configuration</param>
     public MetricsService(IConfiguration configuration)
     {
-        _serviceName = "customer-service";
         _environment = configuration["Environment"] ?? configuration["ASPNETCORE_ENVIRONMENT"] ?? "development";
 
         // Create a meter for this service

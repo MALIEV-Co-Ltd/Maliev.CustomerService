@@ -10,7 +10,7 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for internal note management operations
 /// </summary>
 [ApiController]
-[Route("customers/v1/internal-notes")]
+[Route("customer/v1/internal-notes")]
 [Authorize(Policy = "EmployeeOrHigher")]
 public class InternalNoteController : ControllerBase
 {

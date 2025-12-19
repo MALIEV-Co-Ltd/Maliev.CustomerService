@@ -12,7 +12,7 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for NDA lifecycle management operations
 /// </summary>
 [ApiController]
-[Route("customers/v1/ndas")]
+[Route("customer/v1/ndas")]
 [Authorize]
 public class NDAController : ControllerBase
 {

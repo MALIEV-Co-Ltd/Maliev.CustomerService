@@ -11,7 +11,7 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for user account management operations
 /// </summary>
 [ApiController]
-[Route("customers/v1/users")]
+[Route("customer/v1/users")]
 [Authorize]
 public class UserController : ControllerBase
 {

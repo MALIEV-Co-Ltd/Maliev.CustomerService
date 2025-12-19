@@ -89,7 +89,7 @@ public class CountryServiceClient : ICountryServiceClient
             // Execute request with retry policy
             var response = await _retryPipeline.ExecuteAsync(async cancellationToken =>
             {
-                return await _httpClient.GetAsync($"/countries/v1/countries/{countryId}", cancellationToken);
+                return await _httpClient.GetAsync($"/country/v1/countries/{countryId}", cancellationToken);
             });
 
             var isValid = response.StatusCode == HttpStatusCode.OK;
