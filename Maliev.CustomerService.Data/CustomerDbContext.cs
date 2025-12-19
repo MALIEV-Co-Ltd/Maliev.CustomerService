@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Maliev.CustomerService.Data.Models;
+using Maliev.Aspire.ServiceDefaults.Database;
 
 namespace Maliev.CustomerService.Data;
 
@@ -249,36 +250,8 @@ public class CustomerDbContext : IdentityDbContext<ApplicationUser>
                 .ValueGeneratedOnAddOrUpdate();
         });
 
-        // Configure snake_case naming convention for all tables and columns
-        foreach (var entity in modelBuilder.Model.GetEntityTypes())
-        {
-            // Convert table names to snake_case
-            entity.SetTableName(entity.GetTableName()?.ToSnakeCase());
-
-            // Convert column names to snake_case
-            foreach (var property in entity.GetProperties())
-            {
-                property.SetColumnName(property.GetColumnName().ToSnakeCase());
-            }
-
-            // Convert primary key names to snake_case
-            foreach (var key in entity.GetKeys())
-            {
-                key.SetName(key.GetName()?.ToSnakeCase());
-            }
-
-            // Convert foreign key names to snake_case
-            foreach (var foreignKey in entity.GetForeignKeys())
-            {
-                foreignKey.SetConstraintName(foreignKey.GetConstraintName()?.ToSnakeCase());
-            }
-
-            // Convert index names to snake_case
-            foreach (var index in entity.GetIndexes())
-            {
-                index.SetDatabaseName(index.GetDatabaseName()?.ToSnakeCase());
-            }
-        }
+        // Apply PostgreSQL snake_case naming convention globally
+        SnakeCaseNamingHelper.ApplySnakeCaseNaming(modelBuilder);
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
@@ -286,36 +259,5 @@ public class CustomerDbContext : IdentityDbContext<ApplicationUser>
         base.ConfigureConventions(configurationBuilder);
 
         // Additional convention configurations can be added here
-    }
-}
-
-/// <summary>
-/// Extension method for converting PascalCase to snake_case
-/// </summary>
-public static class StringExtensions
-{
-    public static string ToSnakeCase(this string input)
-    {
-        if (string.IsNullOrEmpty(input))
-            return input;
-
-        var result = new System.Text.StringBuilder();
-        result.Append(char.ToLowerInvariant(input[0]));
-
-        for (int i = 1; i < input.Length; i++)
-        {
-            char c = input[i];
-            if (char.IsUpper(c))
-            {
-                result.Append('_');
-                result.Append(char.ToLowerInvariant(c));
-            }
-            else
-            {
-                result.Append(c);
-            }
-        }
-
-        return result.ToString();
     }
 }
