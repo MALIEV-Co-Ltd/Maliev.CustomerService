@@ -1,0 +1,80 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Maliev CustomerService API",
+    "version": "1.1.0"
+  },
+  "paths": {
+    "/customer/v1/customers/by-principal/{principalId}": {
+      "get": {
+        "summary": "Get customer by central Principal ID",
+        "parameters": [
+          {
+            "name": "principalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Customer not found"
+          }
+        }
+      }
+    },
+    "/customer/v1/customers/validate": {
+      "post": {
+        "summary": "Validate credentials (Legacy)",
+        "responses": {
+          "200": {
+            "description": "Validation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialValidationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CustomerResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "principalId": { "type": "string", "format": "uuid" },
+          "email": { "type": "string" },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" }
+        }
+      },
+      "CredentialValidationResponse": {
+        "type": "object",
+        "properties": {
+          "isValid": { "type": "boolean" },
+          "principalId": { "type": "string", "format": "uuid" },
+          "email": { "type": "string" },
+          "name": { "type": "string" }
+        }
+      }
+    }
+  }
+}

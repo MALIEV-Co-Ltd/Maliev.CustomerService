@@ -15,13 +15,11 @@ public class MetricsService : IDisposable
     // Counters (monotonic - only increase)
     private readonly Counter<long> _customerRegistrations;
     private readonly Counter<long> _customerUpdates;
-    private readonly Counter<long> _authValidation;
     private readonly Counter<long> _ndaTransitions;
     private readonly Counter<long> _documentOperations;
     private readonly Counter<long> _documentDeletionRetry;
 
     // Histograms (for distributions)
-    private readonly Histogram<double> _authValidationDuration;
 
     // Gauges (using ObservableGauge with state tracking)
     private long _customerTotalValue;
@@ -49,10 +47,6 @@ public class MetricsService : IDisposable
             "customer.updates",
             description: "Total customer updates");
 
-        _authValidation = _meter.CreateCounter<long>(
-            "auth.validation",
-            description: "Authentication validation attempts");
-
         _ndaTransitions = _meter.CreateCounter<long>(
             "nda.transitions",
             description: "NDA state transitions");
@@ -64,12 +58,6 @@ public class MetricsService : IDisposable
         _documentDeletionRetry = _meter.CreateCounter<long>(
             "document.deletion.retry",
             description: "Document deletion retry operations");
-
-        // Initialize histograms
-        _authValidationDuration = _meter.CreateHistogram<double>(
-            "auth.validation.duration",
-            unit: "s",
-            description: "Authentication validation duration in seconds");
 
         // Initialize observable gauges
         _meter.CreateObservableGauge(
@@ -104,15 +92,10 @@ public class MetricsService : IDisposable
         // Initialize counters with zero (required for OpenTelemetry to export them)
         _customerRegistrations.Add(0, new KeyValuePair<string, object?>("segment", "unknown"), new KeyValuePair<string, object?>("service", _serviceName), new KeyValuePair<string, object?>("environment", _environment));
         _customerUpdates.Add(0, new KeyValuePair<string, object?>("actor_type", "unknown"), new KeyValuePair<string, object?>("service", _serviceName), new KeyValuePair<string, object?>("environment", _environment));
-        _authValidation.Add(0, new KeyValuePair<string, object?>("result", "success"), new KeyValuePair<string, object?>("service", _serviceName), new KeyValuePair<string, object?>("environment", _environment));
-        _authValidation.Add(0, new KeyValuePair<string, object?>("result", "failure"), new KeyValuePair<string, object?>("service", _serviceName), new KeyValuePair<string, object?>("environment", _environment));
         _ndaTransitions.Add(0, new KeyValuePair<string, object?>("from_status", "unknown"), new KeyValuePair<string, object?>("to_status", "unknown"), new KeyValuePair<string, object?>("service", _serviceName), new KeyValuePair<string, object?>("environment", _environment));
         _documentOperations.Add(0, new KeyValuePair<string, object?>("operation", "unknown"), new KeyValuePair<string, object?>("service", _serviceName), new KeyValuePair<string, object?>("environment", _environment));
         _documentDeletionRetry.Add(0, new KeyValuePair<string, object?>("result", "success"), new KeyValuePair<string, object?>("service", _serviceName), new KeyValuePair<string, object?>("environment", _environment));
         _documentDeletionRetry.Add(0, new KeyValuePair<string, object?>("result", "failure"), new KeyValuePair<string, object?>("service", _serviceName), new KeyValuePair<string, object?>("environment", _environment));
-
-        // Initialize histogram with a zero-duration measurement
-        _authValidationDuration.Record(0, new KeyValuePair<string, object?>("service", _serviceName), new KeyValuePair<string, object?>("environment", _environment));
 
         // Gauges are initialized via their observable callbacks (already set to 0 via Interlocked fields)
     }
@@ -145,45 +128,6 @@ public class MetricsService : IDisposable
     public void RecordCustomerUpdate(string actorType)
     {
         _customerUpdates.Add(1, new KeyValuePair<string, object?>("actor_type", actorType), new KeyValuePair<string, object?>("service", _serviceName), new KeyValuePair<string, object?>("environment", _environment));
-    }
-
-    // Auth metrics methods
-    /// <summary>
-    /// Records an authentication validation attempt
-    /// </summary>
-    /// <param name="success">True if validation succeeded, false otherwise</param>
-    public void RecordAuthValidation(bool success)
-    {
-        _authValidation.Add(1, new KeyValuePair<string, object?>("result", success ? "success" : "failure"), new KeyValuePair<string, object?>("service", _serviceName), new KeyValuePair<string, object?>("environment", _environment));
-    }
-
-    /// <summary>
-    /// Records authentication validation duration
-    /// </summary>
-    /// <param name="durationSeconds">Duration in seconds</param>
-    public void RecordAuthValidationDuration(double durationSeconds)
-    {
-        _authValidationDuration.Record(durationSeconds, new KeyValuePair<string, object?>("service", _serviceName), new KeyValuePair<string, object?>("environment", _environment));
-    }
-
-    /// <summary>
-    /// Creates a stopwatch to measure authentication validation duration
-    /// </summary>
-    /// <returns>Stopwatch for measuring duration</returns>
-    public Stopwatch MeasureAuthValidationDuration()
-    {
-        var stopwatch = Stopwatch.StartNew();
-        return stopwatch;
-    }
-
-    /// <summary>
-    /// Completes authentication validation measurement
-    /// </summary>
-    /// <param name="stopwatch">The stopwatch that was measuring</param>
-    public void CompleteAuthValidationMeasurement(Stopwatch stopwatch)
-    {
-        stopwatch.Stop();
-        RecordAuthValidationDuration(stopwatch.Elapsed.TotalSeconds);
     }
 
     // NDA metrics methods

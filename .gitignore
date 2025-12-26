@@ -57,12 +57,12 @@ packages/
 # Specification files (should not be in gitignore, but listed here for reference)
 # specs/ - DO NOT IGNORE, needed for feature documentation
 .claude/settings.local.json
+.gemini/settings.local.json
 .specify/settings.local.json
 
 # Thumbs.db
 Thumbs.db
 
-.gemini/
 gha-creds-*.json
 
 # Temporary/debug files
@@ -82,3 +82,13 @@ docker-compose.dev.yml
 *SUMMARY*.md
 *AUDIT*.md
 *.Improvements.md
+
+# Test Outputs
+*test-output.txt
+*_error.txt
+
+
+# Test Outputs
+*test-output.txt
+*_error.txt
+

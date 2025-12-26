@@ -1,11 +1,11 @@
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.Companies;
 using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace Maliev.CustomerService.Api.Services;
 

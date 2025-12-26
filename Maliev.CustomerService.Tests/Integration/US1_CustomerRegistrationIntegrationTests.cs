@@ -1,9 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
-using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Models;
+using Maliev.CustomerService.Api.Models.Customers;
+using Maliev.CustomerService.Api.Models.IAM;
 using Maliev.CustomerService.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Moq;
 using Xunit;
 
 namespace Maliev.CustomerService.Tests.Integration;
@@ -19,8 +22,8 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
     private TestWebApplicationFactory _factory = null!;
     private string _testId = null!;
 
-    private static readonly string[] EmployeeRoles = { "employee" };
-    private static readonly string[] CustomerRoles = { "customer" };
+    private static readonly string[] EmployeeRoles = { "roles.customer.representative" };
+    private static readonly string[] CustomerRoles = { "roles.customer.viewer" };
 
     public US1_CustomerRegistrationIntegrationTests(TestDatabaseFixture databaseFixture)
     {
@@ -471,5 +474,64 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         Assert.True(customerInDb!.IsDeleted);
         Assert.Equal("Retail", customerInDb.Segment);
         Assert.Equal("en", customerInDb.PreferredLanguage);
+    }
+
+    /// <summary>
+    /// Scenario 9: Create customer with IAM integration enabled → verify PrincipalId is set
+    /// </summary>
+    [Fact]
+    public async Task Scenario9_CreateCustomer_WithIAMEnabled_ReturnsCustomerWithPrincipalId()
+    {
+        // Arrange
+        await _factory.ClearDatabaseAsync();
+
+        var principalId = Guid.NewGuid();
+        _factory.MockIAMClient
+            .Setup(x => x.CreatePrincipalAsync(It.IsAny<CreatePrincipalRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CreatePrincipalResponse { PrincipalId = principalId, CreatedAt = DateTime.UtcNow });
+
+        // Enable feature flag via WithWebHostBuilder and custom configuration
+        using var factoryWithIAM = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureAppConfiguration((context, config) =>
+            {
+                config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Features:PrincipalBasedAuthEnabled"] = "true"
+                });
+            });
+        });
+
+        var client = factoryWithIAM.CreateClient();
+        // Manually authenticate since we can't use helper from factoryWithIAM easily if it's not castable
+        var token = _factory.CreateTestJwtToken("test-employee", EmployeeRoles);
+        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+
+        var email = UniqueEmail("iam.user");
+        var request = new
+        {
+            firstName = "IAM",
+            lastName = "User",
+            email,
+            segment = "Retail",
+            tier = "Bronze",
+            preferredLanguage = "en",
+            timezone = "UTC"
+        };
+
+        // Act
+        var response = await client.PostAsJsonAsync("/customer/v1/customers", request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var customer = await response.Content.ReadFromJsonAsync<CustomerResponse>();
+        Assert.NotNull(customer);
+        Assert.Equal(principalId, customer!.PrincipalId);
+
+        // Verify in DB
+        using var dbContext = _factory.GetDbContext();
+        var customerInDb = await dbContext.Customers.FindAsync(customer.Id);
+        Assert.NotNull(customerInDb);
+        Assert.Equal(principalId, customerInDb!.PrincipalId);
     }
 }

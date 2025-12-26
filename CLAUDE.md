@@ -1,15 +1,15 @@
 # Maliev.CustomerService Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2025-10-08
+Auto-generated from all feature plans. Last updated: 2025-12-21
 
 ## Active Technologies
-- C# / .NET 9.0 (001-customer-service-microservice)
+- C# / .NET 10.0
 
 ## Project Structure
 ```
-backend/
-frontend/
-tests/
+Maliev.CustomerService.Api/
+Maliev.CustomerService.Data/
+Maliev.CustomerService.Tests/
 ```
 
 ## Commands

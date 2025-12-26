@@ -1,10 +1,13 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
+using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Services;
-using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.CustomerService.Api.Controllers;
 
@@ -12,7 +15,8 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for customer management operations
 /// </summary>
 [ApiController]
-[Route("customer/v1/customers")]
+[ApiVersion("1.0")]
+[Route("customer/v{version:apiVersion}/customers")]
 [Authorize]
 public class CustomerController : ControllerBase
 {
@@ -149,6 +153,48 @@ public class CustomerController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves a customer by their central IAM Principal ID
+    /// </summary>
+    /// <param name="principalId">The IAM Principal ID</param>
+    /// <returns>Customer response</returns>
+    /// <response code="200">Customer found</response>
+    /// <response code="401">Unauthorized</response>
+    /// <response code="403">Forbidden - requires customer.customers.read permission</response>
+    /// <response code="404">Customer not found</response>
+    [HttpGet("by-principal/{principalId:guid}")]
+    [RequirePermission(CustomerPermissions.CustomersRead)]
+    [ProducesResponseType(typeof(CustomerResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CustomerResponse>> GetByPrincipalId(Guid principalId)
+    {
+        try
+        {
+            var customer = await _customerService.GetByPrincipalIdAsync(principalId);
+
+            if (customer == null)
+            {
+                _logger.LogDebug("Customer with Principal ID {PrincipalId} not found", principalId);
+                return NotFound(new ErrorResponse
+                {
+                    Code = "NOT_FOUND",
+                    Message = $"Customer with Principal ID '{principalId}' not found",
+                    TraceId = HttpContext.TraceIdentifier,
+                    Timestamp = DateTime.UtcNow
+                });
+            }
+
+            return Ok(customer);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving customer by Principal ID {PrincipalId}", principalId);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Updates an existing customer
     /// </summary>
     /// <param name="id">Customer ID</param>
@@ -271,8 +317,6 @@ public class CustomerController : ControllerBase
         [FromQuery] string? segment = null,
         [FromQuery] string? tier = null,
         [FromQuery] string? preferredLanguage = null,
-        [FromQuery] DateTime? lastLoginAtFrom = null,
-        [FromQuery] DateTime? lastLoginAtTo = null,
         [FromQuery] string? email = null,
         [FromQuery] Guid? companyId = null,
         [FromQuery] DateTime? createdFrom = null,
@@ -290,8 +334,6 @@ public class CustomerController : ControllerBase
                 segment,
                 tier,
                 preferredLanguage,
-                lastLoginAtFrom,
-                lastLoginAtTo,
                 email,
                 companyId,
                 createdFrom,
@@ -389,10 +431,14 @@ public class CustomerController : ControllerBase
 
         // Determine actor type from role claims
         // Employee role = Employee actor type, otherwise Customer
+        // Updated for GCP-style roles: roles.customer.{role-name}
         var roles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
         var actorType = roles.Any(r => r.Equals("Employee", StringComparison.OrdinalIgnoreCase) ||
                                        r.Equals("Manager", StringComparison.OrdinalIgnoreCase) ||
-                                       r.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+                                       r.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
+                                       r.Equals("roles.customer.admin", StringComparison.OrdinalIgnoreCase) ||
+                                       r.Equals("roles.customer.manager", StringComparison.OrdinalIgnoreCase) ||
+                                       r.Equals("roles.customer.representative", StringComparison.OrdinalIgnoreCase))
             ? "Employee"
             : "Customer";
 

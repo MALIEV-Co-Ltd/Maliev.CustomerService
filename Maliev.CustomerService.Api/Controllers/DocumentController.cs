@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.CustomerService.Api.Models.Documents;
 using Maliev.CustomerService.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -10,7 +11,8 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for document management operations
 /// </summary>
 [ApiController]
-[Route("customer/v1/documents")]
+[ApiVersion("1.0")]
+[Route("customer/v{version:apiVersion}/documents")]
 [Authorize]
 public class DocumentController : ControllerBase
 {

@@ -1,9 +1,10 @@
+using System.Text.Json;
 using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.Customers;
+using Maliev.CustomerService.Api.Models.IAM;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
 
 namespace Maliev.CustomerService.Api.Services;
 
@@ -13,6 +14,8 @@ namespace Maliev.CustomerService.Api.Services;
 public class CustomerService : ICustomerService
 {
     private readonly CustomerDbContext _context;
+    private readonly IIAMClient _iamClient;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<CustomerService> _logger;
     private readonly MetricsService _metricsService;
 
@@ -20,11 +23,20 @@ public class CustomerService : ICustomerService
     /// Initializes a new instance of the CustomerService class
     /// </summary>
     /// <param name="context">Database context for Customer Service</param>
+    /// <param name="iamClient">IAM service client</param>
+    /// <param name="configuration">Application configuration</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="metricsService">Metrics service for recording customer operations</param>
-    public CustomerService(CustomerDbContext context, ILogger<CustomerService> logger, MetricsService metricsService)
+    public CustomerService(
+        CustomerDbContext context,
+        IIAMClient iamClient,
+        IConfiguration configuration,
+        ILogger<CustomerService> logger,
+        MetricsService metricsService)
     {
         _context = context;
+        _iamClient = iamClient;
+        _configuration = configuration;
         _logger = logger;
         _metricsService = metricsService;
     }
@@ -42,6 +54,25 @@ public class CustomerService : ICustomerService
         _logger.LogInformation("Creating customer with email {Email} by actor {ActorId} ({ActorType})",
             request.Email, actorId, actorType);
 
+        // Race Condition Handling
+        // =======================
+        // The duplicate email check below is NOT thread-safe. Concurrent requests could both:
+        // 1. Query and find no existing customer with the email
+        // 2. Pass the validation check
+        // 3. Both attempt to insert a customer with the same email
+        //
+        // This is SAFE and HANDLED because:
+        // - Database has a unique constraint on the Email column (see CustomerConfiguration.cs)
+        // - One request will succeed, the other will get a database constraint violation
+        // - ExceptionHandlingMiddleware detects Npgsql.PostgresException (error code 23505)
+        // - Automatically maps to 409 Conflict with "A record with this email already exists"
+        // - This is a rare edge case (requires precise timing of concurrent requests)
+        //
+        // The application-level check below provides fast-fail for the common case,
+        // while the database constraint provides ultimate safety for race conditions.
+        //
+        // Reviewed: 2025-12-26 - Race condition is HANDLED by DB constraint + middleware
+
         // Check for duplicate email (active customers only)
         var existingCustomer = await _context.Customers
             .Where(c => c.Email == request.Email && !c.IsDeleted)
@@ -53,9 +84,29 @@ public class CustomerService : ICustomerService
             throw new InvalidOperationException($"A customer with email '{request.Email}' already exists");
         }
 
+        _logger.LogInformation("Creating IAM principal for new customer with email {Email}", request.Email);
+        Guid principalId;
+        try
+        {
+            var principalResponse = await _iamClient.CreatePrincipalAsync(new CreatePrincipalRequest
+            {
+                Email = request.Email,
+                DisplayName = $"{request.FirstName} {request.LastName}",
+                PrincipalType = "user",
+                LinkedService = "CustomerService"
+            });
+            principalId = principalResponse.PrincipalId;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create IAM principal for email {Email}", request.Email);
+            throw new InvalidOperationException("Failed to create customer identity in central system", ex);
+        }
+
         var customer = new Customer
         {
             Id = Guid.NewGuid(),
+            PrincipalId = principalId,
             FirstName = request.FirstName,
             LastName = request.LastName,
             Email = request.Email,
@@ -101,9 +152,20 @@ public class CustomerService : ICustomerService
 
         _context.AuditLogs.Add(auditLog);
 
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Customer {CustomerId} created successfully", customer.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save customer to database. Attempting to delete orphaned IAM principal {PrincipalId}", principalId);
 
-        _logger.LogInformation("Customer {CustomerId} created successfully", customer.Id);
+            // Compensation: Delete the IAM principal to avoid orphaned identity
+            await _iamClient.DeletePrincipalAsync(principalId);
+
+            throw new InvalidOperationException("Failed to create customer due to database error. IAM principal has been cleaned up.", ex);
+        }
 
         // Record metrics
         _metricsService.RecordCustomerRegistration(customer.Segment);
@@ -127,6 +189,24 @@ public class CustomerService : ICustomerService
         if (customer == null)
         {
             _logger.LogDebug("Customer {CustomerId} not found or deleted", id);
+            return null;
+        }
+
+        return customer.ToCustomerResponse();
+    }
+
+    /// <inheritdoc/>
+    public async Task<CustomerResponse?> GetByPrincipalIdAsync(Guid principalId, CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Retrieving customer by Principal ID {PrincipalId}", principalId);
+
+        var customer = await _context.Customers
+            .Where(c => c.PrincipalId == principalId && !c.IsDeleted)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (customer == null)
+        {
+            _logger.LogDebug("Customer with Principal ID {PrincipalId} not found", principalId);
             return null;
         }
 
@@ -348,8 +428,6 @@ public class CustomerService : ICustomerService
     /// <param name="segment">Optional segment filter</param>
     /// <param name="tier">Optional tier filter</param>
     /// <param name="preferredLanguage">Optional preferred language filter</param>
-    /// <param name="lastLoginAtFrom">Optional filter for users who last logged in after this date</param>
-    /// <param name="lastLoginAtTo">Optional filter for users who last logged in before this date</param>
     /// <param name="email">Optional email partial match filter</param>
     /// <param name="companyId">Optional company ID filter</param>
     /// <param name="createdFrom">Optional filter for customers created after this date</param>
@@ -362,8 +440,6 @@ public class CustomerService : ICustomerService
         string? segment = null,
         string? tier = null,
         string? preferredLanguage = null,
-        DateTime? lastLoginAtFrom = null,
-        DateTime? lastLoginAtTo = null,
         string? email = null,
         Guid? companyId = null,
         DateTime? createdFrom = null,
@@ -424,16 +500,6 @@ public class CustomerService : ICustomerService
         if (createdTo.HasValue)
         {
             query = query.Where(c => c.CreatedAt <= createdTo.Value);
-        }
-
-        // Filter by last login date requires joining with Users
-        if (lastLoginAtFrom.HasValue || lastLoginAtTo.HasValue)
-        {
-            query = from customer in query
-                    join user in _context.Users on customer.Id equals user.LinkedCustomerId
-                    where (!lastLoginAtFrom.HasValue || user.LastLoginAt >= lastLoginAtFrom.Value) &&
-                          (!lastLoginAtTo.HasValue || user.LastLoginAt <= lastLoginAtTo.Value)
-                    select customer;
         }
 
         // Get total count for pagination

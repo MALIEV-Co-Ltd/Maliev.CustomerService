@@ -1,10 +1,11 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+using Asp.Versioning;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Companies;
 using Maliev.CustomerService.Api.Services;
-using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.CustomerService.Api.Controllers;
 
@@ -12,7 +13,8 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for company management operations
 /// </summary>
 [ApiController]
-[Route("customer/v1/companies")]
+[ApiVersion("1.0")]
+[Route("customer/v{version:apiVersion}/companies")]
 [Authorize]
 public class CompanyController : ControllerBase
 {

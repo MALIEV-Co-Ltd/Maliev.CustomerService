@@ -1,8 +1,6 @@
 using System.Threading.RateLimiting;
-using Maliev.CustomerService.Api.Middleware;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
-using Microsoft.AspNetCore.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,13 +9,17 @@ builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if ava
 
 // --- Infrastructure & Observability ---
 builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
+builder.AddStandardMiddleware(options =>
+{
+    options.EnableRequestLogging = true;
+});
 builder.AddServiceMeters("customers-meter"); // Register service meters for OpenTelemetry business metrics
 
 
 
 builder.AddRedisDistributedCache(instanceName: "customer:"); // Redis with in-memory fallback
 builder.AddMassTransitWithRabbitMq(); // RabbitMQ message bus (non-blocking startup)
-builder.AddPostgresDbContext<CustomerDbContext>(connectionStringName: "CustomerDbContext"); // PostgreSQL with retry logic
+builder.AddPostgresDbContext<CustomerDbContext>(connectionName: "CustomerDbContext"); // PostgreSQL with retry logic
 
 // --- API Configuration ---
 builder.AddDefaultCors(); // CORS from CORS:AllowedOrigins config
@@ -27,74 +29,42 @@ builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
 builder.AddJwtAuthentication();
 
 // Add OpenAPI (must be in Program.cs for XML comments to work via source generator)
-if (!builder.Environment.IsProduction())
-{
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddOpenApi("v1", options =>
-    {
-        options.AddDocumentTransformer((document, context, cancellationToken) =>
-        {
-            document.Info.Title = "MALIEV Customer Service API";
-            document.Info.Version = "v1";
-            document.Info.Description = "Customer relationship management service. Manages customer profiles with addresses and contact information, company entities, user accounts linked to customers, NDA document tracking, internal notes, and document attachments with validation endpoints for service integration.";
-            return Task.CompletedTask;
-        });
-    });
-}
+builder.AddStandardOpenApi(
+    title: "MALIEV Customer Service API",
+    description: "Comprehensive customer management service. Handles individual and corporate customer profiles, address books, NDA tracking, document management, and customer lifecycle status.");
 
-// ASP.NET Core Identity
-builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
-{
-    // Password policy
-    options.Password.RequireDigit = true;
-    options.Password.RequireUppercase = true;
-    options.Password.RequireLowercase = true;
-    options.Password.RequireNonAlphanumeric = true;
-    options.Password.RequiredLength = 8;
-
-    // Lockout policy
-    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
-    options.Lockout.MaxFailedAccessAttempts = 5;
-    options.Lockout.AllowedForNewUsers = true;
-})
-.AddEntityFrameworkStores<CustomerDbContext>()
-.AddDefaultTokenProviders();
-
-// Ensure JWT is the default scheme (Identity overrides it to Cookies by default)
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme;
-});
-
-// OpenTelemetry business metrics
 builder.Services.AddSingleton<Maliev.CustomerService.Api.Services.MetricsService>();
 
 // Application Services
 builder.Services.AddScoped<Maliev.CustomerService.Api.Services.ICustomerService, Maliev.CustomerService.Api.Services.CustomerService>();
 builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IAddressService, Maliev.CustomerService.Api.Services.AddressService>();
-builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IUserService, Maliev.CustomerService.Api.Services.UserService>();
 builder.Services.AddScoped<Maliev.CustomerService.Api.Services.ICompanyService, Maliev.CustomerService.Api.Services.CompanyService>();
 builder.Services.AddScoped<Maliev.CustomerService.Api.Services.INDAService, Maliev.CustomerService.Api.Services.NDAService>();
 builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IDocumentService, Maliev.CustomerService.Api.Services.DocumentService>();
 builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IInternalNoteService, Maliev.CustomerService.Api.Services.InternalNoteService>();
+
+// Scripts
+builder.Services.AddScoped<Maliev.CustomerService.Api.Scripts.MigrateToPrincipalsScript>();
 
 // Background Services
 builder.Services.AddHostedService<Maliev.CustomerService.Api.BackgroundServices.NDAExpirationBackgroundService>();
 builder.Services.AddHostedService<Maliev.CustomerService.Api.BackgroundServices.DocumentDeletionRetryBackgroundService>();
 
 // External Service Clients
-builder.Services.Configure<Maliev.CustomerService.Api.Configuration.CountryServiceOptions>(
-    builder.Configuration.GetSection(Maliev.CustomerService.Api.Configuration.CountryServiceOptions.SectionName));
-builder.Services.AddHttpClient<Maliev.CustomerService.Api.Services.External.ICountryServiceClient,
-    Maliev.CustomerService.Api.Services.External.CountryServiceClient>()
-    .AddStandardResilienceHandler();
+builder.AddServiceClient<Maliev.CustomerService.Api.Services.External.ICountryServiceClient,
+    Maliev.CustomerService.Api.Services.External.CountryServiceClient>("CountryService");
 
-builder.Services.Configure<Maliev.CustomerService.Api.Configuration.UploadServiceOptions>(
-    builder.Configuration.GetSection("ExternalServices:UploadService"));
-builder.Services.AddHttpClient<Maliev.CustomerService.Api.Services.External.IUploadServiceClient,
-    Maliev.CustomerService.Api.Services.External.UploadServiceClient>()
-    .AddStandardResilienceHandler();
+builder.AddServiceClient<Maliev.CustomerService.Api.Services.External.IUploadServiceClient,
+    Maliev.CustomerService.Api.Services.External.UploadServiceClient>("UploadService");
+
+// IAM Service Client
+builder.AddServiceClient<Maliev.CustomerService.Api.Services.IIAMClient, Maliev.CustomerService.Api.Services.IAMClient>("IAM");
+
+// IAM Service HttpClient for registration service
+builder.AddServiceClient("IAMService");
+
+// IAM Registration Service
+builder.Services.AddIAMRegistration<Maliev.CustomerService.Api.Services.CustomerIAMRegistrationService>();
 
 // Controllers
 builder.Services.AddControllers()
@@ -143,6 +113,28 @@ builder.Services.AddRateLimiter(options =>
     };
 });
 var app = builder.Build();
+
+// --- CLI Command Handlers ---
+if (args.Contains("--migrate-principals"))
+{
+    using var scope = app.Services.CreateScope();
+    var migrator = scope.ServiceProvider.GetRequiredService<Maliev.CustomerService.Api.Scripts.MigrateToPrincipalsScript>();
+    var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
+    var cliLogger = loggerFactory.CreateLogger("CLI");
+
+    try
+    {
+        await migrator.ExecuteAsync();
+        cliLogger.LogInformation("Migration command completed successfully.");
+    }
+    catch (Exception ex)
+    {
+        cliLogger.LogCritical(ex, "Migration command failed with error.");
+        Environment.Exit(1);
+    }
+    return;
+}
+
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
 // Run database migrations on startup (skip in Testing environment)
@@ -164,7 +156,7 @@ var metricsService = app.Services.GetRequiredService<Maliev.CustomerService.Api.
 Log.MetricsInitialized(logger);
 
 // Middleware Pipeline
-app.UseExceptionHandling();
+app.UseStandardMiddleware();
 app.UseHttpsRedirection();
 
 app.UseRouting();

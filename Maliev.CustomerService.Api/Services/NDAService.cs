@@ -1,9 +1,9 @@
+using System.Text.Json;
 using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.NDAs;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
 
 namespace Maliev.CustomerService.Api.Services;
 
@@ -256,7 +256,7 @@ public class NDAService : INDAService
             }
         }
 
-        if (nda.Status == NDAStatus.Draft && 
+        if (nda.Status == NDAStatus.Draft &&
             (request.Status == NDAStatus.Expired || request.Status == NDAStatus.Revoked))
         {
             throw new InvalidOperationException(

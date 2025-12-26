@@ -531,6 +531,7 @@ public class CompanyServiceTests
             var customer1 = new Customer
             {
                 Id = Guid.NewGuid(),
+                PrincipalId = Guid.NewGuid(),
                 FirstName = "John",
                 LastName = "Doe",
                 Email = "john@company.com",
@@ -548,6 +549,7 @@ public class CompanyServiceTests
             var customer2 = new Customer
             {
                 Id = Guid.NewGuid(),
+                PrincipalId = Guid.NewGuid(),
                 FirstName = "Jane",
                 LastName = "Smith",
                 Email = "jane@company.com",
@@ -613,6 +615,7 @@ public class CompanyServiceTests
             var activeCustomer = new Customer
             {
                 Id = Guid.NewGuid(),
+                PrincipalId = Guid.NewGuid(),
                 FirstName = "Active",
                 LastName = "Customer",
                 Email = "active@company.com",
@@ -630,6 +633,7 @@ public class CompanyServiceTests
             var deletedCustomer = new Customer
             {
                 Id = Guid.NewGuid(),
+                PrincipalId = Guid.NewGuid(),
                 FirstName = "Deleted",
                 LastName = "Customer",
                 Email = "deleted@company.com",

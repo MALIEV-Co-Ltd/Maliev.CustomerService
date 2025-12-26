@@ -13,6 +13,12 @@ public class Customer
     public Guid Id { get; set; } = Guid.NewGuid();
 
     /// <summary>
+    /// Reference to the central IAM principal ID
+    /// </summary>
+    [Required]
+    public Guid PrincipalId { get; set; }
+
+    /// <summary>
     /// Customer's first name
     /// </summary>
     [Required]

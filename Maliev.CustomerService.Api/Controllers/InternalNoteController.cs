@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Maliev.CustomerService.Api.Models.InternalNotes;
 using Maliev.CustomerService.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -10,7 +11,8 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for internal note management operations
 /// </summary>
 [ApiController]
-[Route("customer/v1/internal-notes")]
+[ApiVersion("1.0")]
+[Route("customer/v{version:apiVersion}/internal-notes")]
 [Authorize(Policy = "EmployeeOrHigher")]
 public class InternalNoteController : ControllerBase
 {

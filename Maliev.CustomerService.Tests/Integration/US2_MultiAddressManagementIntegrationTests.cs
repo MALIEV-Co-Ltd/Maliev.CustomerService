@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
-using Maliev.CustomerService.Api.Models.Customers;
-using Maliev.CustomerService.Api.Models.Addresses;
 using Maliev.CustomerService.Api.Models;
+using Maliev.CustomerService.Api.Models.Addresses;
+using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Tests.Infrastructure;
 using Moq;
 using Xunit;
@@ -20,7 +20,7 @@ public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
     private TestWebApplicationFactory _factory = null!;
     private string _testId = null!;
 
-    private static readonly string[] EmployeeRoles = { "employee" };
+    private static readonly string[] EmployeeRoles = { "roles.customer.representative" };
 
     public US2_MultiAddressManagementIntegrationTests(TestDatabaseFixture databaseFixture)
     {

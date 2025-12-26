@@ -1,23 +1,22 @@
-﻿using System.IdentityModel.Tokens.Jwt;
-using MassTransit;
-using Microsoft.Extensions.Configuration;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using Maliev.CustomerService.Api.Services.External;
+using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
+using Moq;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Testcontainers.Redis;
 using Xunit;
-using Moq;
-using Maliev.CustomerService.Api.Services.External;
 
 namespace Maliev.CustomerService.Tests.Testing;
 
@@ -167,8 +166,8 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     protected virtual void ConfigureEnvironmentVariables()
     {
         // Set dummy URLs for external services to prevent constructor injection failures
-        Environment.SetEnvironmentVariable("ExternalServices__CountryService__BaseUrl", "http://localhost:5000");
-        Environment.SetEnvironmentVariable("ExternalServices__UploadService__BaseUrl", "http://localhost:5001");
+        Environment.SetEnvironmentVariable("CountryService__BaseUrl", "http://localhost:5000");
+        Environment.SetEnvironmentVariable("UploadService__BaseUrl", "http://localhost:5001");
     }
 
     /// <summary>
@@ -218,62 +217,11 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     {
         await using var context = CreateDbContext();
         await context.Database.MigrateAsync();
-
-        // Seed Identity roles required for CustomerService
-        await SeedIdentityRolesAsync(context);
-    }
-
-    /// <summary>
-    /// Seeds ASP.NET Core Identity roles required for testing.
-    /// Uses raw SQL to work with any DbContext type.
-    /// </summary>
-    private static async Task SeedIdentityRolesAsync(TDbContext context)
-    {
-        try
-        {
-            // Check if asp_net_roles table exists (indicates Identity is being used)
-            var tableExists = await context.Database
-                .SqlQueryRaw<int>("SELECT 1 FROM information_schema.tables WHERE table_name = 'asp_net_roles'")
-                .AnyAsync();
-
-            if (tableExists)
-            {
-                var roles = new[] { "Customer", "Employee", "Manager", "Admin" };
-
-                foreach (var roleName in roles)
-                {
-                    var normalizedName = roleName.ToUpperInvariant();
-
-                    // Check if role already exists
-                    var roleExists = await context.Database
-                        .SqlQueryRaw<int>("SELECT 1 FROM asp_net_roles WHERE normalized_name = {0}", normalizedName)
-                        .AnyAsync();
-
-                    if (!roleExists)
-                    {
-                        var roleId = Guid.NewGuid().ToString();
-                        var concurrencyStamp = Guid.NewGuid().ToString();
-
-                        // Insert the role
-                        await context.Database.ExecuteSqlRawAsync(
-                            @"INSERT INTO asp_net_roles (id, name, normalized_name, concurrency_stamp)
-                              VALUES ({0}, {1}, {2}, {3})",
-                            roleId, roleName, normalizedName, concurrencyStamp);
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            // Log the error for debugging
-            System.Diagnostics.Debug.WriteLine($"Failed to seed Identity roles: {ex.Message}");
-        }
     }
 
     /// <summary>
     /// Cleans all data from the database while preserving schema.
     /// Queries the database schema dynamically to get all tables.
-    /// Preserves Identity roles for services that use ASP.NET Core Identity.
     /// </summary>
     public async Task CleanDatabaseAsync()
     {
@@ -287,12 +235,10 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
                   WHERE table_schema = 'public'
                   AND table_type = 'BASE TABLE'
                   AND table_name != '__EFMigrationsHistory'
-                  AND table_name != 'asp_net_roles'
                   ORDER BY table_name")
             .ToListAsync();
 
         // Truncate all tables (CASCADE handles foreign keys)
-        // Note: asp_net_roles is preserved to avoid re-seeding roles on every clean
         foreach (var tableName in tableNames)
         {
             try
