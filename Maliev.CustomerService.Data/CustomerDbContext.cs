@@ -1,6 +1,6 @@
-using Microsoft.EntityFrameworkCore;
-using Maliev.CustomerService.Data.Models;
 using Maliev.Aspire.ServiceDefaults.Database;
+using Maliev.CustomerService.Data.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.CustomerService.Data;
 
