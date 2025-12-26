@@ -90,7 +90,7 @@ public class MigrateToPrincipalsScript
             }
         }
 
-        _logger.LogInformation("Migration backfill complete. Success: {SuccessCount}, Failures: {FailureCount}", 
+        _logger.LogInformation("Migration backfill complete. Success: {SuccessCount}, Failures: {FailureCount}",
             successCount, failureCount);
     }
 }

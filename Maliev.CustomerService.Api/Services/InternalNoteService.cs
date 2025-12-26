@@ -1,9 +1,9 @@
+using System.Text.Json;
 using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.InternalNotes;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
 
 namespace Maliev.CustomerService.Api.Services;
 

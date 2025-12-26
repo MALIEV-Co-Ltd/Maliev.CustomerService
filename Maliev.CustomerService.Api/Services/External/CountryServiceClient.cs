@@ -1,7 +1,7 @@
+using System.Net;
 using Microsoft.Extensions.Caching.Memory;
 using Polly;
 using Polly.Retry;
-using System.Net;
 
 namespace Maliev.CustomerService.Api.Services.External;
 

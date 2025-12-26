@@ -51,7 +51,7 @@ public class NDAExpirationBackgroundService : BackgroundService
 
                     if (expiredCount > 0)
                     {
-                         _logger.LogInformation("NDA expiration check completed. {ExpiredCount} NDAs expired", expiredCount);
+                        _logger.LogInformation("NDA expiration check completed. {ExpiredCount} NDAs expired", expiredCount);
                     }
                     else
                     {

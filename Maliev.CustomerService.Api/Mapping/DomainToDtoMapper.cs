@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Maliev.CustomerService.Api.Models.Addresses;
 using Maliev.CustomerService.Api.Models.Companies;
 using Maliev.CustomerService.Api.Models.Customers;
@@ -5,7 +6,6 @@ using Maliev.CustomerService.Api.Models.Documents;
 using Maliev.CustomerService.Api.Models.InternalNotes;
 using Maliev.CustomerService.Api.Models.NDAs;
 using Maliev.CustomerService.Data.Models;
-using System.Text.Json;
 
 namespace Maliev.CustomerService.Api.Mapping;
 

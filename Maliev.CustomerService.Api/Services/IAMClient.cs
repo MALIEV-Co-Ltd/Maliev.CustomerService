@@ -1,5 +1,5 @@
-using Maliev.CustomerService.Api.Models.IAM;
 using System.Net.Http.Json;
+using Maliev.CustomerService.Api.Models.IAM;
 
 namespace Maliev.CustomerService.Api.Services;
 

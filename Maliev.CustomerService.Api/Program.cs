@@ -121,7 +121,7 @@ if (args.Contains("--migrate-principals"))
     var migrator = scope.ServiceProvider.GetRequiredService<Maliev.CustomerService.Api.Scripts.MigrateToPrincipalsScript>();
     var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
     var cliLogger = loggerFactory.CreateLogger("CLI");
-    
+
     try
     {
         await migrator.ExecuteAsync();
