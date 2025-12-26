@@ -14,6 +14,12 @@ public class CustomerResponse
     public Guid Id { get; set; }
 
     /// <summary>
+    /// Reference to the central IAM principal ID
+    /// </summary>
+    [JsonPropertyName("principalId")]
+    public Guid? PrincipalId { get; set; }
+
+    /// <summary>
     /// Customer's first name
     /// </summary>
     [JsonPropertyName("firstName")]

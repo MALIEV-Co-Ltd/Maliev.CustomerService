@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Maliev.CustomerService.Data.Models;
 using Maliev.Aspire.ServiceDefaults.Database;
@@ -6,9 +5,9 @@ using Maliev.Aspire.ServiceDefaults.Database;
 namespace Maliev.CustomerService.Data;
 
 /// <summary>
-/// Database context for Customer Service with ASP.NET Core Identity
+/// Database context for Customer Service
 /// </summary>
-public class CustomerDbContext : IdentityDbContext<ApplicationUser>
+public class CustomerDbContext : DbContext
 {
     public CustomerDbContext(DbContextOptions<CustomerDbContext> options)
         : base(options)
@@ -48,6 +47,12 @@ public class CustomerDbContext : IdentityDbContext<ApplicationUser>
                 .IsUnique()
                 .HasFilter("is_deleted = false")
                 .HasDatabaseName("ix_customer_email_unique_active");
+
+            // Index for PrincipalId lookup
+            entity.HasIndex(e => e.PrincipalId)
+                .IsUnique()
+                .HasFilter("is_deleted = false AND principal_id != '00000000-0000-0000-0000-000000000000'")
+                .HasDatabaseName("ix_customer_principal_lookup");
 
             // Indexes for performance
             entity.HasIndex(e => e.CompanyId).HasDatabaseName("ix_customer_company_id");
@@ -109,22 +114,6 @@ public class CustomerDbContext : IdentityDbContext<ApplicationUser>
                 .IsRowVersion()
                 .HasDefaultValueSql("'\\x0000000000000001'::bytea")
                 .ValueGeneratedOnAddOrUpdate();
-        });
-
-        // Configure ApplicationUser entity (T050)
-        modelBuilder.Entity<ApplicationUser>(entity =>
-        {
-            // Index on last_login_at for inactive account detection queries
-            entity.HasIndex(e => e.LastLoginAt).HasDatabaseName("ix_aspnetusers_last_login_at");
-
-            // Index on linked_customer_id for customer-user linkage queries
-            entity.HasIndex(e => e.LinkedCustomerId).HasDatabaseName("ix_aspnetusers_linked_customer_id");
-
-            // Index on is_active for filtering active/inactive users
-            entity.HasIndex(e => e.IsActive).HasDatabaseName("ix_aspnetusers_is_active");
-
-            // Index on created_at for time-based queries
-            entity.HasIndex(e => e.CreatedAt).HasDatabaseName("ix_aspnetusers_created_at");
         });
 
         // Configure Company entity (T066)

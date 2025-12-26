@@ -19,10 +19,10 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Add `PrincipalId` property to `Customer` entity in `Maliev.CustomerService.Data/Models/Customer.cs`
-- [ ] T002 Create EF Core migration `AddPrincipalIdToCustomers` in `Maliev.CustomerService.Data`
-- [ ] T003 [P] Create `CreatePrincipalRequest` model in `Maliev.CustomerService.Api/Models/IAM/CreatePrincipalRequest.cs`
-- [ ] T004 [P] Create `CreatePrincipalResponse` model in `Maliev.CustomerService.Api/Models/IAM/CreatePrincipalResponse.cs`
+- [x] T001 Add `PrincipalId` property to `Customer` entity in `Maliev.CustomerService.Data/Models/Customer.cs`
+- [x] T002 Create EF Core migration `AddPrincipalIdToCustomers` in `Maliev.CustomerService.Data`
+- [x] T003 [P] Create `CreatePrincipalRequest` model in `Maliev.CustomerService.Api/Models/IAM/CreatePrincipalRequest.cs`
+- [x] T004 [P] Create `CreatePrincipalResponse` model in `Maliev.CustomerService.Api/Models/IAM/CreatePrincipalResponse.cs`
 
 ---
 
@@ -32,11 +32,11 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 Create `IIAMClient` interface in `Maliev.CustomerService.Api/Services/IIAMClient.cs`
-- [ ] T006 Implement `IAMClient` using `HttpClient` in `Maliev.CustomerService.Api/Services/IAMClient.cs`
-- [ ] T007 Register `IIAMClient` with resilience and bearer token in `Maliev.CustomerService.Api/Program.cs`
-- [ ] T008 [P] Add IAM configuration and feature flags to `Maliev.CustomerService.Api/appsettings.json`
-- [ ] T009 Add unit tests for `IAMClient` in `Maliev.CustomerService.Tests/Services/IAMClientTests.cs`
+- [x] T005 Create `IIAMClient` interface in `Maliev.CustomerService.Api/Services/IIAMClient.cs`
+- [x] T006 Implement `IAMClient` using `HttpClient` in `Maliev.CustomerService.Api/Services/IAMClient.cs`
+- [x] T007 Register `IIAMClient` with resilience and bearer token in `Maliev.CustomerService.Api/Program.cs`
+- [x] T008 [P] Add IAM configuration and feature flags to `Maliev.CustomerService.Api/appsettings.json`
+- [x] T009 Add unit tests for `IAMClient` in `Maliev.CustomerService.Tests/Services/IAMClientTests.cs`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 
@@ -49,13 +49,13 @@
 **Independent Test**: Verify migration script creates principals in IAM and links them to customer records in the database.
 
 ### Tests for User Story 1
-- [ ] T010 [US1] Integration test for `MigrateToPrincipalsScript` in `Maliev.CustomerService.Tests/Integration/MigrationScriptTests.cs`
+- [x] T010 [US1] Integration test for `MigrateToPrincipalsScript` in `Maliev.CustomerService.Tests/Integration/MigrationScriptTests.cs`
 
 ### Implementation for User Story 1
-- [ ] T011 [US1] Create `MigrateToPrincipalsScript` class in `Maliev.CustomerService.Api/Scripts/MigrateToPrincipalsScript.cs`
-- [ ] T012 [US1] Implement batch processing logic (100 per batch) with error logging in `MigrateToPrincipalsScript.cs`
-- [ ] T013 [US1] Add CLI command `--migrate-principals` to `Maliev.CustomerService.Api/Program.cs`
-- [ ] T014 [US1] Create migration runbook and SQL verification queries in `Maliev.CustomerService.Api/Scripts/MIGRATION_RUNBOOK.md`
+- [x] T011 [US1] Create `MigrateToPrincipalsScript` class in `Maliev.CustomerService.Api/Scripts/MigrateToPrincipalsScript.cs`
+- [x] T012 [US1] Implement batch processing logic (100 per batch) with error logging in `MigrateToPrincipalsScript.cs`
+- [x] T013 [US1] Add CLI command `--migrate-principals` to `Maliev.CustomerService.Api/Program.cs`
+- [x] T014 [US1] Create migration runbook and SQL verification queries in `Maliev.CustomerService.Api/Scripts/MIGRATION_RUNBOOK.md`
 
 **Checkpoint**: Existing customers can be migrated and verified independently.
 
@@ -68,13 +68,13 @@
 **Independent Test**: Register a new customer and verify a principal is created in IAM and linked to the record.
 
 ### Tests for User Story 2
-- [ ] T015 [US2] Unit test for registration with IAM integration in `Maliev.CustomerService.Tests/Services/CustomerServiceTests.cs`
-- [ ] T016 [US2] Integration test for end-to-end registration flow in `Maliev.CustomerService.Tests/Integration/US1_CustomerRegistrationIntegrationTests.cs`
+- [x] T015 [US2] Unit test for registration with IAM integration in `Maliev.CustomerService.Tests/Services/CustomerServiceTests.cs`
+- [x] T016 [US2] Integration test for end-to-end registration flow in `Maliev.CustomerService.Tests/Integration/US1_CustomerRegistrationIntegrationTests.cs`
 
 ### Implementation for User Story 4
-- [ ] T017 [US2] Update `CreateAsync` in `Maliev.CustomerService.Api/Services/CustomerService.cs` to call `IIAMClient`
-- [ ] T018 [US2] Implement feature flag check and transactional rollback for IAM failure in `CustomerService.cs`
-- [ ] T019 [US2] Add logging and metrics for new registration flow in `CustomerService.cs`
+- [x] T017 [US2] Update `CreateAsync` in `Maliev.CustomerService.Api/Services/CustomerService.cs` to call `IIAMClient`
+- [x] T018 [US2] Implement feature flag check and transactional rollback for IAM failure in `CustomerService.cs`
+- [x] T019 [US2] Add logging and metrics for new registration flow in `CustomerService.cs`
 
 **Checkpoint**: New registrations now produce central identities.
 
@@ -87,12 +87,12 @@
 **Independent Test**: Call lookup endpoint with valid/invalid Principal IDs and verify results.
 
 ### Tests for User Story 3
-- [ ] T020 [US3] Integration tests for `GET /by-principal/{id}` in `Maliev.CustomerService.Tests/Integration/CustomerControllerTests.cs`
+- [x] T020 [US3] Integration tests for `GET /by-principal/{id}` in `Maliev.CustomerService.Tests/Integration/CustomerControllerTests.cs`
 
 ### Implementation for User Story 3
-- [ ] T021 [US3] Add `GetByPrincipalIdAsync` to `ICustomerService.cs` and `CustomerService.cs`
-- [ ] T022 [US3] Implement `GET /by-principal/{principalId}` endpoint in `Maliev.CustomerService.Api/Controllers/CustomerController.cs`
-- [ ] T023 [US3] Create database migration for lookup performance index `idx_customers_principal_lookup` in `Maliev.CustomerService.Data`
+- [x] T021 [US3] Add `GetByPrincipalIdAsync` to `ICustomerService.cs` and `CustomerService.cs`
+- [x] T022 [US3] Implement `GET /by-principal/{principalId}` endpoint in `Maliev.CustomerService.Api/Controllers/CustomerController.cs`
+- [x] T023 [US3] Create database migration for lookup performance index `idx_customers_principal_lookup` in `Maliev.CustomerService.Data`
 
 **Checkpoint**: Downstream services can now look up customers via central identity.
 
@@ -102,9 +102,9 @@
 
 **Purpose**: Support authentication services during the transition period
 
-- [ ] T024 [P] Update `CredentialValidationResponse` model in `Maliev.CustomerService.Api/Models/Customers/CredentialValidationResponse.cs`
-- [ ] T025 Update `ValidateCredentials` endpoint in `Maliev.CustomerService.Api/Controllers/CustomerController.cs` to return `PrincipalId`
-- [ ] T026 Add integration test for credential validation returning `PrincipalId` in `Maliev.CustomerService.Tests/Integration/US6_UserAccountManagementIntegrationTests.cs`
+- [x] T024 [P] Update `CredentialValidationResponse` model in `Maliev.CustomerService.Api/Models/Customers/CredentialValidationResponse.cs`
+- [x] T025 Update `ValidateCredentials` endpoint in `Maliev.CustomerService.Api/Controllers/CustomerController.cs` to return `PrincipalId`
+- [x] T026 Add integration test for credential validation returning `PrincipalId` in `Maliev.CustomerService.Tests/Integration/US6_UserAccountManagementIntegrationTests.cs`
 
 ---
 
@@ -112,13 +112,14 @@
 
 **Purpose**: Removal of legacy identity systems and data structures
 
-- [ ] T027 [P] Update `Customer.cs` to make `PrincipalId` NOT NULL and create migration in `Maliev.CustomerService.Data`
-- [ ] T028 Add unique constraint index to `PrincipalId` in `Maliev.CustomerService.Data` migration
-- [ ] T029 Remove `ApplicationUser.cs` model from `Maliev.CustomerService.Data/Models/`
-- [ ] T030 Remove ASP.NET Identity configuration and middleware from `Maliev.CustomerService.Api/Program.cs`
-- [ ] T031 Remove Identity-related NuGet packages from `Api` and `Data` project files
-- [ ] T032 Create final cleanup migration to DROP all `AspNet*` and `application_users` tables in `Maliev.CustomerService.Data`
-- [ ] T033 [P] Update `quickstart.md` and architecture documentation with final state
+- [x] T027 [P] Update `Customer.cs` to make `PrincipalId` NOT NULL and create migration in `Maliev.CustomerService.Data`
+- [x] T028 Add unique constraint index to `PrincipalId` in `Maliev.CustomerService.Data` migration
+- [x] T029 Remove `ApplicationUser.cs` model from `Maliev.CustomerService.Data/Models/`
+- [x] T030 Remove ASP.NET Identity configuration and middleware from `Maliev.CustomerService.Api/Program.cs`
+- [x] T031 Remove Identity-related NuGet packages from `Api` and `Data` project files
+- [x] T032 Create a persistent archive/backup of all `AspNet*` and `application_users` tables (e.g., as SQL dump or separate archive schema)
+- [x] T033 Create final cleanup migration to DROP all `AspNet*` and `application_users` tables in `Maliev.CustomerService.Data`
+- [x] T034 [P] Update `quickstart.md` and architecture documentation with final state
 
 ---
 

@@ -2,37 +2,35 @@
 
 ## Entities
 
-### Customer (Updated)
-Represents the business data for a customer.
+### Customer (Modified)
+The primary entity for customer business data.
 
-| Field | Type | Constraint | Description |
-|-------|------|------------|-------------|
-| Id | Guid | PK | Primary key |
-| **PrincipalId** | **Guid** | **Unique, Indexed** | Link to the global IAM Principal |
-| FirstName | string | Required | |
-| LastName | string | Required | |
-| Email | string | Required, Unique | |
-| ... | ... | ... | Legacy fields remain |
+| Field | Type | Description |
+|-------|------|-------------|
+| Id | Guid | Primary Key (Local) |
+| **PrincipalId** | **Guid?** | **Foreign Key to IAM (Nullable during migration, NOT NULL after cleanup)** |
+| FirstName | string | Customer first name |
+| LastName | string | Customer last name |
+| Email | string | Customer email |
 
-### ApplicationUser (Deprecated)
-The legacy ASP.NET Identity entity to be removed after successful migration.
+### IAM Principal (External)
+Owned by the IAM service.
 
-## Relationships
-
-- **Customer -> IAM Principal**: 1:1 relationship via `PrincipalId`. The `PrincipalId` is owned by the IAM service.
-- **Customer -> ApplicationUser**: Legacy 1:1 relationship to be replaced by the Principal link.
-
-## Validation Rules
-
-- `PrincipalId` MUST NOT be null for active customers (post-cleanup).
-- `PrincipalId` MUST be unique across all active customers.
-- During registration, a `PrincipalId` MUST be obtained from the IAM service before the customer record is persisted.
+| Field | Type | Description |
+|-------|------|-------------|
+| PrincipalId | Guid | Unique Identifier |
+| PrincipalType | string | "user" or "service" |
+| LinkedService | string | "CustomerService" |
 
 ## State Transitions
 
-1. **New Registration**:
-   - `Request` -> `IAM Call` -> `Get PrincipalId` -> `Create Customer`
-2. **Migration**:
-   - `Existing Customer` -> `Check Identity` -> `Create Principal in IAM` -> `Link PrincipalId to Customer`
-3. **Cleanup**:
-   - `Verify All Linked` -> `Drop Identity Tables` -> `Set PrincipalId NOT NULL`
+### New Customer Registration
+1. System receives `CreateCustomerRequest`.
+2. System calls `IAM.CreatePrincipal`.
+3. System receives `PrincipalId`.
+4. System creates `Customer` record with `PrincipalId`.
+
+### Backfill Migration
+1. System identifies `Customer` with `PrincipalId == NULL`.
+2. System calls `IAM.CreatePrincipal`.
+3. System updates `Customer` with `PrincipalId`.

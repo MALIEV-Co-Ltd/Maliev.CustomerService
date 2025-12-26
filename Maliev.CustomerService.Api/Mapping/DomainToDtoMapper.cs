@@ -4,9 +4,7 @@ using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Models.Documents;
 using Maliev.CustomerService.Api.Models.InternalNotes;
 using Maliev.CustomerService.Api.Models.NDAs;
-using Maliev.CustomerService.Api.Models.Users;
 using Maliev.CustomerService.Data.Models;
-using Microsoft.AspNetCore.Identity;
 using System.Text.Json;
 
 namespace Maliev.CustomerService.Api.Mapping;
@@ -24,6 +22,7 @@ public static class DomainToDtoMapper
         return new CustomerResponse
         {
             Id = customer.Id,
+            PrincipalId = customer.PrincipalId,
             FirstName = customer.FirstName,
             LastName = customer.LastName,
             Email = customer.Email,
@@ -40,27 +39,6 @@ public static class DomainToDtoMapper
             CreatedAt = customer.CreatedAt,
             UpdatedAt = customer.UpdatedAt,
             Version = customer.Version
-        };
-    }
-
-    /// <summary>
-    /// Maps an ApplicationUser entity to UserResponse DTO (async for role retrieval)
-    /// </summary>
-    public static async Task<UserResponse> ToUserResponseAsync(this ApplicationUser user, UserManager<ApplicationUser> userManager)
-    {
-        var roles = await userManager.GetRolesAsync(user);
-
-        return new UserResponse
-        {
-            Id = user.Id,
-            Username = user.UserName ?? string.Empty,
-            Email = user.Email ?? string.Empty,
-            Roles = roles.ToList(),
-            LinkedCustomerId = user.LinkedCustomerId,
-            IsActive = user.IsActive,
-            LastLoginAt = user.LastLoginAt,
-            CreatedAt = user.CreatedAt,
-            UpdatedAt = user.UpdatedAt
         };
     }
 

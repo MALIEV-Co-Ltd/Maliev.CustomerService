@@ -1,5 +1,3 @@
-using Maliev.CustomerService.Api.Configuration;
-using Microsoft.Extensions.Options;
 using System.Net;
 
 namespace Maliev.CustomerService.Api.Services.External;
@@ -16,14 +14,11 @@ public class UploadServiceClient : IUploadServiceClient
     /// Initializes a new instance of the UploadServiceClient class
     /// </summary>
     /// <param name="httpClient">HTTP client for Upload Service communication</param>
-    /// <param name="options">Upload Service configuration options</param>
     /// <param name="logger">Logger instance</param>
-    public UploadServiceClient(HttpClient httpClient, IOptions<UploadServiceOptions> options, ILogger<UploadServiceClient> logger)
+    public UploadServiceClient(HttpClient httpClient, ILogger<UploadServiceClient> logger)
     {
         _httpClient = httpClient;
         _logger = logger;
-
-        // HttpClient is configured in Program.cs with base address and timeout
     }
 
     /// <summary>

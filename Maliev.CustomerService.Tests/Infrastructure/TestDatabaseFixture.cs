@@ -1,9 +1,8 @@
 using Maliev.CustomerService.Data;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
-using Testcontainers.Redis;
 using Testcontainers.RabbitMq;
+using Testcontainers.Redis;
 
 namespace Maliev.CustomerService.Tests.Infrastructure;
 
@@ -58,35 +57,6 @@ public class TestDatabaseFixture : IAsyncLifetime
         // Apply migrations to test database
         await using var context = CreateDbContext();
         await context.Database.MigrateAsync();
-
-        // Seed ASP.NET Core Identity roles
-        await SeedIdentityRolesAsync(context);
-    }
-
-    /// <summary>
-    /// Seeds ASP.NET Core Identity roles required for testing
-    /// </summary>
-    private static async Task SeedIdentityRolesAsync(CustomerDbContext context)
-    {
-        var roles = new[] { "Customer", "Employee", "Manager", "Admin" };
-
-        foreach (var roleName in roles)
-        {
-            var roleExists = await context.Roles.AnyAsync(r => r.Name == roleName);
-            if (!roleExists)
-            {
-                var role = new IdentityRole
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Name = roleName,
-                    NormalizedName = roleName.ToUpperInvariant(),
-                    ConcurrencyStamp = Guid.NewGuid().ToString()
-                };
-                context.Roles.Add(role);
-            }
-        }
-
-        await context.SaveChangesAsync();
     }
 
     public async Task DisposeAsync()
@@ -129,13 +99,6 @@ public class TestDatabaseFixture : IAsyncLifetime
         await using var context = CreateDbContext();
 
         // Delete data using EF Core in correct FK order
-
-        // Clear Identity-related data (preserve Roles)
-        context.UserTokens.RemoveRange(await context.UserTokens.ToListAsync());
-        context.UserLogins.RemoveRange(await context.UserLogins.ToListAsync());
-        context.UserClaims.RemoveRange(await context.UserClaims.ToListAsync());
-        context.UserRoles.RemoveRange(await context.UserRoles.ToListAsync());
-        context.Users.RemoveRange(await context.Users.ToListAsync());
 
         // Clear application data
         context.InternalNotes.RemoveRange(await context.InternalNotes.ToListAsync());

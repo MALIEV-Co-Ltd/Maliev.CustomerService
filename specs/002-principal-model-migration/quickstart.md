@@ -1,37 +1,22 @@
 # Quickstart: Principal-First Migration
 
-## Developer Environment Setup
+## Setup
+1. Ensure the IAM service is accessible or mocked.
+2. Update `appsettings.json` with `ExternalServices:IAM:BaseUrl`.
 
-1. **IAM Mock**: For local development, ensure you have a mock or local instance of the IAM service running.
-2. **Configuration**: Update your `appsettings.Development.json` with the local IAM endpoint:
-   ```json
-   {
-     "ExternalServices": {
-       "IAM": {
-         "BaseUrl": "http://localhost:8081",
-         "ServiceAccountToken": "dev-token"
-       }
-     }
-   }
+## Running the Migration
+Existing customers have been migrated to use Principals. The `PrincipalId` column is now **REQUIRED** and **UNIQUE**.
+
+## Registration Flow
+New customers automatically receive an IAM Principal ID during the creation process. Local user management has been **REMOVED**.
+
+## Verifying
+1. Check the database for `principal_id` values:
+   ```sql
+   SELECT id, principal_id FROM customers;
+   -- All active customers must have a principal_id.
    ```
-
-## Running the Migration Script (Dev)
-
-To test the backfill on your local database:
-```bash
-dotnet run --project Maliev.CustomerService.Api --migrate-principals
-```
-
-## Verifying the Change
-
-1. Create a customer using the `POST /customer/v1/customers` endpoint.
-2. Check the database to see the `PrincipalId` is populated.
-3. Call the lookup endpoint:
+2. Test the lookup endpoint:
    ```bash
    curl -X GET http://localhost:8080/customer/v1/customers/by-principal/{principalId}
    ```
-
-## Common Issues
-
-- **IAM Connection Refused**: Verify the IAM service is running and the `BaseUrl` is correct.
-- **Unique Constraint Violation**: Ensure you are not trying to register an email that already has a principal linked in IAM but not in CustomerService.

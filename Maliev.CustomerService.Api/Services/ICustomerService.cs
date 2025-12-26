@@ -24,6 +24,14 @@ public interface ICustomerService
     Task<CustomerResponse?> GetByIdAsync(Guid id);
 
     /// <summary>
+    /// Retrieves a customer by their central IAM Principal ID
+    /// </summary>
+    /// <param name="principalId">The IAM Principal ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Customer response or null if not found</returns>
+    Task<CustomerResponse?> GetByPrincipalIdAsync(Guid principalId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Updates an existing customer with optimistic concurrency control and audit logging
     /// </summary>
     /// <param name="id">Customer ID</param>
@@ -51,8 +59,6 @@ public interface ICustomerService
         string? segment = null,
         string? tier = null,
         string? preferredLanguage = null,
-        DateTime? lastLoginAtFrom = null,
-        DateTime? lastLoginAtTo = null,
         string? email = null,
         Guid? companyId = null,
         DateTime? createdFrom = null,

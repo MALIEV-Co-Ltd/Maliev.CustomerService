@@ -1,4 +1,5 @@
 using Maliev.CustomerService.Api.Models.Customers;
+using Maliev.CustomerService.Api.Models.IAM;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Data.Models;
 using Maliev.CustomerService.Tests.Infrastructure;
@@ -17,12 +18,26 @@ namespace Maliev.CustomerService.Tests.Services;
 public class CustomerServiceTests
 {
     private readonly TestDatabaseFixture _fixture;
+    private readonly Mock<IIAMClient> _mockIamClient;
+    private readonly Mock<IConfiguration> _mockConfig;
     private readonly Mock<ILogger<Api.Services.CustomerService>> _mockLogger;
     private readonly Mock<Api.Services.MetricsService> _mockMetricsService;
 
     public CustomerServiceTests(TestDatabaseFixture fixture)
     {
         _fixture = fixture;
+        _mockIamClient = new Mock<IIAMClient>();
+        _mockConfig = new Mock<IConfiguration>();
+
+        // Setup default configuration (enabled in final state)
+        var mockSection = new Mock<IConfigurationSection>();
+        mockSection.Setup(s => s.Value).Returns("true");
+        _mockConfig.Setup(c => c.GetSection("Features:PrincipalBasedAuthEnabled")).Returns(mockSection.Object);
+
+        // Default IAM response (unique per call)
+        _mockIamClient.Setup(x => x.CreatePrincipalAsync(It.IsAny<CreatePrincipalRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => new CreatePrincipalResponse { PrincipalId = Guid.NewGuid(), CreatedAt = DateTime.UtcNow });
+
         _mockLogger = new Mock<ILogger<Api.Services.CustomerService>>();
         _mockMetricsService = new Mock<Api.Services.MetricsService>(MockBehavior.Loose, new object[] { Mock.Of<IConfiguration>() });
     }
@@ -30,7 +45,90 @@ public class CustomerServiceTests
     private Api.Services.CustomerService CreateService()
     {
         var context = _fixture.CreateDbContext();
-        return new Api.Services.CustomerService(context, _mockLogger.Object, _mockMetricsService.Object);
+        return new Api.Services.CustomerService(
+            context,
+            _mockIamClient.Object,
+            _mockConfig.Object,
+            _mockLogger.Object,
+            _mockMetricsService.Object);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithPrincipalAuthEnabled_CallsIAMClientAndSetsPrincipalId()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+
+        // Enable feature flag
+        var mockSection = new Mock<IConfigurationSection>();
+        mockSection.Setup(s => s.Value).Returns("true");
+        _mockConfig.Setup(c => c.GetSection("Features:PrincipalBasedAuthEnabled")).Returns(mockSection.Object);
+
+        var principalId = Guid.NewGuid();
+        _mockIamClient.Setup(x => x.CreatePrincipalAsync(It.IsAny<CreatePrincipalRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CreatePrincipalResponse { PrincipalId = principalId, CreatedAt = DateTime.UtcNow });
+
+        var service = CreateService();
+        var request = new CreateCustomerRequest
+        {
+            FirstName = "IAM",
+            LastName = "User",
+            Email = "iam@example.com",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "UTC"
+        };
+
+        // Act
+        var result = await service.CreateAsync(request, "test-actor", "Employee");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(principalId, result.PrincipalId);
+        _mockIamClient.Verify(x => x.CreatePrincipalAsync(
+            It.Is<CreatePrincipalRequest>(r => r.Email == "iam@example.com"), It.IsAny<CancellationToken>()), Times.Once);
+
+        // Verify persisted in DB
+        await using var context = _fixture.CreateDbContext();
+        var customerInDb = await context.Customers.FindAsync(result.Id);
+        Assert.NotNull(customerInDb);
+        Assert.Equal(principalId, customerInDb!.PrincipalId);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithIAMFailure_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+
+        // Enable feature flag
+        var mockSection = new Mock<IConfigurationSection>();
+        mockSection.Setup(s => s.Value).Returns("true");
+        _mockConfig.Setup(c => c.GetSection("Features:PrincipalBasedAuthEnabled")).Returns(mockSection.Object);
+
+        _mockIamClient.Setup(x => x.CreatePrincipalAsync(It.IsAny<CreatePrincipalRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("IAM Error"));
+
+        var service = CreateService();
+        var request = new CreateCustomerRequest
+        {
+            FirstName = "Fail",
+            LastName = "User",
+            Email = "fail@example.com",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "UTC"
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(request, "test-actor", "Employee"));
+
+        // Verify NO customer was created in DB
+        await using var context = _fixture.CreateDbContext();
+        var count = await context.Customers.CountAsync();
+        Assert.Equal(0, count);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Asp.Versioning;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.NDAs;
 using Maliev.CustomerService.Api.Services;
@@ -12,7 +13,8 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for NDA lifecycle management operations
 /// </summary>
 [ApiController]
-[Route("customer/v1/ndas")]
+[ApiVersion("1.0")]
+[Route("customer/v{version:apiVersion}/ndas")]
 [Authorize]
 public class NDAController : ControllerBase
 {
