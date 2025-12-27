@@ -35,7 +35,10 @@ public class CustomerControllerTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateAuthenticatedClient("test-employee", new[] { "roles.customer.representative" });
+        var client = _factory.CreateAuthenticatedClient(
+            "test-employee",
+            new[] { "roles.customer.representative" },
+            new[] { "customer.customers.read" });
 
         var principalId = Guid.NewGuid();
         var email = $"test.{Guid.NewGuid():N}@example.com";
@@ -71,7 +74,10 @@ public class CustomerControllerTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateAuthenticatedClient("test-employee", new[] { "roles.customer.representative" });
+        var client = _factory.CreateAuthenticatedClient(
+            "test-employee",
+            new[] { "roles.customer.representative" },
+            new[] { "customer.customers.read" });
         var nonExistentPrincipalId = Guid.NewGuid();
 
         // Act
@@ -89,7 +95,10 @@ public class CustomerControllerTests : IAsyncLifetime
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateAuthenticatedClient("test-employee", new[] { "roles.customer.representative" });
+        var client = _factory.CreateAuthenticatedClient(
+            "test-employee",
+            new[] { "roles.customer.representative" },
+            new[] { "customer.customers.read" });
 
         var principalId = Guid.NewGuid();
 
@@ -113,5 +122,25 @@ public class CustomerControllerTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetByPrincipalId_ReturnsForbidden_WhenMissingPermission()
+    {
+        // Arrange
+        await _factory.ClearDatabaseAsync();
+        // Create client WITHOUT the required permission
+        var client = _factory.CreateAuthenticatedClient(
+            "test-employee",
+            new[] { "roles.customer.representative" },
+            permissions: null); // No permissions
+
+        var principalId = Guid.NewGuid();
+
+        // Act
+        var response = await client.GetAsync($"/customer/v1/customers/by-principal/{principalId}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 }

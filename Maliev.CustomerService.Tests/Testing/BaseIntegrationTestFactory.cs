@@ -292,6 +292,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     public string CreateTestJwtToken(
         string userId = "test-user",
         string[]? roles = null,
+        string[]? permissions = null,
         Dictionary<string, string>? additionalClaims = null)
     {
         var claims = new List<Claim>
@@ -308,9 +309,13 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
             }
         }
 
-        // Add wildcard permission for tests to bypass IAM permission checks
-        // This allows tests to focus on business logic rather than authorization
-        claims.Add(new Claim("permissions", "*"));
+        if (permissions != null)
+        {
+            foreach (var permission in permissions)
+            {
+                claims.Add(new Claim("permissions", permission));
+            }
+        }
 
         if (additionalClaims != null)
         {
@@ -346,11 +351,14 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
 
     /// <summary>
-    /// Creates an HTTP client with authenticated user and specified roles.
+    /// Creates an HTTP client with authenticated user, roles, and permissions.
     /// </summary>
-    public HttpClient CreateAuthenticatedClient(string userId = "test-user", string[]? roles = null)
+    public HttpClient CreateAuthenticatedClient(
+        string userId = "test-user",
+        string[]? roles = null,
+        string[]? permissions = null)
     {
-        var token = CreateTestJwtToken(userId, roles);
+        var token = CreateTestJwtToken(userId, roles, permissions);
         var client = CreateClient();
         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
         return client;
