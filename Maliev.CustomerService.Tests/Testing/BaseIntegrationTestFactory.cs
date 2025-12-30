@@ -1,5 +1,5 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Diagnostics.CodeAnalysis;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Maliev.CustomerService.Api.Services.External;
