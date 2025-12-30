@@ -137,19 +137,8 @@ if (args.Contains("--migrate-principals"))
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
-// Run database migrations on startup (skip in Testing environment)
-if (!app.Environment.IsEnvironment("Testing"))
-{
-    try
-    {
-        await app.MigrateDatabaseAsync<CustomerDbContext>();
-    }
-    catch (Exception ex)
-    {
-        Log.MigrationFailed(logger, ex);
-        // Don't throw - allow app to start for debugging
-    }
-}
+// Run database migrations on startup
+await app.MigrateDatabaseAsync<CustomerDbContext>();
 
 // Force instantiation of MetricsService to ensure OpenTelemetry meters are created
 var metricsService = app.Services.GetRequiredService<Maliev.CustomerService.Api.Services.MetricsService>();
