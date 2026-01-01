@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -49,11 +50,11 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
             .Build();
 
         _redisContainer = new RedisBuilder()
-            .WithImage("redis:7-alpine")
+            .WithImage("redis:8.4-alpine")
             .Build();
 
         _rabbitmqContainer = new RabbitMqBuilder()
-            .WithImage("rabbitmq:4.2.1-alpine")
+            .WithImage("rabbitmq:4.2-alpine")
             .Build();
 
         _testRsa = RSA.Create(2048);
@@ -223,6 +224,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     /// Cleans all data from the database while preserving schema.
     /// Queries the database schema dynamically to get all tables.
     /// </summary>
+    [SuppressMessage("Security", "EF1002:Gaps in SQL queries", Justification = "Table names are retrieved from information_schema and are safe.")]
     public async Task CleanDatabaseAsync()
     {
         await using var context = CreateDbContext();
@@ -243,9 +245,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         {
             try
             {
-#pragma warning disable EF1002
                 await context.Database.ExecuteSqlRawAsync($"TRUNCATE TABLE \"{tableName}\" RESTART IDENTITY CASCADE");
-#pragma warning restore EF1002
             }
             catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P01")
             {

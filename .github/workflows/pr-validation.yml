@@ -1,4 +1,4 @@
-﻿name: PR Validation
+name: PR Validation
 
 on:
   pull_request:
@@ -11,22 +11,6 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: customer_service_test_db
-          PGDATA: /var/lib/postgresql/data/pgdata
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -35,12 +19,15 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.x'
+          source-url: https://nuget.pkg.github.com/MALIEV-Co-Ltd/index.json
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.GITOPS_PAT }}
 
       - name: Switch to PackageReference for CI
         run: |
           # Replace ProjectReference with PackageReference in all service csproj files
-          
           for file in $(find . -name "*.csproj"); do
+            sed -i 's|<ProjectReference Include=".*Maliev.Aspire.ServiceDefaults.*.csproj" />|<PackageReference Include="Maliev.Aspire.ServiceDefaults" Version="1.0.*" />|g' "$file"
           done
           echo "Switched to PackageReference for ServiceDefaults"
 
@@ -54,9 +41,6 @@ jobs:
         run: dotnet build Maliev.CustomerService.sln --no-restore --configuration Release
 
       - name: Run tests
-        continue-on-error: true
         run: dotnet test Maliev.CustomerService.sln --no-build --configuration Release --verbosity normal
-        env:
-          ConnectionStrings__CustomerDbContext: "Server=localhost;Port=5432;Database=customer_service_test_db;User Id=postgres;Password=postgres;"
-
-
+        # Testcontainers will automatically spin up PostgreSQL, Redis, and RabbitMQ
+        # No manual connection strings allowed - tests must use Testcontainers infrastructure
