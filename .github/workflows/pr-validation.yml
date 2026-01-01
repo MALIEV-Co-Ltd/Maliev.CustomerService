@@ -21,7 +21,7 @@ jobs:
           dotnet-version: '10.x'
           source-url: https://nuget.pkg.github.com/MALIEV-Co-Ltd/index.json
         env:
-          NUGET_PASSWORD: ${{ secrets.GITOPS_PAT }}
+          NUGET_AUTH_TOKEN: ${{ secrets.GITOPS_PAT }}
 
       - name: Switch to PackageReference for CI
         run: |
