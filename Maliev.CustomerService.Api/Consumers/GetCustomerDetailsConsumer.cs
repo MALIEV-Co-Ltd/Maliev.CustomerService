@@ -14,6 +14,11 @@ public class GetCustomerDetailsConsumer(
     private readonly ICustomerService _customerService = customerService;
     private readonly ILogger<GetCustomerDetailsConsumer> _logger = logger;
 
+    /// <summary>
+    /// Consumes the GetCustomerDetailsRequest message and responds with customer details.
+    /// </summary>
+    /// <param name="context">The consume context containing the request message.</param>
+    /// <returns>A task that represents the asynchronous consume operation.</returns>
     public async Task Consume(ConsumeContext<GetCustomerDetailsRequest> context)
     {
         _logger.LogInformation("Processing GetCustomerDetailsRequest for CustomerId: {CustomerId}", context.Message.Payload.CustomerId);
