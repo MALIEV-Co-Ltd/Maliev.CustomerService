@@ -82,7 +82,7 @@ public class MetricsEndpointTests : IClassFixture<TestWebApplicationFactory>
         var validationRequest = new
         {
             username = "nonexistent@test.com",
-            password = "TestPassword123!"
+            password = TestConstants.DummyPassword
         };
         await client.PostAsJsonAsync("/customer/v1/validate", validationRequest);
 
