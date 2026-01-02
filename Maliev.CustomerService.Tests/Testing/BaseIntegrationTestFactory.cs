@@ -95,12 +95,12 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     public new async Task DisposeAsync()
     {
+        await base.DisposeAsync(); // Stop the Host (and MassTransit) before deleting containers
         await _postgresContainer.DisposeAsync();
         await _redisContainer.DisposeAsync();
         await _rabbitmqContainer.DisposeAsync();
         _testRsa.Dispose();
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", null); // Cleanup
-        await base.DisposeAsync();
     }
 
 
@@ -148,12 +148,8 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
                 };
             });
 
-            // Ensure MassTransit waits until started for tests to avoid race conditions
-            services.Configure<MassTransitHostOptions>(options =>
-            {
-                options.WaitUntilStarted = true;
-                options.StartTimeout = TimeSpan.FromSeconds(30);
-            });
+            // Add MassTransit test harness for testing message publishing/consuming
+            services.AddMassTransitTestHarness();
 
             // Allow derived classes to add additional test services
             ConfigureAdditionalServices(services);
