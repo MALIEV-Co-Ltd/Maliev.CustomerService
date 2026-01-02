@@ -18,7 +18,10 @@ builder.AddServiceMeters("customers-meter"); // Register service meters for Open
 
 
 builder.AddRedisDistributedCache(instanceName: "customer:"); // Redis with in-memory fallback
-builder.AddMassTransitWithRabbitMq(); // RabbitMQ message bus (non-blocking startup)
+builder.AddMassTransitWithRabbitMq(configure: x =>
+{
+    x.AddConsumer<Maliev.CustomerService.Api.Consumers.GetCustomerDetailsConsumer>();
+}); // RabbitMQ message bus (non-blocking startup)
 builder.AddPostgresDbContext<CustomerDbContext>(connectionName: "CustomerDbContext"); // PostgreSQL with retry logic
 
 // --- API Configuration ---
