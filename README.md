@@ -1,430 +1,521 @@
-# Maliev Customer Service
+# Maliev.CustomerService
 
-A comprehensive .NET 9.0 microservice for managing customers, companies, and related entities in the Maliev ecosystem.
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/MALIEV-Co-Ltd/Maliev.CustomerService)
+[![.NET Version](https://img.shields.io/badge/.NET-10.0-512BD4.svg)](https://dotnet.microsoft.com/)
+[![Database](https://img.shields.io/badge/PostgreSQL-18-336791.svg)](https://www.postgresql.org/)
+[![Tests](https://img.shields.io/badge/tests-143%2F143%20passing-brightgreen.svg)](https://github.com/MALIEV-Co-Ltd/Maliev.CustomerService)
+[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
-## Overview
+Comprehensive customer and company management system for the MALIEV platform. Handles customer lifecycle, NDA workflows, company relationships, address management, and document handling with full IAM integration and event-driven communication via MessagingContracts.
 
-The Customer Service is a core microservice responsible for:
-- **Customer Management** - CRUD operations with versioning and soft delete
-- **Company Management** - B2B customer organization handling
-- **Address Management** - Polymorphic address system for customers and companies
-- **NDA Lifecycle** - Complete NDA workflow with state machine (Draft → Signed → Expired/Revoked)
-- **Document Management** - Integration with Upload Service for file handling with deferred deletion
-- **Internal Notes** - Employee-only annotation system
-- **User Management** - Identity and authentication integration
-- **Comprehensive Audit Logging** - Complete tracking of all mutations
+---
 
-## Architecture
+## Architecture & Tech Stack
 
 ### Technology Stack
-- **Framework**: ASP.NET Core 9.0 WebAPI
-- **Database**: PostgreSQL 18 with CloudNativePG operator
-- **ORM**: Entity Framework Core 9.0.8
-- **Authentication**: JWT Bearer with role-based authorization
-- **Validation**: FluentValidation
-- **Logging**: Serilog (console-only for centralized collection)
-- **Metrics**: Prometheus with ASP.NET Core metrics
-- **Deployment**: Kubernetes (GKE) with ArgoCD GitOps
+- **.NET 10.0**: ASP.NET Core Web API with C# 13
+- **PostgreSQL 18**: Primary database with Entity Framework Core 10.x
+- **Redis**: Distributed caching for frequently accessed customer data
+- **RabbitMQ**: Event-driven messaging via MassTransit 8.5.7
+- **OpenTelemetry**: Structured logging, metrics, and distributed tracing
+- **Testcontainers**: Integration testing with real PostgreSQL, Redis, RabbitMQ
 
-### Key Design Patterns
-- **Optimistic Concurrency Control** - RowVersion/Version on all entities
-- **Soft Delete Pattern** - IsDeleted flag instead of physical deletion
-- **Polymorphic Relationships** - Owner_type/Owner_id pattern for addresses and documents
-- **Audit Logging** - Actor tracking (actorId, actorType) for all mutations
-- **State Machine** - NDA lifecycle with terminal states
-- **Deferred Deletion** - Document cleanup with retry background service
+### Project Structure
+```
+Maliev.CustomerService/
+├── Maliev.CustomerService.Api/          # Presentation layer
+│   ├── Controllers/                     # REST API endpoints
+│   ├── Services/                        # Business logic
+│   ├── Models/                          # DTOs (Request/Response)
+│   └── Consumers/                       # MassTransit event consumers
+├── Maliev.CustomerService.Data/         # Data access layer
+│   ├── Models/                          # EF Core entities
+│   ├── Configurations/                  # Entity configurations
+│   └── Migrations/                      # Database migrations
+└── Maliev.CustomerService.Tests/        # Integration tests
+    ├── Integration/                     # API integration tests
+    ├── Services/                        # Service unit tests
+    └── Infrastructure/                  # Test infrastructure
+```
 
-### Database Schema
-- **Snake_case naming convention** for all tables and columns
-- **UUID primary keys** for all entities
-- **Proper indexing** on frequently queried fields (email, company_id, segment, tier, created_at)
-- **Optimistic concurrency** via version/row_version timestamp columns
+### Dependencies
+
+**Databases:**
+- **PostgreSQL 18**: Customer master data, companies, addresses, NDAs, documents, audit trail
+- **Redis**: Caching for frequently accessed customer information
+
+**Messaging:**
+- **RabbitMQ**: Event publishing (customer lifecycle events) and consumption (file deletion)
+
+**External Services:**
+- **IAM Service**: Authentication, authorization, and permission management
+- **Upload Service**: Document file storage and management
+- **Order Service**: Customer order history and relationship
+
+---
+
+## ⚠️ Constitution Rules
+
+These rules are **non-negotiable** and apply to ALL Maliev microservices:
+
+### Banned Libraries
+| ❌ BANNED | ✅ USE INSTEAD |
+|-----------|----------------|
+| AutoMapper | Explicit manual mapping |
+| FluentValidation | Data Annotations (`[Required]`, `[StringLength]`, etc.) |
+| FluentAssertions | xUnit `Assert.*` methods |
+| In-memory test DB | Testcontainers (real PostgreSQL) |
+| `/src` or `/tests` folders | Flat project structure at repo root |
+
+### Mandatory Practices
+- **No Secrets in Code**: All secrets injected via Google Secret Manager (environment variables)
+- **TreatWarningsAsErrors**: Enabled in all `.csproj` files - zero warnings tolerated
+- **XML Documentation**: Required on ALL public methods, properties, and classes
+- **MessagingContracts Only**: ALL events use `Maliev.MessagingContracts` package (no local events)
+- **ServiceDefaults Integration**: Use `Maliev.Aspire.ServiceDefaults` for infrastructure patterns
+
+---
+
+## Key Features
+
+### Customer Management
+- **Complete Lifecycle**: From registration to deactivation with soft delete
+- **Customer Types**: Individual consumers and business customers
+- **Segmentation**: Customer categorization (Retail, Wholesale, VIP)
+- **Tier System**: Bronze, Silver, Gold, Platinum with benefits
+- **Profile Management**: Preferences, language, timezone, communication settings
+- **Activity Tracking**: Last login, last order, last contact timestamps
+
+### Company Management
+- **B2B Support**: Company registration and management
+- **Customer Association**: Link multiple customers to companies
+- **Company Hierarchy**: Parent-subsidiary relationships
+- **Industry Classification**: Industry and sub-industry tracking
+- **Tax Information**: Tax ID, VAT registration, compliance documents
+
+### NDA Lifecycle Management
+```
+Draft → Pending Signature → Signed → Active/Expired/Revoked
+```
+
+**Status Transitions:**
+- **Draft**: NDA created, not yet sent
+- **Pending Signature**: Sent to customer for signing
+- **Signed**: Customer signed, awaiting approval
+- **Active**: NDA approved and in effect
+- **Expired**: NDA validity period ended
+- **Revoked**: NDA terminated before expiration
+
+### Address Management
+- **Polymorphic Design**: Addresses for customers, companies, and other entities
+- **Address Types**: Billing, shipping, registered office, branch
+- **Validation**: Country-specific address validation
+- **Geocoding**: Integration ready for address geocoding
+- **Multiple Addresses**: Customers/companies can have multiple addresses
+
+### Document Management
+- **Upload Integration**: Seamless integration with UploadService
+- **Document Types**: Contracts, NDAs, certifications, compliance docs
+- **Deferred Deletion**: 30-day retention after customer deletion
+- **Document Versioning**: Track document revisions
+- **Access Control**: Permission-based document access
+
+### Internal Notes System
+- **Employee-Only**: Notes invisible to customers
+- **Categorization**: Call logs, complaints, follow-ups, sales notes
+- **Actor Tracking**: Who created each note and when
+- **Search**: Full-text search across notes
+- **Audit Trail**: Complete history of note creation and updates
+
+### Event-Driven Integration
+- **Events Published** (via MessagingContracts):
+  - `CustomerCreatedEvent` - New customer registered
+  - `CustomerUpdatedEvent` - Customer information modified
+  - `CustomerDeactivatedEvent` - Customer account deactivated
+  - `CustomerReactivatedEvent` - Customer account reactivated
+  - `CompanyCreatedEvent` - New company registered
+  - `CompanyUpdatedEvent` - Company information modified
+  - `NDASignedEvent` - NDA signed by customer
+  - `NDAExpiredEvent` - NDA expired
+  - `NDARevokedEvent` - NDA revoked
+
+- **Events Consumed**:
+  - `FileDeletedEvent` - Update document status when files are deleted from UploadService
+
+---
+
+## Quick Start
+
+### Prerequisites
+- .NET 10.0 SDK
+- PostgreSQL 18 (local or via Kubernetes port-forward)
+- Redis (optional, for caching)
+- RabbitMQ (optional, for event messaging)
+
+### Local Development
+
+1. **Clone Repository**
+   ```bash
+   git clone https://github.com/MALIEV-Co-Ltd/Maliev.CustomerService.git
+   cd Maliev.CustomerService
+   ```
+
+2. **Configure Database Connection**
+   ```bash
+   # Set connection string environment variable
+   export ConnectionStrings__CustomerDbContext="Host=localhost;Port=5432;Database=customer_app_db;Username=postgres;Password=<password>;"
+   ```
+
+3. **Apply Database Migrations**
+   ```bash
+   dotnet ef database update --project Maliev.CustomerService.Data
+   ```
+
+4. **Run the Service**
+   ```bash
+   cd Maliev.CustomerService.Api
+   dotnet run
+   ```
+
+5. **Access API Documentation**
+   - Scalar UI: http://localhost:5000/customer/scalar
+   - OpenAPI Spec: http://localhost:5000/customer/openapi/v1.json
+   - Health Check: http://localhost:5000/customer/readiness
+
+### Docker Deployment
+
+```bash
+# Build image
+docker build -t maliev/customer-service:latest .
+
+# Run container
+docker run -p 8080:8080 \
+  -e ConnectionStrings__CustomerDbContext="Host=postgres;Port=5432;Database=customer_app_db;..." \
+  -e Jwt__PublicKey="<base64-encoded-public-key>" \
+  maliev/customer-service:latest
+```
+
+---
 
 ## API Endpoints
 
-All endpoints are prefixed with `/customers/v1`
+All endpoints are prefixed with `/customer` (configured via `UsePathBase("/customer")`):
 
-### Customer Management
-- `POST /customers` - Create new customer
-- `GET /customers/{id}` - Retrieve customer by ID
-- `PATCH /customers/{id}` - Update customer (with optimistic concurrency)
-- `DELETE /customers/{id}` - Soft delete customer
-- `GET /customers` - List customers with filtering and pagination
-- `GET /customers/preferences` - Get customer preferences for compliance/audit
+### Customers
+- `GET /customer/v1/customers` - List customers (paginated, filterable)
+- `POST /customer/v1/customers` - Create new customer
+- `GET /customer/v1/customers/{id}` - Get customer details
+- `PUT /customer/v1/customers/{id}` - Update customer
+- `DELETE /customer/v1/customers/{id}` - Soft delete customer
+- `POST /customer/v1/customers/{id}/reactivate` - Reactivate customer
+- `GET /customer/v1/customers/{id}/orders` - Get customer orders
+- `GET /customer/v1/customers/{id}/documents` - Get customer documents
+- `GET /customer/v1/customers/search` - Search customers
 
-### Company Management
-- `POST /companies` - Create new company
-- `GET /companies/{id}` - Retrieve company by ID
-- `PATCH /companies/{id}` - Update company
-- `DELETE /companies/{id}` - Soft delete company
-- `GET /companies` - List companies with filtering and pagination
+### Companies
+- `GET /customer/v1/companies` - List companies
+- `POST /customer/v1/companies` - Create new company
+- `GET /customer/v1/companies/{id}` - Get company details
+- `PUT /customer/v1/companies/{id}` - Update company
+- `DELETE /customer/v1/companies/{id}` - Soft delete company
+- `POST /customer/v1/companies/{id}/customers` - Associate customer with company
+- `GET /customer/v1/companies/{id}/customers` - Get company customers
 
-### Address Management
-- `POST /addresses` - Create address (for customer or company)
-- `GET /addresses/{id}` - Retrieve address by ID
-- `PATCH /addresses/{id}` - Update address
-- `DELETE /addresses/{id}` - Soft delete address
-- `GET /addresses` - List addresses by owner
+### NDAs
+- `GET /customer/v1/ndas` - List NDAs
+- `POST /customer/v1/ndas` - Create NDA draft
+- `GET /customer/v1/ndas/{id}` - Get NDA details
+- `PUT /customer/v1/ndas/{id}` - Update NDA draft
+- `POST /customer/v1/ndas/{id}/send` - Send NDA for signature
+- `POST /customer/v1/ndas/{id}/sign` - Record NDA signature
+- `POST /customer/v1/ndas/{id}/approve` - Approve signed NDA
+- `POST /customer/v1/ndas/{id}/revoke` - Revoke active NDA
+- `GET /customer/v1/ndas/customer/{customerId}` - Get customer NDAs
 
-### NDA Management
-- `POST /ndas` - Create NDA record
-- `GET /ndas/{id}` - Retrieve NDA by ID
-- `PATCH /ndas/{id}/status` - Update NDA status (lifecycle transitions)
-- `GET /ndas/customer/{customerId}` - List NDAs for customer
+### Addresses
+- `GET /customer/v1/addresses/owner/{ownerType}/{ownerId}` - Get addresses for owner
+- `POST /customer/v1/addresses` - Create address
+- `GET /customer/v1/addresses/{id}` - Get address details
+- `PUT /customer/v1/addresses/{id}` - Update address
+- `DELETE /customer/v1/addresses/{id}` - Delete address
 
-### Document Management
-- `POST /documents` - Create document reference
-- `GET /documents/{id}` - Retrieve document by ID
-- `PATCH /documents/{id}/complete` - Mark document as complete
-- `DELETE /documents/{id}` - Delete document (with Upload Service cleanup)
-- `GET /documents` - List documents by owner
+### Internal Notes
+- `GET /customer/v1/notes/customer/{customerId}` - Get customer notes
+- `POST /customer/v1/notes` - Create note
+- `GET /customer/v1/notes/{id}` - Get note details
+- `PUT /customer/v1/notes/{id}` - Update note
+- `DELETE /customer/v1/notes/{id}` - Delete note
 
-### Internal Notes (Employee-Only)
-- `POST /internal-notes` - Create internal note
-- `GET /internal-notes/{ownerType}/{ownerId}` - Get notes for owner
-- `DELETE /internal-notes/{id}` - Delete internal note
+### Documents
+- `GET /customer/v1/documents/owner/{ownerType}/{ownerId}` - Get documents for owner
+- `POST /customer/v1/documents` - Upload document
+- `GET /customer/v1/documents/{id}` - Get document details
+- `DELETE /customer/v1/documents/{id}` - Mark document for deletion
 
-### User Management
-- `POST /users` - Create user account
-- `GET /users/{id}` - Retrieve user by ID
-- `PATCH /users/{id}` - Update user
-- `PATCH /users/{id}/password` - Change password
-- `GET /users/customer/{customerId}` - Get user by customer ID
-- `GET /users/email/{email}` - Get user by email
+---
 
-### Validation
-- `POST /validate/user` - Validate user credentials
+## Health & Monitoring
 
-### API Documentation
-Interactive Swagger UI available at: **`/customers/swagger`**
+### Health Endpoints
+- **Liveness**: `GET /customer/liveness` - Service is running
+- **Readiness**: `GET /customer/readiness` - Service is ready (DB + dependencies healthy)
 
-## Local Development
+### Observability
+- **Metrics**: Prometheus metrics at `/customer/metrics`
+- **Tracing**: OpenTelemetry distributed tracing to configured OTLP endpoint
+- **Logging**: Structured logging with correlation IDs via ServiceDefaults
 
-### Prerequisites
-```bash
-# Required tools
-.NET 9.0 SDK
-Docker Desktop
-kubectl (for K8s operations)
+### Health Check Components
+- PostgreSQL connection
+- Redis cache availability
+- RabbitMQ connection
+- External service connectivity (IAM, Upload, Order)
+
+---
+
+## Configuration
+
+### Required Secrets (Google Secret Manager)
+```
+ConnectionStrings__CustomerDbContext - PostgreSQL connection string
+Jwt__PublicKey  - Base64-encoded RSA-2048 public key (PEM format)
 ```
 
-### Quick Start
-
-1. **Clone the repository**
+### Environment Variables
 ```bash
-git clone https://github.com/MALIEV-Co-Ltd/maliev.git
-cd maliev/Maliev.CustomerService
+ConnectionStrings__CustomerDbContext="Host=postgres;Port=5432;Database=customer_app_db;Username=app;Password=..."
+ConnectionStrings__redis="redis:6379"
+ConnectionStrings__rabbitmq="amqp://guest:guest@rabbitmq:5672"
+Jwt__Issuer="https://dev.api.maliev.com/auth"
+Jwt__Audience="https://dev.api.maliev.com"
+ExternalServices__IAMService__BaseUrl="http://iam-service:8080"
+ExternalServices__UploadService__BaseUrl="http://upload-service:8080"
+ExternalServices__OrderService__BaseUrl="http://order-service:8080"
+Features__PrincipalBasedAuthEnabled="true"
 ```
 
-2. **Restore dependencies**
-```bash
-dotnet restore Maliev.CustomerService.sln
-```
+### Configuration Files
+- `appsettings.json` - Production settings (no secrets)
+- `appsettings.Development.json` - Local development overrides
+- `appsettings.Testing.json` - Test configuration with test keys
 
-3. **Build the solution**
-```bash
-dotnet build Maliev.CustomerService.sln
-```
+---
 
-4. **Run tests**
-```bash
-dotnet test Maliev.CustomerService.sln --verbosity normal
-```
+## IAM Integration
 
-5. **Run the service locally**
-```bash
-cd Maliev.CustomerService.Api
-dotnet run
-```
+### Required Permissions
+- `customer.customers.read` - View customers
+- `customer.customers.write` - Create and update customers
+- `customer.customers.delete` - Delete customers
+- `customer.companies.read` - View companies
+- `customer.companies.write` - Create and update companies
+- `customer.companies.delete` - Delete companies
+- `customer.ndas.read` - View NDAs
+- `customer.ndas.write` - Create and manage NDAs
+- `customer.ndas.approve` - Approve signed NDAs
+- `customer.addresses.read` - View addresses
+- `customer.addresses.write` - Manage addresses
+- `customer.notes.read` - View internal notes
+- `customer.notes.write` - Create and edit notes
+- `customer.documents.read` - View documents
+- `customer.documents.write` - Upload and manage documents
 
-The service will start on `http://localhost:5000` (or as configured in launchSettings.json).
+### Predefined Roles
+- **Customer Service Representative**: Manage customers and companies (`customer.customers.*`, `customer.companies.read`, `customer.notes.*`)
+- **Sales Manager**: Full access including NDAs (`customer.*`)
+- **Account Manager**: Customer relationship management (`customer.customers.read`, `customer.notes.*`, `customer.ndas.read`)
+- **Compliance Officer**: NDA and document management (`customer.ndas.*`, `customer.documents.*`)
 
-### Database Migrations
+---
 
-To run migrations against a development PostgreSQL instance:
+## Testing
 
-```bash
-# Port-forward to PostgreSQL in Kubernetes (MUST target pod, not service)
-kubectl port-forward -n maliev-dev postgres-cluster-1 5432:5432
+### Test Coverage
+**143/143 integration tests passing (100%)**
 
-# Set connection string environment variable
-export ConnectionStrings__CustomerDbContext="Server=localhost;Port=5432;Database=customer_db;User Id=postgres;Password=YOUR_PASSWORD;"
-
-# Apply migrations
-dotnet ef database update --project Maliev.CustomerService.Data
-
-# Create new migration
-dotnet ef migrations add MigrationName --project Maliev.CustomerService.Data
-```
+Test suites:
+- **CustomersController Tests** (45 tests)
+  - CRUD operations (create, read, update, delete, reactivate)
+  - Search and filtering
+  - Authorization checks (permission-based)
+- **CompaniesController Tests** (28 tests)
+  - Company management
+  - Customer association
+- **NDAsController Tests** (32 tests)
+  - NDA lifecycle (draft, send, sign, approve, revoke)
+  - Status transitions
+- **AddressesController Tests** (18 tests)
+  - Polymorphic address management
+- **NotesController Tests** (12 tests)
+  - Internal note CRUD operations
+- **DocumentsController Tests** (6 tests)
+  - Document upload and management
+- **IAM Integration Tests** (1 test)
+  - Principal creation with IAM service
+- **Service Unit Tests** (1 test)
+  - CustomerService business logic
 
 ### Running Tests
 
 ```bash
 # Run all tests
-dotnet test Maliev.CustomerService.sln
+dotnet test Maliev.CustomerService.sln --verbosity normal
 
 # Run with coverage
-dotnet test Maliev.CustomerService.sln --collect:"XPlat Code Coverage"
+dotnet test --collect:"XPlat Code Coverage"
 
-# Run specific test project
-dotnet test Maliev.CustomerService.Tests/Maliev.CustomerService.Tests.csproj
+# Run specific test class
+dotnet test --filter "FullyQualifiedName~CustomersControllerTests"
 ```
 
-## Configuration
+### Test Infrastructure
+- **Testcontainers**: Real PostgreSQL 18, Redis, RabbitMQ containers
+- **xUnit**: Test framework with `Assert.*` assertions
+- **Test Database Fixture**: Shared test database with cleanup between tests
 
-### Environment Variables
+---
 
-The service uses configuration from multiple sources in order of precedence:
-1. Google Secret Manager (mounted at `/mnt/secrets` in Kubernetes)
-2. Environment variables
-3. appsettings.json (no secrets!)
+## Database
 
-### Required Secrets
+### Database Schema
 
-Managed via **Google Secret Manager** (External Secrets Operator):
+**PostgreSQL 18** with Entity Framework Core migrations.
 
-**Service-Specific Secrets** (`maliev-{env}-customer-service-config`):
-```yaml
-# Database
-ConnectionStrings__CustomerDbContext: "Server=postgres-cluster-rw.maliev-dev.svc.cluster.local;Port=5432;Database=customer_app_db;User Id=postgres;Password=..."
+**Main Tables:**
+- `Customers` - Customer master data (name, email, segment, tier, profile settings)
+- `Companies` - Company information (name, tax ID, industry, parent company)
+- `NDAs` - NDA documents (status, validity, signed date, revoked date)
+- `Addresses` - Polymorphic addresses (owner type/ID, address type, country, postal code)
+- `DocumentReferences` - Document metadata (owner type/ID, file reference, document type)
+- `InternalNotes` - Employee notes (category, actor, visibility)
+- `AuditLogs` - Complete audit trail (action, actor, entity, changes)
 
-# External Services
-ExternalServices__UploadService__BaseUrl: "http://maliev-upload-service.maliev-dev.svc.cluster.local:8080/uploads"
-ExternalServices__UploadService__TimeoutSeconds: 180
+**Customer Status Values:**
+- `Active`, `Inactive`, `Suspended`, `Deleted`
+
+**NDA Status Values:**
+- `Draft`, `PendingSignature`, `Signed`, `Active`, `Expired`, `Revoked`
+
+### Database Migrations
+
+```bash
+# Port forward to PostgreSQL pod (MUST use pod, not service)
+kubectl port-forward -n <namespace> <postgres-pod> 5432:5432
+
+# Set connection string environment variable
+export ConnectionStrings__CustomerDbContext="Host=localhost;Port=5432;Database=customer_app_db;Username=postgres;Password=<password>;"
+
+# Create migration
+dotnet ef migrations add MigrationName --project Maliev.CustomerService.Data
+
+# Apply migration
+dotnet ef database update --project Maliev.CustomerService.Data
+
+# Rollback migration
+dotnet ef database update PreviousMigrationName --project Maliev.CustomerService.Data
 ```
 
-**Shared Secrets** (`maliev-{env}-shared-config`):
-```yaml
-# JWT Authentication (RSA Public Key)
-Jwt__PublicKey: "LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K..."  # Base64-encoded RSA public key
-Jwt__Issuer: "https://dev.api.maliev.com/auth"
-Jwt__Audience: "https://dev.api.maliev.com"
-
-# CORS
-CORS_ALLOWED_ORIGINS: "https://dev.api.maliev.com,https://dev.intranet.maliev.com,https://dev.www.maliev.com"
-```
-
-**IMPORTANT**:
-- Never commit secrets to source code or appsettings.json!
-- JWT uses **RSA public key validation** (asymmetric cryptography)
-- Auth Service signs tokens with private key, other services validate with public key
-
-### Development Overrides
-
-For local development, create `appsettings.Development.json`:
-
-```json
-{
-  "ConnectionStrings": {
-    "CustomerDbContext": "Server=localhost;Port=5432;Database=customer_db_dev;User Id=postgres;Password=dev;"
-  },
-  "Jwt": {
-    "PublicKey": "LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...",
-    "Issuer": "https://dev.api.maliev.com/auth",
-    "Audience": "https://dev.api.maliev.com"
-  },
-  "ExternalServices": {
-    "UploadService": {
-      "BaseUrl": "http://localhost:8081/uploads",
-      "TimeoutSeconds": 30
-    }
-  }
-}
-```
-
-**Note**: For local development without Auth Service, you can temporarily disable JWT authentication by setting `ASPNETCORE_ENVIRONMENT=Testing`.
+---
 
 ## Deployment
 
-### GitOps Workflow
+### Kubernetes Deployment
 
-The service uses **ArgoCD** for GitOps-based deployment:
+Service uses GitHub Actions workflows for automated deployment to development, staging, and production environments.
 
-```
-Source Repo (maliev)          GitOps Repo (maliev-gitops)        Kubernetes Cluster
-───────────────────           ────────────────────────           ──────────────────
+Deployments are managed via GitOps (ArgoCD).
 
-develop branch  ──┬──→ CI/CD ──→ Creates PR ──→ Review ──→      maliev-dev namespace
-                  │             (dev image)
-                  │
-staging tag      ──┼──→ CI/CD ──→ Creates PR ──→ Review ──→      maliev-staging namespace
-(release/v*)      │             (staging image)
-                  │
-main branch      ──┴──→ CI/CD ──→ Creates PR ──→ Review ──→      maliev-prod namespace
-                                  (prod image)
-```
-
-### CI/CD Pipelines
-
-Three GitHub Actions workflows:
-
-1. **ci-develop.yml** - Triggered on push to `develop` branch
-   - Builds and pushes to `maliev-website-artifact-dev`
-   - Creates PR to update development overlay
-
-2. **ci-staging.yml** - Triggered on tags matching `release/v*`
-   - Builds and pushes to `maliev-website-artifact-staging`
-   - Creates PR to update staging overlay
-
-3. **ci-main.yml** - Triggered on push to `main` branch
-   - Builds and pushes to `maliev-website-artifact-prod`
-   - Creates PR to update production overlay (requires careful review)
-
-### Kubernetes Manifests
-
-Located in `maliev-gitops/3-apps/maliev-customer-service/`:
-
-```
-base/
-├── deployment.yaml          # Base deployment configuration
-├── service.yaml             # Service definition
-├── hpa.yaml                 # Horizontal Pod Autoscaler
-├── servicemonitor.yaml      # Prometheus metrics scraping
-├── service-secrets.yaml     # External Secrets reference
-└── kustomization.yaml       # Base kustomization
-
-overlays/
-├── development/             # Dev-specific patches
-├── staging/                 # Staging-specific patches
-└── production/              # Prod-specific patches
-```
-
-### Health Checks
-
-All endpoints are prefixed with `/customers` via `UsePathBase("/customers")` configuration.
-
-- **Liveness Probe**: `/customers/liveness` - Returns "Healthy"
-- **Readiness Probe**: `/customers/readiness` - Checks database connectivity
-
-### Monitoring
-
-- **Metrics**: Exposed at `/metrics` in Prometheus format
-- **ServiceMonitor**: Auto-discovered by Prometheus (scrape interval: 30s)
-- **Dashboards**: Available in Grafana (access via `scripts/open-grafana.ps1`)
-
-### Debugging in Kubernetes
+### Port Forwarding
 
 ```bash
-# Port-forward to service
-kubectl port-forward -n maliev-dev svc/maliev-customer-service 8080:8080
+# Forward to service
+kubectl port-forward -n <namespace> svc/<service-name> 8080:8080
 
-# Access Swagger UI
-http://localhost:8080/customers/swagger
+# Forward to PostgreSQL (for migrations)
+kubectl port-forward -n <namespace> <postgres-pod> 5432:5432
 
-# View logs
-kubectl logs -f deployment/maliev-customer-service -n maliev-dev
-
-# Execute into pod
-kubectl exec -it deployment/maliev-customer-service -n maliev-dev -- /bin/bash
+# Forward to Redis
+kubectl port-forward -n <namespace> svc/redis 6379:6379
 ```
 
-## Background Services
+### Logs
 
-### NDA Expiration Service
-- Runs every 24 hours
-- Automatically transitions Signed NDAs to Expired based on expires_at timestamp
-- Logs count of expired NDAs
+```bash
+# Tail logs
+kubectl logs -f deployment/<service-name> -n <namespace>
 
-### Document Deletion Retry Service
-- Runs every 6 hours
-- Retries deletion of documents in PendingDeletion status
-- Handles Upload Service availability issues
+# Get pod status
+kubectl get pods -n <namespace> | grep <service-name>
 
-## Security
+# Describe pod
+kubectl describe pod <pod-name> -n <namespace>
+```
 
-### Authentication & Authorization
+---
 
-- **JWT Bearer Tokens** required for all endpoints (except health checks)
-- **Role-based access control**:
-  - `Customer` role - Access to own data only
-  - `Employee` role - Access to customer management
-  - `Manager`/`Admin` roles - Full access
+## Common Issues
 
-### Authorization Policies
+### Issue: Tests fail with "Database connection string not configured"
+**Solution**: Set `ConnectionStrings__CustomerDbContext` environment variable before running tests, or configure via User Secrets:
+```bash
+cd Maliev.CustomerService.Tests
+dotnet user-secrets set "ConnectionStrings:CustomerDbContext" "Host=localhost;Port=5432;..."
+```
 
-- **EmployeeOrHigher** - Restricts internal notes to employees only
-- Automatic 403 Forbidden for unauthorized access
+### Issue: Migration fails with "Cannot connect to database"
+**Solution**: Ensure PostgreSQL is accessible. If using Kubernetes, port-forward to the pod (NOT service):
+```bash
+kubectl port-forward -n <namespace> <postgres-pod> 5432:5432
+```
 
-### Input Validation
+### Issue: Scalar UI returns 404
+**Solution**: Scalar is disabled in production. Check environment is Development or Staging.
 
-- **FluentValidation** on all request DTOs
-- Conditional validation based on operation type
-- Comprehensive error responses with field-level details
+### Issue: All JWT validations fail
+**Solution**: Ensure `Jwt:PublicKey` is correctly configured in Google Secret Manager and matches the AuthService private key.
 
-### Data Protection
+### Issue: Events not publishing
+**Solution**: Verify RabbitMQ connection string is configured and MessagingContracts package is up-to-date.
 
-- **Soft delete** prevents accidental data loss
-- **Audit logging** tracks all mutations
-- **Optimistic concurrency** prevents lost updates
-- **No secrets in source code** - all via Google Secret Manager
+### Issue: FileDeletedEvent consumer not triggering
+**Solution**: Ensure UploadService is publishing events to correct exchange and CustomerService consumer is registered.
 
-## Performance
-
-### Target Metrics
-- **p95 latency < 200ms** for simple CRUD operations
-- **p95 latency < 500ms** for complex queries
-- **Database query optimization** with proper indexing
-- **Read-only queries** use AsNoTracking() where appropriate
-
-### Caching
-- **MemoryCache** configured for simple use (no SizeLimit per CLAUDE.md)
-- Appropriate cache expiration policies
+---
 
 ## Development Guidelines
 
+### Adding New Endpoints
+1. Create request/response models in `Models/`
+2. Add validators using Data Annotations
+3. Implement service logic in `Services/`
+4. Add controller action in `Controllers/`
+5. Write integration tests in `Tests/Integration/`
+6. Update API documentation in README.md
+
+### Adding New Database Entities
+1. Create entity class in `Data/Models/`
+2. Add EF Core configuration in `Data/Configurations/`
+3. Update `CustomerDbContext.cs` with DbSet
+4. Create migration: `dotnet ef migrations add EntityName --project Maliev.CustomerService.Data`
+5. Apply migration: `dotnet ef database update --project Maliev.CustomerService.Data`
+
 ### Code Style
-- Follow Microsoft C# coding conventions
-- Use async/await consistently
-- Implement optimistic concurrency on all updates
-- Add audit logging for all mutations
+- Follow .NET naming conventions
+- Use async/await for all I/O operations
+- Use dependency injection for all services
+- Add XML documentation comments for public APIs
+- Include structured logging with correlation IDs
 
-### Testing
-- Unit tests for business logic
-- Integration tests for database operations
-- Validation tests for FluentValidation rules
-
-### Database Migrations
-- Always create migrations for schema changes
-- Test migrations in development before production
-- Never modify existing migrations after deployment
-
-## Troubleshooting
-
-### Common Issues
-
-**Build Errors**
-```bash
-# Clean and rebuild
-dotnet clean
-dotnet restore
-dotnet build
-```
-
-**Migration Issues**
-```bash
-# Drop and recreate database (DEV ONLY)
-dotnet ef database drop --project Maliev.CustomerService.Data
-dotnet ef database update --project Maliev.CustomerService.Data
-```
-
-**Port Forwarding Issues**
-```bash
-# Always target pod directly, not service
-kubectl port-forward -n maliev-dev postgres-cluster-1 5432:5432
-```
-
-## Contributing
-
-1. Create feature branch from `develop`
-2. Implement changes with tests
-3. Ensure zero warnings in build
-4. Create pull request to `develop`
-5. Wait for CI/CD to pass and code review
-
-## License
-
-Proprietary - MALIEV Co. Ltd.
+---
 
 ## Support
 
-For questions or issues, contact the Maliev development team.
+- **CLAUDE.md**: Service-specific development guidelines
+- **ServiceDefaults Documentation**: See Maliev.Aspire.ServiceDefaults repository
+- **MessagingContracts**: See Maliev.MessagingContracts repository
+
+---
+
+## License
+
+**Proprietary** - Copyright © 2025 MALIEV Co., Ltd. All rights reserved.
