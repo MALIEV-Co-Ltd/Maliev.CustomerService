@@ -3,6 +3,7 @@ using Maliev.CustomerService.Api.Models.IAM;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Data.Models;
 using Maliev.CustomerService.Tests.Infrastructure;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -22,12 +23,14 @@ public class CustomerServiceTests
     private readonly Mock<IConfiguration> _mockConfig;
     private readonly Mock<ILogger<Api.Services.CustomerService>> _mockLogger;
     private readonly Mock<Api.Services.MetricsService> _mockMetricsService;
+    private readonly Mock<IPublishEndpoint> _mockPublishEndpoint;
 
     public CustomerServiceTests(TestDatabaseFixture fixture)
     {
         _fixture = fixture;
         _mockIamClient = new Mock<IIAMClient>();
         _mockConfig = new Mock<IConfiguration>();
+        _mockPublishEndpoint = new Mock<IPublishEndpoint>();
 
         // Setup default configuration (enabled in final state)
         var mockSection = new Mock<IConfigurationSection>();
@@ -50,7 +53,8 @@ public class CustomerServiceTests
             _mockIamClient.Object,
             _mockConfig.Object,
             _mockLogger.Object,
-            _mockMetricsService.Object);
+            _mockMetricsService.Object,
+            _mockPublishEndpoint.Object);
     }
 
     [Fact]

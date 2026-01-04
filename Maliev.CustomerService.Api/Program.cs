@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using Maliev.Aspire.ServiceDefaults;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
 
@@ -15,12 +16,11 @@ builder.AddStandardMiddleware(options =>
 });
 builder.AddServiceMeters("customers-meter"); // Register service meters for OpenTelemetry business metrics
 
-
-
-builder.AddRedisDistributedCache(instanceName: "customer:"); // Redis with in-memory fallback
+builder.AddRedisDistributedCache(instanceName: "customer:");
 builder.AddMassTransitWithRabbitMq(configure: x =>
 {
     x.AddConsumer<Maliev.CustomerService.Api.Consumers.GetCustomerDetailsConsumer>();
+    x.AddConsumer<Maliev.CustomerService.Api.Consumers.FileDeletedEventConsumer>();
 }); // RabbitMQ message bus (non-blocking startup)
 builder.AddPostgresDbContext<CustomerDbContext>(connectionName: "CustomerDbContext"); // PostgreSQL with retry logic
 
@@ -71,7 +71,7 @@ builder.Services.AddIAMRegistration<Maliev.CustomerService.Api.Services.Customer
 
 // Controllers
 builder.Services.AddControllers()
-    .AddApplicationPart(typeof(Program).Assembly)
+    .AddApplicationPart(typeof(Maliev.CustomerService.Api.Program).Assembly)
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
@@ -138,14 +138,14 @@ if (args.Contains("--migrate-principals"))
     return;
 }
 
-var logger = app.Services.GetRequiredService<ILogger<Program>>();
+var logger = app.Services.GetRequiredService<ILogger<Maliev.CustomerService.Api.Program>>();
 
 // Run database migrations on startup
 await app.MigrateDatabaseAsync<CustomerDbContext>();
 
 // Force instantiation of MetricsService to ensure OpenTelemetry meters are created
 var metricsService = app.Services.GetRequiredService<Maliev.CustomerService.Api.Services.MetricsService>();
-Log.MetricsInitialized(logger);
+Maliev.CustomerService.Api.Program.Log.MetricsInitialized(logger);
 
 // Middleware Pipeline
 app.UseStandardMiddleware();
@@ -168,24 +168,26 @@ app.MapDefaultEndpoints(servicePrefix: "customer");
 // Map OpenAPI and Scalar documentation (dev/staging only)
 app.MapApiDocumentation(servicePrefix: "customer");
 
-Log.ServiceStarted(logger);
+Maliev.CustomerService.Api.Program.Log.ServiceStarted(logger);
 await app.RunAsync();
 
-/// <summary>
-/// Represents the entry point and main application class for the program.
-/// </summary>
-public partial class Program
+namespace Maliev.CustomerService.Api
 {
-    internal static partial class Log
+    /// <summary>
+    /// Represents the entry point and main application class for the program.
+    /// </summary>
+    public partial class Program
     {
-        [LoggerMessage(Level = LogLevel.Information, Message = "CustomerService started successfully")]
-        public static partial void ServiceStarted(ILogger logger);
+        internal static partial class Log
+        {
+            [LoggerMessage(Level = LogLevel.Information, Message = "CustomerService started successfully")]
+            public static partial void ServiceStarted(ILogger logger);
 
-        [LoggerMessage(Level = LogLevel.Error, Message = "Database migration failed - application may not function correctly")]
-        public static partial void MigrationFailed(ILogger logger, Exception exception);
+            [LoggerMessage(Level = LogLevel.Error, Message = "Database migration failed - application may not function correctly")]
+            public static partial void MigrationFailed(ILogger logger, Exception exception);
 
-        [LoggerMessage(Level = LogLevel.Information, Message = "OpenTelemetry metrics service initialized")]
-        public static partial void MetricsInitialized(ILogger logger);
+            [LoggerMessage(Level = LogLevel.Information, Message = "OpenTelemetry metrics service initialized")]
+            public static partial void MetricsInitialized(ILogger logger);
+        }
     }
 }
-

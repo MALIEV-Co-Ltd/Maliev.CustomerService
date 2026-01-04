@@ -4,6 +4,8 @@ using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Models.IAM;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
+using Maliev.MessagingContracts.Generated;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.CustomerService.Api.Services;
@@ -18,6 +20,7 @@ public class CustomerService : ICustomerService
     private readonly IConfiguration _configuration;
     private readonly ILogger<CustomerService> _logger;
     private readonly MetricsService _metricsService;
+    private readonly IPublishEndpoint _publishEndpoint;
 
     /// <summary>
     /// Initializes a new instance of the CustomerService class
@@ -27,18 +30,21 @@ public class CustomerService : ICustomerService
     /// <param name="configuration">Application configuration</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="metricsService">Metrics service for recording customer operations</param>
+    /// <param name="publishEndpoint">MassTransit publish endpoint for domain events</param>
     public CustomerService(
         CustomerDbContext context,
         IIAMClient iamClient,
         IConfiguration configuration,
         ILogger<CustomerService> logger,
-        MetricsService metricsService)
+        MetricsService metricsService,
+        IPublishEndpoint publishEndpoint)
     {
         _context = context;
         _iamClient = iamClient;
         _configuration = configuration;
         _logger = logger;
         _metricsService = metricsService;
+        _publishEndpoint = publishEndpoint;
     }
 
     /// <summary>
@@ -169,6 +175,34 @@ public class CustomerService : ICustomerService
 
         // Record metrics
         _metricsService.RecordCustomerRegistration(customer.Segment);
+
+        // Publish CustomerCreatedEvent
+        await _publishEndpoint.Publish(new CustomerCreatedEvent(
+            MessageId: Guid.NewGuid(),
+            MessageName: "CustomerCreatedEvent",
+            MessageType: MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy: "CustomerService",
+            ConsumedBy: ["NotificationService", "AnalyticsService"],
+            CorrelationId: Guid.NewGuid(),
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
+            Payload: new CustomerCreatedEventPayload(
+                CustomerId: customer.Id,
+                PrincipalId: customer.PrincipalId,
+                FirstName: customer.FirstName,
+                LastName: customer.LastName,
+                Email: customer.Email,
+                Phone: customer.Phone,
+                Segment: customer.Segment,
+                Tier: customer.Tier,
+                CompanyId: customer.CompanyId,
+                CreatedAt: new DateTimeOffset(customer.CreatedAt, TimeSpan.Zero)
+            )
+        ));
+
+        _logger.LogInformation("Published CustomerCreatedEvent for customer {CustomerId}", customer.Id);
 
         return customer.ToCustomerResponse();
     }
@@ -362,6 +396,29 @@ public class CustomerService : ICustomerService
 
                 // Record metrics
                 _metricsService.RecordCustomerUpdate(actorType);
+
+                // Publish CustomerUpdatedEvent
+                await _publishEndpoint.Publish(new CustomerUpdatedEvent(
+                    MessageId: Guid.NewGuid(),
+                    MessageName: "CustomerUpdatedEvent",
+                    MessageType: MessageType.Event,
+                    MessageVersion: "1.0.0",
+                    PublishedBy: "CustomerService",
+                    ConsumedBy: ["NotificationService", "AnalyticsService"],
+                    CorrelationId: Guid.NewGuid(),
+                    CausationId: null,
+                    OccurredAtUtc: DateTimeOffset.UtcNow,
+                    IsPublic: false,
+                    Payload: new CustomerUpdatedEventPayload(
+                        CustomerId: customer.Id,
+                        UpdatedFields: changedFields,
+                        UpdatedBy: actorId,
+                        ActorType: actorType,
+                        UpdatedAt: new DateTimeOffset(customer.UpdatedAt, TimeSpan.Zero)
+                    )
+                ));
+
+                _logger.LogInformation("Published CustomerUpdatedEvent for customer {CustomerId}", id);
             }
             catch (DbUpdateConcurrencyException ex)
             {
@@ -418,6 +475,28 @@ public class CustomerService : ICustomerService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Customer {CustomerId} soft deleted successfully", id);
+
+        // Publish CustomerDeletedEvent
+        await _publishEndpoint.Publish(new CustomerDeletedEvent(
+            MessageId: Guid.NewGuid(),
+            MessageName: "CustomerDeletedEvent",
+            MessageType: MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy: "CustomerService",
+            ConsumedBy: ["NotificationService", "AnalyticsService"],
+            CorrelationId: Guid.NewGuid(),
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
+            Payload: new CustomerDeletedEventPayload(
+                CustomerId: customer.Id,
+                DeletedBy: actorId,
+                ActorType: actorType,
+                DeletedAt: new DateTimeOffset(customer.UpdatedAt, TimeSpan.Zero)
+            )
+        ));
+
+        _logger.LogInformation("Published CustomerDeletedEvent for customer {CustomerId}", id);
 
         return true;
     }
