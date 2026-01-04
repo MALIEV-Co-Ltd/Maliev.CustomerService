@@ -20,7 +20,6 @@ builder.AddRedisDistributedCache(instanceName: "customer:");
 builder.AddMassTransitWithRabbitMq(configure: x =>
 {
     x.AddConsumer<Maliev.CustomerService.Api.Consumers.GetCustomerDetailsConsumer>();
-    x.AddConsumer<Maliev.CustomerService.Api.Consumers.FileDeletedEventConsumer>();
 }); // RabbitMQ message bus (non-blocking startup)
 builder.AddPostgresDbContext<CustomerDbContext>(connectionName: "CustomerDbContext"); // PostgreSQL with retry logic
 
