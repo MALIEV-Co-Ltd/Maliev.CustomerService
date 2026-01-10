@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Asp.Versioning;
+using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.NDAs;
 using Maliev.CustomerService.Api.Services;
@@ -38,6 +39,7 @@ public class NDAController : ControllerBase
     /// Creates a new NDA record
     /// </summary>
     /// <param name="request">NDA creation request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Created NDA response</returns>
     /// <response code="201">NDA created successfully</response>
     /// <response code="400">Invalid request data</response>
@@ -46,7 +48,7 @@ public class NDAController : ControllerBase
     [ProducesResponseType(typeof(NDAResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<NDAResponse>> Create([FromBody] CreateNDARequest request)
+    public async Task<ActionResult<NDAResponse>> Create([FromBody] CreateNDARequest request, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -72,7 +74,7 @@ public class NDAController : ControllerBase
                 return BadRequest(errorResponse);
             }
 
-            var (actorId, actorType) = GetActorInfo();
+            var (actorId, actorType) = User.GetActorInfo();
 
             var nda = await _ndaService.CreateAsync(request, actorId, actorType);
 
@@ -129,6 +131,7 @@ public class NDAController : ControllerBase
     /// </summary>
     /// <param name="id">NDA ID</param>
     /// <param name="request">Status update request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Updated NDA response</returns>
     /// <response code="200">NDA status updated successfully</response>
     /// <response code="400">Invalid request data</response>
@@ -143,7 +146,7 @@ public class NDAController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status422UnprocessableEntity)]
-    public async Task<ActionResult<NDAResponse>> UpdateStatus(Guid id, [FromBody] UpdateNDAStatusRequest request)
+    public async Task<ActionResult<NDAResponse>> UpdateStatus(Guid id, [FromBody] UpdateNDAStatusRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -169,9 +172,9 @@ public class NDAController : ControllerBase
                 return BadRequest(errorResponse);
             }
 
-            var (actorId, actorType) = GetActorInfo();
+            var (actorId, actorType) = User.GetActorInfo();
 
-            var nda = await _ndaService.UpdateStatusAsync(id, request, actorId, actorType);
+            var nda = await _ndaService.UpdateStatusAsync(id, request, actorId, actorType, cancellationToken);
 
             return Ok(nda);
         }
@@ -214,7 +217,7 @@ public class NDAController : ControllerBase
             return Conflict(new ErrorResponse
             {
                 Code = "VERSION_CONFLICT",
-                Message = "The NDA was modified by another user. Please refresh and try again.",
+                Message = "The record was modified by another user. Please refresh and try again.",
                 TraceId = HttpContext.TraceIdentifier,
                 Timestamp = DateTime.UtcNow
             });
@@ -224,30 +227,5 @@ public class NDAController : ControllerBase
             _logger.LogError(ex, "Unexpected error updating NDA status {NDAId}", id);
             throw;
         }
-    }
-
-    /// <summary>
-    /// Extracts actor information from JWT claims
-    /// </summary>
-    /// <returns>Tuple of (actorId, actorType)</returns>
-    private (string actorId, string actorType) GetActorInfo()
-    {
-        // Extract user ID from JWT claims (typically "sub" claim)
-        var actorId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-            ?? User.FindFirst("sub")?.Value
-            ?? "unknown";
-
-        // Determine actor type from role claims
-        // Employee role = Employee actor type, otherwise Customer
-        var roles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
-        var actorType = roles.Any(r => r.Equals("Employee", StringComparison.OrdinalIgnoreCase) ||
-                                       r.Equals("Manager", StringComparison.OrdinalIgnoreCase) ||
-                                       r.Equals("Admin", StringComparison.OrdinalIgnoreCase))
-            ? "Employee"
-            : "Customer";
-
-        _logger.LogDebug("Actor info: ID={ActorId}, Type={ActorType}", actorId, actorType);
-
-        return (actorId, actorType);
     }
 }

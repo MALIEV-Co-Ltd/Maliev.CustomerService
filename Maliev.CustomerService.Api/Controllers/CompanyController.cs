@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Asp.Versioning;
+using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Companies;
 using Maliev.CustomerService.Api.Services;
@@ -38,6 +39,7 @@ public class CompanyController : ControllerBase
     /// Creates a new company
     /// </summary>
     /// <param name="request">Company creation request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Created company response</returns>
     /// <response code="201">Company created successfully</response>
     /// <response code="400">Invalid request data</response>
@@ -48,7 +50,7 @@ public class CompanyController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status422UnprocessableEntity)]
-    public async Task<ActionResult<CompanyResponse>> Create([FromBody] CreateCompanyRequest request)
+    public async Task<ActionResult<CompanyResponse>> Create([FromBody] CreateCompanyRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -74,7 +76,7 @@ public class CompanyController : ControllerBase
                 return BadRequest(errorResponse);
             }
 
-            var (actorId, actorType) = GetActorInfo();
+            var (actorId, actorType) = User.GetActorInfo();
 
             var company = await _companyService.CreateAsync(request, actorId, actorType);
 
@@ -188,6 +190,7 @@ public class CompanyController : ControllerBase
     /// </summary>
     /// <param name="id">Company ID</param>
     /// <param name="request">Company update request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Updated company response</returns>
     /// <response code="200">Company updated successfully</response>
     /// <response code="400">Invalid request data</response>
@@ -202,7 +205,7 @@ public class CompanyController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status422UnprocessableEntity)]
-    public async Task<ActionResult<CompanyResponse>> Update(Guid id, [FromBody] UpdateCompanyRequest request)
+    public async Task<ActionResult<CompanyResponse>> Update(Guid id, [FromBody] UpdateCompanyRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -228,7 +231,7 @@ public class CompanyController : ControllerBase
                 return BadRequest(errorResponse);
             }
 
-            var (actorId, actorType) = GetActorInfo();
+            var (actorId, actorType) = User.GetActorInfo();
 
             var company = await _companyService.UpdateAsync(id, request, actorId, actorType);
 
@@ -251,7 +254,7 @@ public class CompanyController : ControllerBase
             return Conflict(new ErrorResponse
             {
                 Code = "VERSION_CONFLICT",
-                Message = "The company was modified by another user. Please refresh and try again.",
+                Message = "The record was modified by another user. Please refresh and try again.",
                 TraceId = HttpContext.TraceIdentifier,
                 Timestamp = DateTime.UtcNow
             });
@@ -326,30 +329,5 @@ public class CompanyController : ControllerBase
             _logger.LogError(ex, "Error retrieving company {CompanyId} with customers", id);
             throw;
         }
-    }
-
-    /// <summary>
-    /// Extracts actor information from JWT claims
-    /// </summary>
-    /// <returns>Tuple of (actorId, actorType)</returns>
-    private (string actorId, string actorType) GetActorInfo()
-    {
-        // Extract user ID from JWT claims (typically "sub" claim)
-        var actorId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-            ?? User.FindFirst("sub")?.Value
-            ?? "unknown";
-
-        // Determine actor type from role claims
-        // Employee role = Employee actor type, otherwise Customer
-        var roles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
-        var actorType = roles.Any(r => r.Equals("Employee", StringComparison.OrdinalIgnoreCase) ||
-                                       r.Equals("Manager", StringComparison.OrdinalIgnoreCase) ||
-                                       r.Equals("Admin", StringComparison.OrdinalIgnoreCase))
-            ? "Employee"
-            : "Customer";
-
-        _logger.LogDebug("Actor info: ID={ActorId}, Type={ActorType}", actorId, actorType);
-
-        return (actorId, actorType);
     }
 }
