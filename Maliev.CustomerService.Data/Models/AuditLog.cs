@@ -66,10 +66,14 @@ public class AuditLog
 /// </summary>
 public static class ActorType
 {
+    /// <summary>Customer actor type.</summary>
     public const string Customer = "Customer";
+    /// <summary>Employee actor type.</summary>
     public const string Employee = "Employee";
+    /// <summary>System actor type.</summary>
     public const string System = "System";
 
+    /// <summary>All actor types.</summary>
     public static readonly string[] All = { Customer, Employee, System };
 }
 
@@ -78,14 +82,23 @@ public static class ActorType
 /// </summary>
 public static class AuditAction
 {
+    /// <summary>Create action.</summary>
     public const string Create = "Create";
+    /// <summary>Update action.</summary>
     public const string Update = "Update";
+    /// <summary>Delete action.</summary>
     public const string Delete = "Delete";
+    /// <summary>Soft delete action.</summary>
     public const string SoftDelete = "SoftDelete";
+    /// <summary>Restore action.</summary>
     public const string Restore = "Restore";
+    /// <summary>Login action.</summary>
     public const string Login = "Login";
+    /// <summary>Logout action.</summary>
     public const string Logout = "Logout";
+    /// <summary>Validate credentials action.</summary>
     public const string ValidateCredentials = "ValidateCredentials";
 
+    /// <summary>All audit actions.</summary>
     public static readonly string[] All = { Create, Update, Delete, SoftDelete, Restore, Login, Logout, ValidateCredentials };
 }

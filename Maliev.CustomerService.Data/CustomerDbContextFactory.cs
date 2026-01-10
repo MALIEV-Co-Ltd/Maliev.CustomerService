@@ -8,6 +8,7 @@ namespace Maliev.CustomerService.Data;
 /// </summary>
 public class CustomerDbContextFactory : IDesignTimeDbContextFactory<CustomerDbContext>
 {
+    /// <inheritdoc />
     public CustomerDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<CustomerDbContext>();

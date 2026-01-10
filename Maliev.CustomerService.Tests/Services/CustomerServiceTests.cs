@@ -6,6 +6,7 @@ using Maliev.CustomerService.Tests.Infrastructure;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -42,7 +43,7 @@ public class CustomerServiceTests
             .ReturnsAsync(() => new CreatePrincipalResponse { PrincipalId = Guid.NewGuid(), CreatedAt = DateTime.UtcNow });
 
         _mockLogger = new Mock<ILogger<Api.Services.CustomerService>>();
-        _mockMetricsService = new Mock<Api.Services.MetricsService>(MockBehavior.Loose, new object[] { Mock.Of<IConfiguration>() });
+        _mockMetricsService = new Mock<Api.Services.MetricsService>(MockBehavior.Loose, new object[] { Mock.Of<IHostEnvironment>() });
     }
 
     private Api.Services.CustomerService CreateService()

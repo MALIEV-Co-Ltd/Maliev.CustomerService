@@ -9,20 +9,51 @@ namespace Maliev.CustomerService.Data;
 /// </summary>
 public class CustomerDbContext : DbContext
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CustomerDbContext"/> class.
+    /// </summary>
+    /// <param name="options">The options for this context.</param>
     public CustomerDbContext(DbContextOptions<CustomerDbContext> options)
         : base(options)
     {
     }
 
-    // DbSets for application entities
+    /// <summary>
+    /// Gets or sets the customers.
+    /// </summary>
     public DbSet<Customer> Customers => Set<Customer>();
+
+    /// <summary>
+    /// Gets or sets the audit logs.
+    /// </summary>
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+
+    /// <summary>
+    /// Gets or sets the addresses.
+    /// </summary>
     public DbSet<Address> Addresses => Set<Address>();
+
+    /// <summary>
+    /// Gets or sets the companies.
+    /// </summary>
     public DbSet<Company> Companies => Set<Company>();
+
+    /// <summary>
+    /// Gets or sets the NDA records.
+    /// </summary>
     public DbSet<NDARecord> NDARecords => Set<NDARecord>();
+
+    /// <summary>
+    /// Gets or sets the document references.
+    /// </summary>
     public DbSet<DocumentReference> DocumentReferences => Set<DocumentReference>();
+
+    /// <summary>
+    /// Gets or sets the internal notes.
+    /// </summary>
     public DbSet<InternalNote> InternalNotes => Set<InternalNote>();
 
+    /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -243,6 +274,7 @@ public class CustomerDbContext : DbContext
         SnakeCaseNamingHelper.ApplySnakeCaseNaming(modelBuilder);
     }
 
+    /// <inheritdoc />
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         base.ConfigureConventions(configurationBuilder);
