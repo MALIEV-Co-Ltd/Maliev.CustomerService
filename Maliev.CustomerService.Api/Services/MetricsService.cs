@@ -30,10 +30,10 @@ public class MetricsService : IDisposable
     /// <summary>
     /// Initializes a new instance of the MetricsService class
     /// </summary>
-    /// <param name="configuration">Application configuration</param>
-    public MetricsService(IConfiguration configuration)
+    /// <param name="environment">Host environment</param>
+    public MetricsService(IHostEnvironment environment)
     {
-        _environment = configuration["Environment"] ?? configuration["ASPNETCORE_ENVIRONMENT"] ?? "development";
+        _environment = environment.EnvironmentName;
 
         // Create a meter for this service
         _meter = new Meter(_serviceName, "1.0.0");

@@ -13,17 +13,19 @@ public interface IAddressService
     /// <param name="request">Address creation request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Created address response</returns>
     /// <exception cref="InvalidOperationException">Country Service unavailable or invalid country ID</exception>
-    Task<AddressResponse> CreateAsync(CreateAddressRequest request, string actorId, string actorType);
+    Task<AddressResponse> CreateAsync(CreateAddressRequest request, string actorId, string actorType, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves all addresses for a specific owner
     /// </summary>
     /// <param name="ownerType">Type of owner (Customer or Company)</param>
     /// <param name="ownerId">Owner ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>List of addresses</returns>
-    Task<List<AddressResponse>> GetByOwnerAsync(string ownerType, Guid ownerId);
+    Task<List<AddressResponse>> GetByOwnerAsync(string ownerType, Guid ownerId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Updates an existing address with optimistic concurrency control, country validation, and audit logging
@@ -32,10 +34,11 @@ public interface IAddressService
     /// <param name="request">Address update request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Updated address response</returns>
     /// <exception cref="KeyNotFoundException">Address not found</exception>
     /// <exception cref="InvalidOperationException">Country Service unavailable or invalid country ID, or version conflict</exception>
-    Task<AddressResponse> UpdateAsync(Guid id, UpdateAddressRequest request, string actorId, string actorType);
+    Task<AddressResponse> UpdateAsync(Guid id, UpdateAddressRequest request, string actorId, string actorType, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Deletes an address with audit logging
@@ -43,6 +46,7 @@ public interface IAddressService
     /// <param name="id">Address ID</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if deleted, false if not found</returns>
-    Task<bool> DeleteAsync(Guid id, string actorId, string actorType);
+    Task<bool> DeleteAsync(Guid id, string actorId, string actorType, CancellationToken cancellationToken = default);
 }

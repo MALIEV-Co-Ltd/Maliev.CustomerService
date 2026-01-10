@@ -37,9 +37,10 @@ public class CompanyService : ICompanyService
     /// <param name="request">Company creation request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Created company response</returns>
     /// <exception cref="InvalidOperationException">Thrown when VAT number format is invalid</exception>
-    public async Task<CompanyResponse> CreateAsync(CreateCompanyRequest request, string actorId, string actorType)
+    public async Task<CompanyResponse> CreateAsync(CreateCompanyRequest request, string actorId, string actorType, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Creating company with name {Name} by actor {ActorId} ({ActorType})",
             request.Name, actorId, actorType);
@@ -90,7 +91,7 @@ public class CompanyService : ICompanyService
 
         _context.AuditLogs.Add(auditLog);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Company {CompanyId} created successfully", company.Id);
 
@@ -101,14 +102,15 @@ public class CompanyService : ICompanyService
     /// Retrieves a company by ID
     /// </summary>
     /// <param name="id">Company ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Company response or null if not found</returns>
-    public async Task<CompanyResponse?> GetByIdAsync(Guid id)
+    public async Task<CompanyResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("Retrieving company {CompanyId}", id);
 
         var company = await _context.Companies
             .Where(c => c.Id == id)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (company == null)
         {
@@ -126,17 +128,18 @@ public class CompanyService : ICompanyService
     /// <param name="request">Company update request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Updated company response</returns>
     /// <exception cref="KeyNotFoundException">Thrown when company is not found</exception>
     /// <exception cref="InvalidOperationException">Thrown when VAT number format is invalid or version conflict occurs</exception>
-    public async Task<CompanyResponse> UpdateAsync(Guid id, UpdateCompanyRequest request, string actorId, string actorType)
+    public async Task<CompanyResponse> UpdateAsync(Guid id, UpdateCompanyRequest request, string actorId, string actorType, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Updating company {CompanyId} by actor {ActorId} ({ActorType})",
             id, actorId, actorType);
 
         var company = await _context.Companies
             .Where(c => c.Id == id)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (company == null)
         {
@@ -233,7 +236,7 @@ public class CompanyService : ICompanyService
 
             try
             {
-                await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync(cancellationToken);
                 _logger.LogInformation("Company {CompanyId} updated successfully with {FieldCount} field(s)",
                     id, changedFields.Count);
             }
@@ -255,14 +258,15 @@ public class CompanyService : ICompanyService
     /// Retrieves a company with its associated active customers
     /// </summary>
     /// <param name="id">Company ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Tuple containing company response and list of associated customer responses, or null if company not found</returns>
-    public async Task<(CompanyResponse Company, List<CustomerResponse> Customers)?> GetWithCustomersAsync(Guid id)
+    public async Task<(CompanyResponse Company, List<CustomerResponse> Customers)?> GetWithCustomersAsync(Guid id, CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("Retrieving company {CompanyId} with customers", id);
 
         var company = await _context.Companies
             .Where(c => c.Id == id)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (company == null)
         {
@@ -272,7 +276,7 @@ public class CompanyService : ICompanyService
 
         var customers = await _context.Customers
             .Where(c => c.CompanyId == id && !c.IsDeleted)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         var customerResponses = customers.Select(c => c.ToCustomerResponse()).ToList();
 
@@ -288,8 +292,9 @@ public class CompanyService : ICompanyService
     /// <param name="pageSize">Number of items per page</param>
     /// <param name="segment">Optional segment filter</param>
     /// <param name="tier">Optional tier filter</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Tuple containing list of company responses and total count</returns>
-    public async Task<(List<CompanyResponse> Companies, int TotalCount)> GetAllAsync(int page, int pageSize, string? segment = null, string? tier = null)
+    public async Task<(List<CompanyResponse> Companies, int TotalCount)> GetAllAsync(int page, int pageSize, string? segment = null, string? tier = null, CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("Retrieving companies - Page: {Page}, PageSize: {PageSize}, Segment: {Segment}, Tier: {Tier}",
             page, pageSize, segment ?? "all", tier ?? "all");
@@ -308,14 +313,14 @@ public class CompanyService : ICompanyService
         }
 
         // Get total count
-        var totalCount = await query.CountAsync();
+        var totalCount = await query.CountAsync(cancellationToken);
 
         // Apply pagination
         var companies = await query
             .OrderBy(c => c.Name)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         var companyResponses = companies.Select(c => c.ToCompanyResponse()).ToList();
 

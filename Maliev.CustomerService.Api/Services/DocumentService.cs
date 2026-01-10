@@ -43,9 +43,10 @@ public class DocumentService : IDocumentService
     /// <param name="request">Document creation request containing owner details and file reference</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Created document response</returns>
     /// <exception cref="InvalidOperationException">Thrown when file reference is invalid in Upload Service</exception>
-    public async Task<DocumentResponse> CreateAsync(CreateDocumentRequest request, string actorId, string actorType)
+    public async Task<DocumentResponse> CreateAsync(CreateDocumentRequest request, string actorId, string actorType, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Creating document for owner {OwnerType}/{OwnerId} by actor {ActorId} ({ActorType})",
             request.OwnerType, request.OwnerId, actorId, actorType);
@@ -95,7 +96,7 @@ public class DocumentService : IDocumentService
         };
 
         _context.AuditLogs.Add(auditLog);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Document {DocumentId} created successfully", document.Id);
 
@@ -110,15 +111,16 @@ public class DocumentService : IDocumentService
     /// </summary>
     /// <param name="ownerType">Type of owner (Customer or Company)</param>
     /// <param name="ownerId">Owner ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>List of document responses ordered by creation date descending</returns>
-    public async Task<List<DocumentResponse>> GetByOwnerAsync(string ownerType, Guid ownerId)
+    public async Task<List<DocumentResponse>> GetByOwnerAsync(string ownerType, Guid ownerId, CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("Retrieving documents for owner {OwnerType}/{OwnerId}", ownerType, ownerId);
 
         var documents = await _context.DocumentReferences
             .Where(d => d.OwnerType == ownerType && d.OwnerId == ownerId)
             .OrderByDescending(d => d.CreatedAt)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         return documents.Select(d => d.ToDocumentResponse()).ToList();
     }
@@ -130,15 +132,16 @@ public class DocumentService : IDocumentService
     /// <param name="request">Update request containing new file reference and filename</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Updated document response with incremented version</returns>
     /// <exception cref="KeyNotFoundException">Thrown when document is not found</exception>
     /// <exception cref="InvalidOperationException">Thrown when file reference is invalid or version conflict occurs</exception>
-    public async Task<DocumentResponse> UpdateAsync(Guid id, UpdateDocumentRequest request, string actorId, string actorType)
+    public async Task<DocumentResponse> UpdateAsync(Guid id, UpdateDocumentRequest request, string actorId, string actorType, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Updating document {DocumentId} with new file reference by actor {ActorId} ({ActorType})",
             id, actorId, actorType);
 
-        var document = await _context.DocumentReferences.FirstOrDefaultAsync(d => d.Id == id);
+        var document = await _context.DocumentReferences.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
         if (document == null)
         {
             _logger.LogWarning("Document {DocumentId} not found for update", id);
@@ -189,13 +192,13 @@ public class DocumentService : IDocumentService
 
         try
         {
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("Document {DocumentId} updated successfully to version {Version}", id, document.Version);
         }
         catch (DbUpdateConcurrencyException ex)
         {
             _logger.LogWarning(ex, "Concurrency conflict updating document {DocumentId}", id);
-            throw new InvalidOperationException("The document was modified by another user. Please refresh and try again.");
+            throw new InvalidOperationException("The record was modified by another user. Please refresh and try again.");
         }
 
         return document.ToDocumentResponse();
@@ -209,14 +212,15 @@ public class DocumentService : IDocumentService
     /// <param name="signedAt">Optional timestamp when the document was signed</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Updated document response with Complete status</returns>
     /// <exception cref="KeyNotFoundException">Thrown when document is not found</exception>
-    public async Task<DocumentResponse> MarkCompleteAsync(Guid id, string? signedBy, DateTime? signedAt, string actorId, string actorType)
+    public async Task<DocumentResponse> MarkCompleteAsync(Guid id, string? signedBy, DateTime? signedAt, string actorId, string actorType, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Marking document {DocumentId} as complete by actor {ActorId} ({ActorType})",
             id, actorId, actorType);
 
-        var document = await _context.DocumentReferences.FirstOrDefaultAsync(d => d.Id == id);
+        var document = await _context.DocumentReferences.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
         if (document == null)
         {
             _logger.LogWarning("Document {DocumentId} not found", id);
@@ -253,7 +257,7 @@ public class DocumentService : IDocumentService
         };
 
         _context.AuditLogs.Add(auditLog);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Document {DocumentId} marked as complete", id);
 
@@ -269,96 +273,103 @@ public class DocumentService : IDocumentService
     /// <param name="id">Document ID</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <exception cref="KeyNotFoundException">Thrown when document is not found</exception>
     /// <remarks>
     /// If deletion from Upload Service fails, the document is marked as PendingDeletion for retry
     /// </remarks>
-    public async Task DeleteAsync(Guid id, string actorId, string actorType)
+    public async Task DeleteAsync(Guid id, string actorId, string actorType, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Deleting document {DocumentId} by actor {ActorId} ({ActorType})",
             id, actorId, actorType);
 
-        var document = await _context.DocumentReferences.FirstOrDefaultAsync(d => d.Id == id);
+        var document = await _context.DocumentReferences.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
         if (document == null)
         {
             _logger.LogWarning("Document {DocumentId} not found for deletion", id);
             throw new KeyNotFoundException($"Document with ID '{id}' not found");
         }
 
-        // Try to delete from Upload Service
-        var deleted = await _uploadServiceClient.DeleteFileAsync(document.FileReference);
-        if (!deleted)
-        {
-            _logger.LogWarning("Failed to delete file {FileReference} from Upload Service, marking as PendingDeletion",
-                document.FileReference);
-            document.Status = DocumentStatus.PendingDeletion;
-            document.UpdatedAt = DateTime.UtcNow;
+        // Standard Pattern: Mark as PendingDeletion first to ensure atomicity
+        var oldStatus = document.Status;
+        document.Status = DocumentStatus.PendingDeletion;
+        document.UpdatedAt = DateTime.UtcNow;
 
-            var auditLog = new AuditLog
-            {
-                ActorId = actorId,
-                ActorType = actorType,
-                Action = "MarkPendingDeletion",
-                EntityType = nameof(DocumentReference),
-                EntityId = document.Id.ToString(),
-                Timestamp = DateTime.UtcNow,
-                ChangedFields = JsonSerializer.Serialize(new { Status = DocumentStatus.PendingDeletion }),
-                PreviousValues = JsonSerializer.Serialize(new { document.Status })
-            };
-
-            _context.AuditLogs.Add(auditLog);
-            await _context.SaveChangesAsync();
-
-            _logger.LogWarning("Document {DocumentId} marked as PendingDeletion", id);
-            return;
-        }
-
-        // Successfully deleted from Upload Service, remove from database
-        _context.DocumentReferences.Remove(document);
-
-        var deleteAuditLog = new AuditLog
+        var auditLog = new AuditLog
         {
             ActorId = actorId,
             ActorType = actorType,
-            Action = AuditAction.Delete,
+            Action = "MarkPendingDeletion",
             EntityType = nameof(DocumentReference),
             EntityId = document.Id.ToString(),
             Timestamp = DateTime.UtcNow,
-            PreviousValues = JsonSerializer.Serialize(new
-            {
-                document.OwnerType,
-                document.OwnerId,
-                document.DocumentType,
-                document.FileReference,
-                document.Filename,
-                document.Status
-            })
+            ChangedFields = JsonSerializer.Serialize(new { Status = DocumentStatus.PendingDeletion }),
+            PreviousValues = JsonSerializer.Serialize(new { Status = oldStatus })
         };
 
-        _context.AuditLogs.Add(deleteAuditLog);
-        await _context.SaveChangesAsync();
+        _context.AuditLogs.Add(auditLog);
+        await _context.SaveChangesAsync(cancellationToken);
 
-        _logger.LogInformation("Document {DocumentId} deleted successfully", id);
+        // Try to delete from Upload Service
+        var deleted = await _uploadServiceClient.DeleteFileAsync(document.FileReference);
+        if (deleted)
+        {
+            _logger.LogInformation("Successfully deleted file {FileReference} from Upload Service, removing local record",
+                document.FileReference);
 
-        // Record metrics
-        _metricsService.RecordDocumentOperation("delete");
+            // Successfully deleted from Upload Service, remove from database
+            _context.DocumentReferences.Remove(document);
+
+            var deleteAuditLog = new AuditLog
+            {
+                ActorId = actorId,
+                ActorType = actorType,
+                Action = AuditAction.Delete,
+                EntityType = nameof(DocumentReference),
+                EntityId = document.Id.ToString(),
+                Timestamp = DateTime.UtcNow,
+                PreviousValues = JsonSerializer.Serialize(new
+                {
+                    document.OwnerType,
+                    document.OwnerId,
+                    document.DocumentType,
+                    document.FileReference,
+                    document.Filename,
+                    document.Status
+                })
+            };
+
+            _context.AuditLogs.Add(deleteAuditLog);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Document {DocumentId} deleted successfully", id);
+
+            // Record metrics
+            _metricsService.RecordDocumentOperation("delete");
+        }
+        else
+        {
+            _logger.LogWarning("Failed to delete file {FileReference} from Upload Service, will retry in background",
+                document.FileReference);
+        }
     }
 
     /// <summary>
     /// Retries deletion of documents marked as PendingDeletion (for background job processing)
     /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Count of successfully deleted documents</returns>
-    public async Task<int> RetryPendingDeletionsAsync()
+    public async Task<int> RetryPendingDeletionsAsync(CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Retrying pending document deletions");
+        _logger.LogDebug("Retrying pending document deletions");
 
         var pendingDeletions = await _context.DocumentReferences
             .Where(d => d.Status == DocumentStatus.PendingDeletion)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         if (pendingDeletions.Count == 0)
         {
-            _logger.LogInformation("No pending deletions found");
+            _logger.LogDebug("No pending deletions found");
             return 0;
         }
 
@@ -409,7 +420,7 @@ public class DocumentService : IDocumentService
 
         if (successCount > 0)
         {
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
         }
 
         _logger.LogInformation("Retried {SuccessCount} out of {TotalCount} pending deletions",

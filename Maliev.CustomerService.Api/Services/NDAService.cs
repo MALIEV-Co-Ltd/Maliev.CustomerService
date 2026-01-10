@@ -35,8 +35,9 @@ public class NDAService : INDAService
     /// <param name="request">NDA creation request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Created NDA response</returns>
-    public async Task<NDAResponse> CreateAsync(CreateNDARequest request, string actorId, string actorType)
+    public async Task<NDAResponse> CreateAsync(CreateNDARequest request, string actorId, string actorType, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Creating NDA for customer {CustomerId} by actor {ActorId} ({ActorType})",
             request.CustomerId, actorId, actorType);
@@ -72,7 +73,7 @@ public class NDAService : INDAService
         };
 
         _context.AuditLogs.Add(auditLog);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("NDA {NDAId} created successfully", nda.Id);
         return nda.ToNDAResponse();
@@ -82,13 +83,14 @@ public class NDAService : INDAService
     /// Retrieves an NDA record by ID
     /// </summary>
     /// <param name="id">NDA ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>NDA response or null if not found</returns>
-    public async Task<NDAResponse?> GetByIdAsync(Guid id)
+    public async Task<NDAResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("Retrieving NDA {NDAId}", id);
 
         var nda = await _context.NDARecords
-            .FirstOrDefaultAsync(n => n.Id == id);
+            .FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
 
         if (nda == null)
         {
@@ -106,16 +108,17 @@ public class NDAService : INDAService
     /// <param name="request">Status update request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Updated NDA response</returns>
     /// <exception cref="KeyNotFoundException">Thrown when NDA is not found</exception>
     /// <exception cref="InvalidOperationException">Thrown when lifecycle transition is invalid or version conflict occurs</exception>
-    public async Task<NDAResponse> UpdateStatusAsync(Guid id, UpdateNDAStatusRequest request, string actorId, string actorType)
+    public async Task<NDAResponse> UpdateStatusAsync(Guid id, UpdateNDAStatusRequest request, string actorId, string actorType, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Updating NDA {NDAId} status to {Status} by actor {ActorId} ({ActorType})",
             id, request.Status, actorId, actorType);
 
         var nda = await _context.NDARecords
-            .FirstOrDefaultAsync(n => n.Id == id);
+            .FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
 
         if (nda == null)
         {
@@ -173,7 +176,7 @@ public class NDAService : INDAService
 
         try
         {
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("NDA {NDAId} status updated successfully to {Status}", id, request.Status);
 
             // Record NDA state transition metric
@@ -182,7 +185,7 @@ public class NDAService : INDAService
         catch (DbUpdateConcurrencyException ex)
         {
             _logger.LogWarning(ex, "Concurrency conflict updating NDA {NDAId}", id);
-            throw new InvalidOperationException("The NDA was modified by another user. Please refresh and try again.");
+            throw new InvalidOperationException("The record was modified by another user. Please refresh and try again.");
         }
 
         return nda.ToNDAResponse();
@@ -191,10 +194,11 @@ public class NDAService : INDAService
     /// <summary>
     /// Checks for expired NDAs and transitions them to Expired status (for background job processing)
     /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Count of NDAs that were expired</returns>
-    public async Task<int> CheckExpiredNDAsAsync()
+    public async Task<int> CheckExpiredNDAsAsync(CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Checking for expired NDAs");
+        _logger.LogDebug("Checking for expired NDAs");
 
         var now = DateTime.UtcNow;
 
@@ -202,11 +206,11 @@ public class NDAService : INDAService
             .Where(n => n.Status == NDAStatus.Signed &&
                        n.ExpiresAt.HasValue &&
                        n.ExpiresAt.Value < now)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         if (expiredNDAs.Count == 0)
         {
-            _logger.LogInformation("No expired NDAs found");
+            _logger.LogDebug("No expired NDAs found");
             return 0;
         }
 
@@ -232,7 +236,7 @@ public class NDAService : INDAService
             _context.AuditLogs.Add(auditLog);
         }
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Expired {Count} NDAs", expiredNDAs.Count);
 

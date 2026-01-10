@@ -13,15 +13,17 @@ public interface INDAService
     /// <param name="request">NDA creation request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Created NDA response</returns>
-    Task<NDAResponse> CreateAsync(CreateNDARequest request, string actorId, string actorType);
+    Task<NDAResponse> CreateAsync(CreateNDARequest request, string actorId, string actorType, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves an NDA record by ID
     /// </summary>
     /// <param name="id">NDA ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>NDA response or null if not found</returns>
-    Task<NDAResponse?> GetByIdAsync(Guid id);
+    Task<NDAResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Updates NDA status with lifecycle validation and audit logging
@@ -30,14 +32,16 @@ public interface INDAService
     /// <param name="request">Status update request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Updated NDA response</returns>
     /// <exception cref="KeyNotFoundException">Thrown when NDA is not found</exception>
     /// <exception cref="InvalidOperationException">Thrown when lifecycle transition is invalid or version conflict occurs</exception>
-    Task<NDAResponse> UpdateStatusAsync(Guid id, UpdateNDAStatusRequest request, string actorId, string actorType);
+    Task<NDAResponse> UpdateStatusAsync(Guid id, UpdateNDAStatusRequest request, string actorId, string actorType, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Checks for expired NDAs and transitions them to Expired status (for background job processing)
     /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Count of NDAs that were expired</returns>
-    Task<int> CheckExpiredNDAsAsync();
+    Task<int> CheckExpiredNDAsAsync(CancellationToken cancellationToken = default);
 }

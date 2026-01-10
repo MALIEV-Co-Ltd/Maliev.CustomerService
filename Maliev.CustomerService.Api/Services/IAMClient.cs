@@ -33,7 +33,12 @@ public class IAMClient : IIAMClient
         {
             var response = await _httpClient.PostAsJsonAsync("/iam/v1/service-accounts", request, cancellationToken);
 
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogError("IAM service returned error: {StatusCode}, Content: {Content}", response.StatusCode, errorContent);
+                throw new HttpRequestException($"IAM service returned {response.StatusCode}: {errorContent}");
+            }
 
             var result = await response.Content.ReadFromJsonAsync<CreatePrincipalResponse>(
                 cancellationToken: cancellationToken);
