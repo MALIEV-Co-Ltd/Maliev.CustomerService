@@ -61,6 +61,10 @@ public class CustomerService : ICustomerService
         _logger.LogInformation("Creating customer with email {Email} by actor {ActorId} ({ActorType})",
             request.Email, actorId, actorType);
 
+        // Race condition for duplicate emails is handled by a unique database constraint
+        // on the Email column (see CustomerConfiguration.cs) and caught by ExceptionHandlingMiddleware.
+        // This application-level check provides a fast-fail for common cases.
+
         // Check for duplicate email (active customers only)
         var existingCustomer = await _context.Customers
             .Where(c => c.Email == request.Email && !c.IsDeleted)

@@ -30,16 +30,14 @@ public static class ClaimsPrincipalExtensions
         // Employee role = Employee actor type, otherwise Customer
         // Updated for GCP-style roles: roles.customer.{role-name}
         var roles = principal.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
-        var isInternal = roles.Any(r =>
-            r.Equals("Employee", StringComparison.OrdinalIgnoreCase) ||
-            r.Equals("Manager", StringComparison.OrdinalIgnoreCase) ||
-            r.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
-            r.Equals("roles.customer.admin", StringComparison.OrdinalIgnoreCase) ||
-            r.Equals("roles.customer.manager", StringComparison.OrdinalIgnoreCase) ||
-            r.Equals("roles.customer.representative", StringComparison.OrdinalIgnoreCase));
+        var internalRoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "Employee", "Manager", "Admin",
+                    "roles.customer.admin", "roles.customer.manager", "roles.customer.representative"
+                };
+        var isInternal = roles.Any(internalRoles.Contains);
 
         var actorType = isInternal ? "Employee" : "Customer";
-
         return (actorId, actorType);
     }
 }
