@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Asp.Versioning;
+using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Addresses;
 using Maliev.CustomerService.Api.Services;
@@ -74,7 +75,7 @@ public class AddressController : ControllerBase
                 return BadRequest(errorResponse);
             }
 
-            var (actorId, actorType) = GetActorInfo();
+            var (actorId, actorType) = User.GetActorInfo();
 
             var address = await _addressService.CreateAsync(request, actorId, actorType);
 
@@ -187,7 +188,7 @@ public class AddressController : ControllerBase
                 return BadRequest(errorResponse);
             }
 
-            var (actorId, actorType) = GetActorInfo();
+            var (actorId, actorType) = User.GetActorInfo();
 
             var address = await _addressService.UpdateAsync(id, request, actorId, actorType);
 
@@ -272,7 +273,7 @@ public class AddressController : ControllerBase
     {
         try
         {
-            var (actorId, actorType) = GetActorInfo();
+            var (actorId, actorType) = User.GetActorInfo();
 
             var deleted = await _addressService.DeleteAsync(id, actorId, actorType);
 
@@ -295,30 +296,5 @@ public class AddressController : ControllerBase
             _logger.LogError(ex, "Error deleting address {AddressId}", id);
             throw;
         }
-    }
-
-    /// <summary>
-    /// Extracts actor information from JWT claims
-    /// </summary>
-    /// <returns>Tuple of (actorId, actorType)</returns>
-    private (string actorId, string actorType) GetActorInfo()
-    {
-        // Extract user ID from JWT claims (typically "sub" claim)
-        var actorId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-            ?? User.FindFirst("sub")?.Value
-            ?? "unknown";
-
-        // Determine actor type from role claims
-        // Employee role = Employee actor type, otherwise Customer
-        var roles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
-        var actorType = roles.Any(r => r.Equals("Employee", StringComparison.OrdinalIgnoreCase) ||
-                                       r.Equals("Manager", StringComparison.OrdinalIgnoreCase) ||
-                                       r.Equals("Admin", StringComparison.OrdinalIgnoreCase))
-            ? "Employee"
-            : "Customer";
-
-        _logger.LogDebug("Actor info: ID={ActorId}, Type={ActorType}", actorId, actorType);
-
-        return (actorId, actorType);
     }
 }

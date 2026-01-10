@@ -53,36 +53,22 @@ public class CustomerService : ICustomerService
     /// <param name="request">Customer creation request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Created customer response</returns>
     /// <exception cref="InvalidOperationException">Thrown when duplicate email is found for active customer</exception>
-    public async Task<CustomerResponse> CreateAsync(CreateCustomerRequest request, string actorId, string actorType)
+    public async Task<CustomerResponse> CreateAsync(CreateCustomerRequest request, string actorId, string actorType, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Creating customer with email {Email} by actor {ActorId} ({ActorType})",
             request.Email, actorId, actorType);
 
-        // Race Condition Handling
-        // =======================
-        // The duplicate email check below is NOT thread-safe. Concurrent requests could both:
-        // 1. Query and find no existing customer with the email
-        // 2. Pass the validation check
-        // 3. Both attempt to insert a customer with the same email
-        //
-        // This is SAFE and HANDLED because:
-        // - Database has a unique constraint on the Email column (see CustomerConfiguration.cs)
-        // - One request will succeed, the other will get a database constraint violation
-        // - ExceptionHandlingMiddleware detects Npgsql.PostgresException (error code 23505)
-        // - Automatically maps to 409 Conflict with "A record with this email already exists"
-        // - This is a rare edge case (requires precise timing of concurrent requests)
-        //
-        // The application-level check below provides fast-fail for the common case,
-        // while the database constraint provides ultimate safety for race conditions.
-        //
-        // Reviewed: 2025-12-26 - Race condition is HANDLED by DB constraint + middleware
+        // Race condition for duplicate emails is handled by a unique database constraint
+        // on the Email column (see CustomerConfiguration.cs) and caught by ExceptionHandlingMiddleware.
+        // This application-level check provides a fast-fail for common cases.
 
         // Check for duplicate email (active customers only)
         var existingCustomer = await _context.Customers
             .Where(c => c.Email == request.Email && !c.IsDeleted)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (existingCustomer != null)
         {
@@ -100,7 +86,7 @@ public class CustomerService : ICustomerService
                 DisplayName = $"{request.FirstName} {request.LastName}",
                 PrincipalType = "user",
                 LinkedService = "CustomerService"
-            });
+            }, cancellationToken);
             principalId = principalResponse.PrincipalId;
         }
         catch (Exception ex)
@@ -160,7 +146,7 @@ public class CustomerService : ICustomerService
 
         try
         {
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("Customer {CustomerId} created successfully", customer.Id);
         }
         catch (Exception ex)
@@ -168,7 +154,7 @@ public class CustomerService : ICustomerService
             _logger.LogError(ex, "Failed to save customer to database. Attempting to delete orphaned IAM principal {PrincipalId}", principalId);
 
             // Compensation: Delete the IAM principal to avoid orphaned identity
-            await _iamClient.DeletePrincipalAsync(principalId);
+            await _iamClient.DeletePrincipalAsync(principalId, cancellationToken);
 
             throw new InvalidOperationException("Failed to create customer due to database error. IAM principal has been cleaned up.", ex);
         }
@@ -200,7 +186,7 @@ public class CustomerService : ICustomerService
                 CompanyId: customer.CompanyId,
                 CreatedAt: new DateTimeOffset(customer.CreatedAt, TimeSpan.Zero)
             )
-        ));
+        ), cancellationToken);
 
         _logger.LogInformation("Published CustomerCreatedEvent for customer {CustomerId}", customer.Id);
 
@@ -211,14 +197,15 @@ public class CustomerService : ICustomerService
     /// Retrieves a customer by ID
     /// </summary>
     /// <param name="id">Customer ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Customer response or null if not found</returns>
-    public async Task<CustomerResponse?> GetByIdAsync(Guid id)
+    public async Task<CustomerResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("Retrieving customer {CustomerId}", id);
 
         var customer = await _context.Customers
             .Where(c => c.Id == id && !c.IsDeleted)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (customer == null)
         {
@@ -254,17 +241,18 @@ public class CustomerService : ICustomerService
     /// <param name="request">Customer update request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Updated customer response</returns>
     /// <exception cref="KeyNotFoundException">Customer not found</exception>
     /// <exception cref="InvalidOperationException">Version conflict or duplicate email</exception>
-    public async Task<CustomerResponse> UpdateAsync(Guid id, UpdateCustomerRequest request, string actorId, string actorType)
+    public async Task<CustomerResponse> UpdateAsync(Guid id, UpdateCustomerRequest request, string actorId, string actorType, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Updating customer {CustomerId} by actor {ActorId} ({ActorType})",
             id, actorId, actorType);
 
         var customer = await _context.Customers
             .Where(c => c.Id == id && !c.IsDeleted)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (customer == null)
         {
@@ -308,7 +296,7 @@ public class CustomerService : ICustomerService
             // Check for duplicate email
             var existingCustomer = await _context.Customers
                 .Where(c => c.Email == request.Email && c.Id != id && !c.IsDeleted)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(cancellationToken);
 
             if (existingCustomer != null)
             {
@@ -390,7 +378,7 @@ public class CustomerService : ICustomerService
 
             try
             {
-                await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync(cancellationToken);
                 _logger.LogInformation("Customer {CustomerId} updated successfully with {FieldCount} field(s)",
                     id, changedFields.Count);
 
@@ -416,7 +404,7 @@ public class CustomerService : ICustomerService
                         ActorType: actorType,
                         UpdatedAt: new DateTimeOffset(customer.UpdatedAt, TimeSpan.Zero)
                     )
-                ));
+                ), cancellationToken);
 
                 _logger.LogInformation("Published CustomerUpdatedEvent for customer {CustomerId}", id);
             }
@@ -440,15 +428,16 @@ public class CustomerService : ICustomerService
     /// <param name="id">Customer ID</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if deleted, false if not found</returns>
-    public async Task<bool> SoftDeleteAsync(Guid id, string actorId, string actorType)
+    public async Task<bool> SoftDeleteAsync(Guid id, string actorId, string actorType, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Soft deleting customer {CustomerId} by actor {ActorId} ({ActorType})",
             id, actorId, actorType);
 
         var customer = await _context.Customers
             .Where(c => c.Id == id && !c.IsDeleted)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (customer == null)
         {
@@ -472,7 +461,7 @@ public class CustomerService : ICustomerService
 
         _context.AuditLogs.Add(auditLog);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Customer {CustomerId} soft deleted successfully", id);
 
@@ -494,7 +483,7 @@ public class CustomerService : ICustomerService
                 ActorType: actorType,
                 DeletedAt: new DateTimeOffset(customer.UpdatedAt, TimeSpan.Zero)
             )
-        ));
+        ), cancellationToken);
 
         _logger.LogInformation("Published CustomerDeletedEvent for customer {CustomerId}", id);
 
@@ -514,6 +503,7 @@ public class CustomerService : ICustomerService
     /// <param name="includeDeleted">Include soft-deleted customers in results</param>
     /// <param name="page">Page number (1-based)</param>
     /// <param name="pageSize">Number of items per page</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Paginated response containing customer list and pagination metadata</returns>
     public async Task<PaginatedResponse<CustomerResponse>> GetAllAsync(
         string? segment = null,
@@ -525,7 +515,8 @@ public class CustomerService : ICustomerService
         DateTime? createdTo = null,
         bool includeDeleted = false,
         int page = 1,
-        int pageSize = 50)
+        int pageSize = 50,
+        CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("Querying customers with filters: segment={Segment}, tier={Tier}, language={Language}, email={Email}, companyId={CompanyId}, page={Page}, pageSize={PageSize}",
             segment, tier, preferredLanguage, email, companyId, page, pageSize);
@@ -559,6 +550,8 @@ public class CustomerService : ICustomerService
         }
 
         // Email partial match using LIKE (T126, T128)
+        // Note: Requires pg_trgm extension and a GIN index in the database:
+        // CREATE INDEX idx_customer_email_trgm ON customers USING gin (email gin_trgm_ops);
         if (!string.IsNullOrEmpty(email))
         {
             query = query.Where(c => EF.Functions.Like(c.Email, $"%{email}%"));
@@ -582,7 +575,7 @@ public class CustomerService : ICustomerService
         }
 
         // Get total count for pagination
-        var totalCount = await query.CountAsync();
+        var totalCount = await query.CountAsync(cancellationToken);
 
         // Calculate pagination
         var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
@@ -593,7 +586,7 @@ public class CustomerService : ICustomerService
             .OrderByDescending(c => c.CreatedAt)
             .Skip(skip)
             .Take(pageSize)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         _logger.LogDebug("Retrieved {Count} customers (page {Page}/{TotalPages}, total {TotalCount})",
             customers.Count, page, totalPages, totalCount);
@@ -613,10 +606,12 @@ public class CustomerService : ICustomerService
     /// </summary>
     /// <param name="page">Page number (1-based)</param>
     /// <param name="pageSize">Number of items per page</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Paginated response containing customer preferences</returns>
     public async Task<PaginatedResponse<GetCustomerPreferencesResponse>> GetPreferencesAsync(
         int page = 1,
-        int pageSize = 100)
+        int pageSize = 100,
+        CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("Querying customer preferences for compliance/audit: page={Page}, pageSize={PageSize}",
             page, pageSize);
@@ -626,7 +621,7 @@ public class CustomerService : ICustomerService
             .AsQueryable();
 
         // Get total count for pagination
-        var totalCount = await query.CountAsync();
+        var totalCount = await query.CountAsync(cancellationToken);
 
         // Calculate pagination
         var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
@@ -637,7 +632,7 @@ public class CustomerService : ICustomerService
             .OrderBy(c => c.Email)
             .Skip(skip)
             .Take(pageSize)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         _logger.LogDebug("Retrieved {Count} customer preferences (page {Page}/{TotalPages}, total {TotalCount})",
             customers.Count, page, totalPages, totalCount);

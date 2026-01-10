@@ -4,75 +4,41 @@ using Maliev.CustomerService.Api.Authorization;
 namespace Maliev.CustomerService.Api.Services;
 
 /// <summary>
-/// Background service that registers Customer Service permissions and roles with IAM.
-/// Uses the standard IAMRegistrationService base class.
+/// Registers Customer Service permissions and roles with IAM via RabbitMQ.
 /// </summary>
 public class CustomerIAMRegistrationService : IAMRegistrationService
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="CustomerIAMRegistrationService"/> class.
     /// </summary>
-    /// <param name="httpClientFactory">Factory for creating HTTP clients.</param>
+    /// <param name="configuration">The application configuration.</param>
     /// <param name="logger">Logger instance.</param>
     public CustomerIAMRegistrationService(
-        IHttpClientFactory httpClientFactory,
+        IConfiguration configuration,
         ILogger<CustomerIAMRegistrationService> logger)
-        : base(httpClientFactory, logger, "customer")
+        : base(configuration, logger, "customer")
     {
     }
 
-    /// <summary>
-    /// Gets all permissions for the Customer Service.
-    /// </summary>
-    /// <returns>Collection of permission registrations.</returns>
+    /// <inheritdoc />
     protected override IEnumerable<PermissionRegistration> GetPermissions()
     {
-        return CustomerPermissions.All.Select(p => new PermissionRegistration
+        return CustomerPermissions.AllWithDescriptions.Select(p => new PermissionRegistration
         {
-            PermissionId = p,
-            Description = GetPermissionDescription(p)
+            PermissionId = p.Key,
+            Description = p.Value
         });
     }
 
-    /// <summary>
-    /// Gets all predefined roles for the Customer Service.
-    /// </summary>
-    /// <returns>Collection of role registrations.</returns>
-    protected override IEnumerable<Maliev.Aspire.ServiceDefaults.IAM.RoleRegistration> GetPredefinedRoles()
+    /// <inheritdoc />
+    protected override IEnumerable<RoleRegistration> GetPredefinedRoles()
     {
-        return CustomerPredefinedRoles.All.Select(r => new Maliev.Aspire.ServiceDefaults.IAM.RoleRegistration
+        return CustomerPredefinedRoles.All.Select(r => new RoleRegistration
         {
             RoleId = r.RoleId,
             Description = r.Description,
             PermissionIds = r.Permissions.ToList(),
             IsCustom = false
         });
-    }
-
-    private static string GetPermissionDescription(string permission)
-    {
-        return permission switch
-        {
-            CustomerPermissions.CustomersCreate => "Create new customers",
-            CustomerPermissions.CustomersRead => "Read customer information",
-            CustomerPermissions.CustomersUpdate => "Update customer information",
-            CustomerPermissions.CustomersDelete => "Delete customers",
-            CustomerPermissions.CustomersList => "List all customers",
-            CustomerPermissions.CustomersSearch => "Search customers",
-            CustomerPermissions.CompaniesManage => "Manage company information",
-            CustomerPermissions.AddressesManage => "Manage customer addresses",
-            CustomerPermissions.DocumentsCreate => "Create customer documents",
-            CustomerPermissions.DocumentsRead => "Read customer documents",
-            CustomerPermissions.DocumentsDelete => "Delete customer documents",
-            CustomerPermissions.NotesCreate => "Create internal notes",
-            CustomerPermissions.NotesRead => "Read internal notes",
-            CustomerPermissions.NotesUpdate => "Update internal notes",
-            CustomerPermissions.NotesDelete => "Delete internal notes",
-            CustomerPermissions.NdasCreate => "Create NDAs",
-            CustomerPermissions.NdasRead => "Read NDAs",
-            CustomerPermissions.NdasUpdate => "Update NDAs",
-            CustomerPermissions.NdasDelete => "Delete NDAs",
-            _ => $"Permission: {permission}"
-        };
     }
 }

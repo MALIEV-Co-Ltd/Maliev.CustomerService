@@ -5,11 +5,16 @@ namespace Maliev.CustomerService.Data.Models;
 /// </summary>
 public static class NDAStatus
 {
+    /// <summary>NDA is in draft.</summary>
     public const string Draft = "Draft";
+    /// <summary>NDA is signed.</summary>
     public const string Signed = "Signed";
+    /// <summary>NDA is expired.</summary>
     public const string Expired = "Expired";
+    /// <summary>NDA is revoked.</summary>
     public const string Revoked = "Revoked";
 
+    /// <summary>All NDA statuses.</summary>
     public static readonly string[] All = { Draft, Signed, Expired, Revoked };
 
     /// <summary>

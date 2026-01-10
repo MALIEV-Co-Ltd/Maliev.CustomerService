@@ -57,15 +57,33 @@ public static class CustomerPermissions
     public const string NdasDelete = "customer.ndas.delete";
 
     /// <summary>
+    /// Collection of all defined customer permissions with descriptions.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> AllWithDescriptions = new Dictionary<string, string>
+    {
+        { CustomersCreate, "Create new customers" },
+        { CustomersRead, "Read customer information" },
+        { CustomersUpdate, "Update customer information" },
+        { CustomersDelete, "Delete customers" },
+        { CustomersList, "List all customers" },
+        { CustomersSearch, "Search customers" },
+        { CompaniesManage, "Manage company information" },
+        { AddressesManage, "Manage customer addresses" },
+        { DocumentsCreate, "Create customer documents" },
+        { DocumentsRead, "Read customer documents" },
+        { DocumentsDelete, "Delete customer documents" },
+        { NotesCreate, "Create internal notes" },
+        { NotesRead, "Read internal notes" },
+        { NotesUpdate, "Update internal notes" },
+        { NotesDelete, "Delete internal notes" },
+        { NdasCreate, "Create NDAs" },
+        { NdasRead, "Read NDAs" },
+        { NdasUpdate, "Update NDAs" },
+        { NdasDelete, "Delete NDAs" }
+    };
+
+    /// <summary>
     /// All permissions defined for the Customer Service.
     /// </summary>
-    public static readonly string[] All = new[]
-    {
-        CustomersCreate, CustomersRead, CustomersUpdate, CustomersDelete, CustomersList, CustomersSearch,
-        CompaniesManage,
-        AddressesManage,
-        DocumentsCreate, DocumentsRead, DocumentsDelete,
-        NotesCreate, NotesRead, NotesUpdate, NotesDelete,
-        NdasCreate, NdasRead, NdasUpdate, NdasDelete
-    };
+    public static readonly string[] All = AllWithDescriptions.Keys.ToArray();
 }

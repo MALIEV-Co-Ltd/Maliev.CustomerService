@@ -5,6 +5,7 @@ using Maliev.CustomerService.Data.Models;
 using Maliev.CustomerService.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -27,7 +28,7 @@ public class DocumentServiceTests
         _fixture = fixture;
         _mockUploadServiceClient = new Mock<IUploadServiceClient>();
         _mockLogger = new Mock<ILogger<DocumentService>>();
-        _mockMetricsService = new Mock<MetricsService>(MockBehavior.Loose, new object[] { Mock.Of<IConfiguration>() });
+        _mockMetricsService = new Mock<MetricsService>(MockBehavior.Loose, new object[] { Mock.Of<IHostEnvironment>() });
     }
 
     private DocumentService CreateService()
@@ -514,8 +515,12 @@ public class DocumentServiceTests
             .OrderBy(a => a.Timestamp)
             .ToListAsync();
 
-        Assert.Equal(2, auditLogs.Count); // Create + Delete
-        var deleteAudit = auditLogs[1];
+        Assert.Equal(3, auditLogs.Count); // Create + MarkPendingDeletion + Delete
+        var markAudit = auditLogs[1];
+        Assert.Equal("admin-999", markAudit.ActorId);
+        Assert.Equal("MarkPendingDeletion", markAudit.Action);
+
+        var deleteAudit = auditLogs[2];
         Assert.Equal("admin-999", deleteAudit.ActorId);
         Assert.Equal("Admin", deleteAudit.ActorType);
         Assert.Equal(AuditAction.Delete, deleteAudit.Action);

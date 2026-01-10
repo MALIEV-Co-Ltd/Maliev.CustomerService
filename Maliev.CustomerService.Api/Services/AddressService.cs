@@ -39,9 +39,10 @@ public class AddressService : IAddressService
     /// <param name="request">Address creation request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Created address response</returns>
     /// <exception cref="InvalidOperationException">Country Service unavailable or invalid country ID</exception>
-    public async Task<AddressResponse> CreateAsync(CreateAddressRequest request, string actorId, string actorType)
+    public async Task<AddressResponse> CreateAsync(CreateAddressRequest request, string actorId, string actorType, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Creating address for {OwnerType} {OwnerId} by actor {ActorId} ({ActorType})",
             request.OwnerType, request.OwnerId, actorId, actorType);
@@ -107,7 +108,7 @@ public class AddressService : IAddressService
 
         _context.AuditLogs.Add(auditLog);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Address {AddressId} created successfully", address.Id);
 
@@ -119,8 +120,9 @@ public class AddressService : IAddressService
     /// </summary>
     /// <param name="ownerType">Type of owner (Customer or Company)</param>
     /// <param name="ownerId">Owner ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>List of addresses</returns>
-    public async Task<List<AddressResponse>> GetByOwnerAsync(string ownerType, Guid ownerId)
+    public async Task<List<AddressResponse>> GetByOwnerAsync(string ownerType, Guid ownerId, CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("Retrieving addresses for {OwnerType} {OwnerId}", ownerType, ownerId);
 
@@ -128,7 +130,7 @@ public class AddressService : IAddressService
             .Where(a => a.OwnerType == ownerType && a.OwnerId == ownerId)
             .OrderBy(a => a.Type)
             .ThenBy(a => a.CreatedAt)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         _logger.LogDebug("Found {Count} addresses for {OwnerType} {OwnerId}",
             addresses.Count, ownerType, ownerId);
@@ -143,16 +145,17 @@ public class AddressService : IAddressService
     /// <param name="request">Address update request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Updated address response</returns>
     /// <exception cref="KeyNotFoundException">Address not found</exception>
     /// <exception cref="InvalidOperationException">Country Service unavailable or invalid country ID, or version conflict</exception>
-    public async Task<AddressResponse> UpdateAsync(Guid id, UpdateAddressRequest request, string actorId, string actorType)
+    public async Task<AddressResponse> UpdateAsync(Guid id, UpdateAddressRequest request, string actorId, string actorType, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Updating address {AddressId} by actor {ActorId} ({ActorType})",
             id, actorId, actorType);
 
         var address = await _context.Addresses
-            .FirstOrDefaultAsync(a => a.Id == id);
+            .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
         if (address == null)
         {
@@ -260,7 +263,7 @@ public class AddressService : IAddressService
 
             try
             {
-                await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync(cancellationToken);
                 _logger.LogInformation("Address {AddressId} updated successfully with {FieldCount} field(s)",
                     id, changedFields.Count);
             }
@@ -284,14 +287,15 @@ public class AddressService : IAddressService
     /// <param name="id">Address ID</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if deleted, false if not found</returns>
-    public async Task<bool> DeleteAsync(Guid id, string actorId, string actorType)
+    public async Task<bool> DeleteAsync(Guid id, string actorId, string actorType, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Deleting address {AddressId} by actor {ActorId} ({ActorType})",
             id, actorId, actorType);
 
         var address = await _context.Addresses
-            .FirstOrDefaultAsync(a => a.Id == id);
+            .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
         if (address == null)
         {
@@ -326,7 +330,7 @@ public class AddressService : IAddressService
 
         _context.AuditLogs.Add(auditLog);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Address {AddressId} deleted successfully", id);
 

@@ -110,11 +110,16 @@ public class Customer
 /// </summary>
 public static class CustomerSegment
 {
+    /// <summary>Retail segment.</summary>
     public const string Retail = "Retail";
+    /// <summary>Wholesale segment.</summary>
     public const string Wholesale = "Wholesale";
+    /// <summary>Enterprise segment.</summary>
     public const string Enterprise = "Enterprise";
+    /// <summary>Government segment.</summary>
     public const string Government = "Government";
 
+    /// <summary>All customer segments.</summary>
     public static readonly string[] All = { Retail, Wholesale, Enterprise, Government };
 }
 
@@ -123,11 +128,17 @@ public static class CustomerSegment
 /// </summary>
 public static class CustomerTier
 {
+    /// <summary>Bronze tier.</summary>
     public const string Bronze = "Bronze";
+    /// <summary>Silver tier.</summary>
     public const string Silver = "Silver";
+    /// <summary>Gold tier.</summary>
     public const string Gold = "Gold";
+    /// <summary>Platinum tier.</summary>
     public const string Platinum = "Platinum";
+    /// <summary>VIP tier.</summary>
     public const string VIP = "VIP";
 
+    /// <summary>All customer tiers.</summary>
     public static readonly string[] All = { Bronze, Silver, Gold, Platinum, VIP };
 }

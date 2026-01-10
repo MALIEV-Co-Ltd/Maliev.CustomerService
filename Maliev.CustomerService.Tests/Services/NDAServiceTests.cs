@@ -4,6 +4,7 @@ using Maliev.CustomerService.Data.Models;
 using Maliev.CustomerService.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -24,7 +25,7 @@ public class NDAServiceTests
     {
         _fixture = fixture;
         _mockLogger = new Mock<ILogger<NDAService>>();
-        _mockMetricsService = new Mock<MetricsService>(MockBehavior.Loose, new object[] { Mock.Of<IConfiguration>() });
+        _mockMetricsService = new Mock<MetricsService>(MockBehavior.Loose, new object[] { Mock.Of<IHostEnvironment>() });
     }
 
     private NDAService CreateService()

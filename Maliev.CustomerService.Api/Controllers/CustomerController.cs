@@ -40,6 +40,7 @@ public class CustomerController : ControllerBase
     /// Creates a new customer
     /// </summary>
     /// <param name="request">Customer creation request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Created customer response</returns>
     /// <response code="201">Customer created successfully</response>
     /// <response code="400">Invalid request data</response>
@@ -52,7 +53,7 @@ public class CustomerController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status422UnprocessableEntity)]
-    public async Task<ActionResult<CustomerResponse>> Create([FromBody] CreateCustomerRequest request)
+    public async Task<ActionResult<CustomerResponse>> Create([FromBody] CreateCustomerRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -78,9 +79,9 @@ public class CustomerController : ControllerBase
                 return BadRequest(errorResponse);
             }
 
-            var (actorId, actorType) = GetActorInfo();
+            var (actorId, actorType) = User.GetActorInfo();
 
-            var customer = await _customerService.CreateAsync(request, actorId, actorType);
+            var customer = await _customerService.CreateAsync(request, actorId, actorType, cancellationToken);
 
             return CreatedAtAction(nameof(GetById), new { id = customer.Id }, customer);
         }
@@ -117,6 +118,7 @@ public class CustomerController : ControllerBase
     /// Retrieves a customer by ID
     /// </summary>
     /// <param name="id">Customer ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Customer response</returns>
     /// <response code="200">Customer found</response>
     /// <response code="401">Unauthorized</response>
@@ -125,11 +127,11 @@ public class CustomerController : ControllerBase
     [ProducesResponseType(typeof(CustomerResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<CustomerResponse>> GetById(Guid id)
+    public async Task<ActionResult<CustomerResponse>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
         try
         {
-            var customer = await _customerService.GetByIdAsync(id);
+            var customer = await _customerService.GetByIdAsync(id, cancellationToken);
 
             if (customer == null)
             {
@@ -156,6 +158,7 @@ public class CustomerController : ControllerBase
     /// Retrieves a customer by their central IAM Principal ID
     /// </summary>
     /// <param name="principalId">The IAM Principal ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Customer response</returns>
     /// <response code="200">Customer found</response>
     /// <response code="401">Unauthorized</response>
@@ -167,11 +170,11 @@ public class CustomerController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<CustomerResponse>> GetByPrincipalId(Guid principalId)
+    public async Task<ActionResult<CustomerResponse>> GetByPrincipalId(Guid principalId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var customer = await _customerService.GetByPrincipalIdAsync(principalId);
+            var customer = await _customerService.GetByPrincipalIdAsync(principalId, cancellationToken);
 
             if (customer == null)
             {
@@ -199,6 +202,7 @@ public class CustomerController : ControllerBase
     /// </summary>
     /// <param name="id">Customer ID</param>
     /// <param name="request">Customer update request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Updated customer response</returns>
     /// <response code="200">Customer updated successfully</response>
     /// <response code="400">Invalid request data</response>
@@ -213,7 +217,7 @@ public class CustomerController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status422UnprocessableEntity)]
-    public async Task<ActionResult<CustomerResponse>> Update(Guid id, [FromBody] UpdateCustomerRequest request)
+    public async Task<ActionResult<CustomerResponse>> Update(Guid id, [FromBody] UpdateCustomerRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -239,9 +243,9 @@ public class CustomerController : ControllerBase
                 return BadRequest(errorResponse);
             }
 
-            var (actorId, actorType) = GetActorInfo();
+            var (actorId, actorType) = User.GetActorInfo();
 
-            var customer = await _customerService.UpdateAsync(id, request, actorId, actorType);
+            var customer = await _customerService.UpdateAsync(id, request, actorId, actorType, cancellationToken);
 
             return Ok(customer);
         }
@@ -323,7 +327,8 @@ public class CustomerController : ControllerBase
         [FromQuery] DateTime? createdTo = null,
         [FromQuery] bool includeDeleted = false,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 50)
+        [FromQuery] int pageSize = 50,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -340,7 +345,8 @@ public class CustomerController : ControllerBase
                 createdTo,
                 includeDeleted,
                 page,
-                pageSize);
+                pageSize,
+                cancellationToken);
 
             return Ok(result);
         }
@@ -359,14 +365,15 @@ public class CustomerController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetPreferences(
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 100)
+        [FromQuery] int pageSize = 100,
+        CancellationToken cancellationToken = default)
     {
         try
         {
             _logger.LogInformation("Getting customer preferences for compliance/audit: page={Page}, pageSize={PageSize}",
                 page, pageSize);
 
-            var result = await _customerService.GetPreferencesAsync(page, pageSize);
+            var result = await _customerService.GetPreferencesAsync(page, pageSize, cancellationToken);
 
             return Ok(result);
         }
@@ -381,6 +388,7 @@ public class CustomerController : ControllerBase
     /// Soft deletes a customer
     /// </summary>
     /// <param name="id">Customer ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>No content on success</returns>
     /// <response code="204">Customer deleted successfully</response>
     /// <response code="401">Unauthorized</response>
@@ -389,13 +397,13 @@ public class CustomerController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         try
         {
-            var (actorId, actorType) = GetActorInfo();
+            var (actorId, actorType) = User.GetActorInfo();
 
-            var deleted = await _customerService.SoftDeleteAsync(id, actorId, actorType);
+            var deleted = await _customerService.SoftDeleteAsync(id, actorId, actorType, cancellationToken);
 
             if (!deleted)
             {
@@ -416,34 +424,5 @@ public class CustomerController : ControllerBase
             _logger.LogError(ex, "Error deleting customer {CustomerId}", id);
             throw;
         }
-    }
-
-    /// <summary>
-    /// Extracts actor information from JWT claims
-    /// </summary>
-    /// <returns>Tuple of (actorId, actorType)</returns>
-    private (string actorId, string actorType) GetActorInfo()
-    {
-        // Extract user ID from JWT claims (typically "sub" claim)
-        var actorId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-            ?? User.FindFirst("sub")?.Value
-            ?? "unknown";
-
-        // Determine actor type from role claims
-        // Employee role = Employee actor type, otherwise Customer
-        // Updated for GCP-style roles: roles.customer.{role-name}
-        var roles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
-        var actorType = roles.Any(r => r.Equals("Employee", StringComparison.OrdinalIgnoreCase) ||
-                                       r.Equals("Manager", StringComparison.OrdinalIgnoreCase) ||
-                                       r.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
-                                       r.Equals("roles.customer.admin", StringComparison.OrdinalIgnoreCase) ||
-                                       r.Equals("roles.customer.manager", StringComparison.OrdinalIgnoreCase) ||
-                                       r.Equals("roles.customer.representative", StringComparison.OrdinalIgnoreCase))
-            ? "Employee"
-            : "Customer";
-
-        _logger.LogDebug("Actor info: ID={ActorId}, Type={ActorType}", actorId, actorType);
-
-        return (actorId, actorType);
     }
 }

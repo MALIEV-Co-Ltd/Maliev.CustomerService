@@ -13,15 +13,17 @@ public interface ICustomerService
     /// <param name="request">Customer creation request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Created customer response</returns>
-    Task<CustomerResponse> CreateAsync(CreateCustomerRequest request, string actorId, string actorType);
+    Task<CustomerResponse> CreateAsync(CreateCustomerRequest request, string actorId, string actorType, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves a customer by ID
     /// </summary>
     /// <param name="id">Customer ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Customer response or null if not found</returns>
-    Task<CustomerResponse?> GetByIdAsync(Guid id);
+    Task<CustomerResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves a customer by their central IAM Principal ID
@@ -38,10 +40,11 @@ public interface ICustomerService
     /// <param name="request">Customer update request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Updated customer response</returns>
     /// <exception cref="KeyNotFoundException">Customer not found</exception>
     /// <exception cref="InvalidOperationException">Version conflict</exception>
-    Task<CustomerResponse> UpdateAsync(Guid id, UpdateCustomerRequest request, string actorId, string actorType);
+    Task<CustomerResponse> UpdateAsync(Guid id, UpdateCustomerRequest request, string actorId, string actorType, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Soft deletes a customer with audit logging
@@ -49,8 +52,9 @@ public interface ICustomerService
     /// <param name="id">Customer ID</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if deleted, false if not found</returns>
-    Task<bool> SoftDeleteAsync(Guid id, string actorId, string actorType);
+    Task<bool> SoftDeleteAsync(Guid id, string actorId, string actorType, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets all customers with optional filtering and pagination (T119-T120, T126-T127)
@@ -65,12 +69,14 @@ public interface ICustomerService
         DateTime? createdTo = null,
         bool includeDeleted = false,
         int page = 1,
-        int pageSize = 50);
+        int pageSize = 50,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets customer preferences for compliance/audit purposes (T123)
     /// </summary>
     Task<PaginatedResponse<GetCustomerPreferencesResponse>> GetPreferencesAsync(
         int page = 1,
-        int pageSize = 100);
+        int pageSize = 100,
+        CancellationToken cancellationToken = default);
 }

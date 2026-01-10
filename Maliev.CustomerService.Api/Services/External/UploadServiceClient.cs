@@ -63,11 +63,6 @@ public class UploadServiceClient : IUploadServiceClient
             _logger.LogError(ex, "Timeout validating file reference {FileReference} with Upload Service", fileReference);
             return false;
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Unexpected error validating file reference {FileReference} with Upload Service", fileReference);
-            return false;
-        }
     }
 
     /// <summary>
@@ -104,11 +99,6 @@ public class UploadServiceClient : IUploadServiceClient
         catch (TaskCanceledException ex)
         {
             _logger.LogError(ex, "Timeout deleting file reference {FileReference} from Upload Service", fileReference);
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Unexpected error deleting file reference {FileReference} from Upload Service", fileReference);
             return false;
         }
     }

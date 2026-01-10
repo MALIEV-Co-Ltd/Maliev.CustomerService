@@ -14,16 +14,18 @@ public interface ICompanyService
     /// <param name="request">Company creation request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Created company response</returns>
     /// <exception cref="InvalidOperationException">Thrown when VAT number format is invalid</exception>
-    Task<CompanyResponse> CreateAsync(CreateCompanyRequest request, string actorId, string actorType);
+    Task<CompanyResponse> CreateAsync(CreateCompanyRequest request, string actorId, string actorType, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves a company by ID
     /// </summary>
     /// <param name="id">Company ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Company response or null if not found</returns>
-    Task<CompanyResponse?> GetByIdAsync(Guid id);
+    Task<CompanyResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Updates an existing company with optimistic concurrency control and audit logging
@@ -32,17 +34,19 @@ public interface ICompanyService
     /// <param name="request">Company update request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Updated company response</returns>
     /// <exception cref="KeyNotFoundException">Thrown when company is not found</exception>
     /// <exception cref="InvalidOperationException">Thrown when VAT number format is invalid or version conflict occurs</exception>
-    Task<CompanyResponse> UpdateAsync(Guid id, UpdateCompanyRequest request, string actorId, string actorType);
+    Task<CompanyResponse> UpdateAsync(Guid id, UpdateCompanyRequest request, string actorId, string actorType, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves a company with its associated active customers
     /// </summary>
     /// <param name="id">Company ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Tuple containing company response and list of associated customer responses, or null if company not found</returns>
-    Task<(CompanyResponse Company, List<CustomerResponse> Customers)?> GetWithCustomersAsync(Guid id);
+    Task<(CompanyResponse Company, List<CustomerResponse> Customers)?> GetWithCustomersAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves all companies with pagination and optional filtering by segment and tier
@@ -51,6 +55,7 @@ public interface ICompanyService
     /// <param name="pageSize">Number of items per page</param>
     /// <param name="segment">Optional segment filter</param>
     /// <param name="tier">Optional tier filter</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Tuple containing list of company responses and total count</returns>
-    Task<(List<CompanyResponse> Companies, int TotalCount)> GetAllAsync(int page, int pageSize, string? segment = null, string? tier = null);
+    Task<(List<CompanyResponse> Companies, int TotalCount)> GetAllAsync(int page, int pageSize, string? segment = null, string? tier = null, CancellationToken cancellationToken = default);
 }
