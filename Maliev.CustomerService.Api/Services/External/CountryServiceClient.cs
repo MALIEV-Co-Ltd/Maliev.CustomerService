@@ -94,15 +94,17 @@ public class CountryServiceClient : ICountryServiceClient
 
             var isValid = response.StatusCode == HttpStatusCode.OK;
 
-            // Cache valid results for 24 hours
+            // Cache both valid and invalid results to prevent downstream spam
+            var expiration = isValid ? CacheExpiration : TimeSpan.FromMinutes(10);
+            _cache.Set(cacheKey, isValid, expiration);
+
             if (isValid)
             {
-                _cache.Set(cacheKey, true, CacheExpiration);
                 _logger.LogInformation("Country ID {CountryId} validated successfully and cached", countryId);
             }
             else if (response.StatusCode == HttpStatusCode.NotFound)
             {
-                _logger.LogWarning("Country ID {CountryId} not found in Country Service", countryId);
+                _logger.LogWarning("Country ID {CountryId} not found in Country Service, result cached for 10m", countryId);
             }
             else
             {

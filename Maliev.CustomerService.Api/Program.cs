@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 using Maliev.Aspire.ServiceDefaults;
+using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
 
@@ -63,15 +64,12 @@ builder.AddServiceClient<Maliev.CustomerService.Api.Services.External.IUploadSer
 // IAM Service Client
 builder.AddServiceClient<Maliev.CustomerService.Api.Services.IIAMClient, Maliev.CustomerService.Api.Services.IAMClient>("IAM");
 
-// IAM Service HttpClient for registration service
-builder.AddServiceClient("IAMService");
-
 // IAM Registration Service
-builder.Services.AddIAMRegistration<Maliev.CustomerService.Api.Services.CustomerIAMRegistrationService>();
+builder.AddIAMServiceClient("customer");
+builder.Services.AddIAMRegistration<CustomerIAMRegistrationService>("customer");
 
 // Controllers
 builder.Services.AddControllers()
-    .AddApplicationPart(typeof(Maliev.CustomerService.Api.Program).Assembly)
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
@@ -87,17 +85,18 @@ builder.Services.AddAuthorization(options =>
 // Rate Limiting
 builder.Services.AddRateLimiter(options =>
 {
-    options.AddPolicy("sliding-validation-policy", context =>
+    options.AddPolicy("fixed-validation-policy", context =>
     {
         // Use an extremely aggressive rate limit for test environment to ensure it triggers
         // The X-Test-ID header should make each test run use a separate rate limit counter
         var testId = context.Request.Headers["X-Test-ID"].FirstOrDefault();
         var key = !string.IsNullOrEmpty(testId) ? testId : context.Connection.RemoteIpAddress?.ToString() ?? "default-rate-limit-key";
 
+        var limit = builder.Environment.IsDevelopment() ? 3 : 100;
         return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 3, // Allow only 3 requests
-            Window = TimeSpan.FromSeconds(1), // Per second
+            PermitLimit = limit,
+            Window = TimeSpan.FromSeconds(1),
             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             QueueLimit = 0
         });
@@ -149,7 +148,10 @@ Maliev.CustomerService.Api.Program.Log.MetricsInitialized(logger);
 
 // Middleware Pipeline
 app.UseStandardMiddleware();
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseRouting();
 app.UseCors();

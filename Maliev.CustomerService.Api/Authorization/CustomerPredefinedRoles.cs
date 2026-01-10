@@ -1,21 +1,5 @@
 namespace Maliev.CustomerService.Api.Authorization;
 
-/// <summary>Represents a role registration request for the IAM service.</summary>
-public record RoleRegistration
-{
-    /// <summary>The unique identifier for the role (GCP format: roles.{service}.{role-name}).</summary>
-    public required string RoleId { get; init; }
-
-    /// <summary>The display name of the role.</summary>
-    public required string RoleName { get; init; }
-
-    /// <summary>A description of the role's purpose.</summary>
-    public required string Description { get; init; }
-
-    /// <summary>The list of permissions assigned to this role.</summary>
-    public required string[] Permissions { get; init; }
-}
-
 /// <summary>
 /// Defines predefined roles for the Customer Service.
 /// Roles follow the GCP format: roles.{service}.{role-name}
@@ -23,21 +7,22 @@ public record RoleRegistration
 public static class CustomerPredefinedRoles
 {
     /// <summary>Full access to all customer operations.</summary>
-    public static readonly RoleRegistration Admin = new()
-    {
-        RoleId = "roles.customer.admin",
-        RoleName = "Customer Administrator",
-        Description = "Full access to all customer operations",
-        Permissions = CustomerPermissions.All
-    };
+    public const string Admin = "roles.customer.admin";
+    /// <summary>Manage customers, companies, and addresses.</summary>
+    public const string Manager = "roles.customer.manager";
+    /// <summary>Create and update customer data, view documents and notes.</summary>
+    public const string Representative = "roles.customer.representative";
+    /// <summary>Read-only access to customer data.</summary>
+    public const string Viewer = "roles.customer.viewer";
 
-    /// <summary>Manage customers, companies, addresses (no document/note deletion).</summary>
-    public static readonly RoleRegistration Manager = new()
+    /// <summary>
+    /// Collection of all predefined roles for the Customer Service.
+    /// </summary>
+    public static readonly IReadOnlyList<(string RoleId, string Description, string[] Permissions)> All = new List<(string, string, string[])>
     {
-        RoleId = "roles.customer.manager",
-        RoleName = "Customer Manager",
-        Description = "Manage customers, companies, and addresses",
-        Permissions = new[]
+        (Admin, "Full access to all customer operations", CustomerPermissions.All),
+
+        (Manager, "Manage customers, companies, and addresses", new[]
         {
             CustomerPermissions.CustomersCreate,
             CustomerPermissions.CustomersRead,
@@ -49,25 +34,15 @@ public static class CustomerPredefinedRoles
             CustomerPermissions.AddressesManage,
             CustomerPermissions.DocumentsCreate,
             CustomerPermissions.DocumentsRead,
-            // No DocumentsDelete permission
             CustomerPermissions.NotesCreate,
             CustomerPermissions.NotesRead,
             CustomerPermissions.NotesUpdate,
-            // No NotesDelete permission
             CustomerPermissions.NdasCreate,
             CustomerPermissions.NdasRead,
             CustomerPermissions.NdasUpdate
-            // No NdasDelete permission
-        }
-    };
+        }),
 
-    /// <summary>Create/update customers, view documents/notes.</summary>
-    public static readonly RoleRegistration Representative = new()
-    {
-        RoleId = "roles.customer.representative",
-        RoleName = "Customer Representative",
-        Description = "Create and update customer data, view documents and notes",
-        Permissions = new[]
+        (Representative, "Create and update customer data, view documents and notes", new[]
         {
             CustomerPermissions.CustomersCreate,
             CustomerPermissions.CustomersRead,
@@ -77,16 +52,9 @@ public static class CustomerPredefinedRoles
             CustomerPermissions.DocumentsRead,
             CustomerPermissions.NotesRead,
             CustomerPermissions.NdasRead
-        }
-    };
+        }),
 
-    /// <summary>Read-only access to customer data.</summary>
-    public static readonly RoleRegistration Viewer = new()
-    {
-        RoleId = "roles.customer.viewer",
-        RoleName = "Customer Viewer",
-        Description = "Read-only access to customer data",
-        Permissions = new[]
+        (Viewer, "Read-only access to customer data", new[]
         {
             CustomerPermissions.CustomersRead,
             CustomerPermissions.CustomersList,
@@ -94,12 +62,6 @@ public static class CustomerPredefinedRoles
             CustomerPermissions.DocumentsRead,
             CustomerPermissions.NotesRead,
             CustomerPermissions.NdasRead
-        }
-    };
-
-    /// <summary>All predefined roles.</summary>
-    public static readonly RoleRegistration[] All = new[]
-    {
-        Admin, Manager, Representative, Viewer
+        })
     };
 }
