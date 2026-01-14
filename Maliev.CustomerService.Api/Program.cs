@@ -3,175 +3,193 @@ using Maliev.Aspire.ServiceDefaults;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
+using Microsoft.Extensions.Logging;
 
-var builder = WebApplication.CreateBuilder(args);
+// Initialize bootstrap logging
+using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
+var bootstrapLogger = loggerFactory.CreateLogger("Program");
 
-// --- Secrets & Configuration ---
-builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if available
-
-// --- Infrastructure & Observability ---
-builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
-builder.AddStandardMiddleware(options =>
+try
 {
-    options.EnableRequestLogging = true;
-});
-builder.AddServiceMeters("customers-meter"); // Register service meters for OpenTelemetry business metrics
+    bootstrapLogger.LogInformation("Starting Customer Service host");
 
-builder.AddRedisDistributedCache(instanceName: "customer:");
-builder.AddMassTransitWithRabbitMq(configure: x =>
-{
-    x.AddConsumer<Maliev.CustomerService.Api.Consumers.GetCustomerDetailsConsumer>();
-    x.AddConsumer<Maliev.CustomerService.Api.Consumers.FileDeletedEventConsumer>();
-}); // RabbitMQ message bus (non-blocking startup)
-builder.AddPostgresDbContext<CustomerDbContext>(connectionName: "CustomerDbContext"); // PostgreSQL with retry logic
+    var builder = WebApplication.CreateBuilder(args);
 
-// --- API Configuration ---
-builder.AddDefaultCors(); // CORS from CORS:AllowedOrigins config
-builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
+    // --- Secrets & Configuration ---
+    builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if available
 
-// JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
-builder.AddJwtAuthentication();
-
-// Add OpenAPI (must be in Program.cs for XML comments to work via source generator)
-builder.AddStandardOpenApi(
-    title: "MALIEV Customer Service API",
-    description: "Comprehensive customer management service. Handles individual and corporate customer profiles, address books, NDA tracking, document management, and customer lifecycle status.");
-
-builder.Services.AddSingleton<Maliev.CustomerService.Api.Services.MetricsService>();
-
-// Application Services
-builder.Services.AddScoped<Maliev.CustomerService.Api.Services.ICustomerService, Maliev.CustomerService.Api.Services.CustomerService>();
-builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IAddressService, Maliev.CustomerService.Api.Services.AddressService>();
-builder.Services.AddScoped<Maliev.CustomerService.Api.Services.ICompanyService, Maliev.CustomerService.Api.Services.CompanyService>();
-builder.Services.AddScoped<Maliev.CustomerService.Api.Services.INDAService, Maliev.CustomerService.Api.Services.NDAService>();
-builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IDocumentService, Maliev.CustomerService.Api.Services.DocumentService>();
-builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IInternalNoteService, Maliev.CustomerService.Api.Services.InternalNoteService>();
-
-// Scripts
-builder.Services.AddScoped<Maliev.CustomerService.Api.Scripts.MigrateToPrincipalsScript>();
-
-// Background Services
-builder.Services.AddHostedService<Maliev.CustomerService.Api.BackgroundServices.NDAExpirationBackgroundService>();
-builder.Services.AddHostedService<Maliev.CustomerService.Api.BackgroundServices.DocumentDeletionRetryBackgroundService>();
-
-// External Service Clients
-builder.AddServiceClient<Maliev.CustomerService.Api.Services.External.ICountryServiceClient,
-    Maliev.CustomerService.Api.Services.External.CountryServiceClient>("CountryService");
-
-builder.AddServiceClient<Maliev.CustomerService.Api.Services.External.IUploadServiceClient,
-    Maliev.CustomerService.Api.Services.External.UploadServiceClient>("UploadService");
-
-// IAM Service Client
-builder.AddServiceClient<Maliev.CustomerService.Api.Services.IIAMClient, Maliev.CustomerService.Api.Services.IAMClient>("IAM");
-
-// IAM Registration Service
-builder.AddIAMServiceClient("customer");
-builder.Services.AddIAMRegistration<CustomerIAMRegistrationService>("customer");
-
-// Controllers
-builder.Services.AddControllers()
-    .AddJsonOptions(options =>
+    // --- Infrastructure & Observability ---
+    builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
+    builder.AddStandardMiddleware(options =>
     {
-        options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+        options.EnableRequestLogging = true;
     });
+    builder.AddServiceMeters("customers-meter"); // Register service meters for OpenTelemetry business metrics
 
-builder.Services.AddAuthorization(options =>
-{
-    // EmployeeOrHigher policy for internal notes
-    options.AddPolicy("EmployeeOrHigher", policy =>
-        policy.RequireRole("Employee", "Manager", "Admin"));
-});
-
-// Rate Limiting
-builder.Services.AddRateLimiter(options =>
-{
-    options.AddPolicy("fixed-validation-policy", context =>
+    builder.AddRedisDistributedCache(instanceName: "customer:");
+    builder.AddMassTransitWithRabbitMq(configure: x =>
     {
-        // Use an extremely aggressive rate limit for test environment to ensure it triggers
-        // The X-Test-ID header should make each test run use a separate rate limit counter
-        var testId = context.Request.Headers["X-Test-ID"].FirstOrDefault();
-        var key = !string.IsNullOrEmpty(testId) ? testId : context.Connection.RemoteIpAddress?.ToString() ?? "default-rate-limit-key";
+        x.AddConsumer<Maliev.CustomerService.Api.Consumers.GetCustomerDetailsConsumer>();
+        x.AddConsumer<Maliev.CustomerService.Api.Consumers.FileDeletedEventConsumer>();
+    }); // RabbitMQ message bus (non-blocking startup)
+    builder.AddPostgresDbContext<CustomerDbContext>(connectionName: "CustomerDbContext"); // PostgreSQL with retry logic
 
-        var limit = builder.Environment.IsDevelopment() ? 3 : 100;
-        return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+    // --- API Configuration ---
+    builder.AddDefaultCors(); // CORS from CORS:AllowedOrigins config
+    builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
+
+    // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
+    builder.AddJwtAuthentication();
+
+    // Add OpenAPI (must be in Program.cs for XML comments to work via source generator)
+    builder.AddStandardOpenApi(
+        title: "MALIEV Customer Service API",
+        description: "Comprehensive customer management service. Handles individual and corporate customer profiles, address books, NDA tracking, document management, and customer lifecycle status.");
+
+    builder.Services.AddSingleton<Maliev.CustomerService.Api.Services.MetricsService>();
+
+    // Application Services
+    builder.Services.AddScoped<Maliev.CustomerService.Api.Services.ICustomerService, Maliev.CustomerService.Api.Services.CustomerService>();
+    builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IAddressService, Maliev.CustomerService.Api.Services.AddressService>();
+    builder.Services.AddScoped<Maliev.CustomerService.Api.Services.ICompanyService, Maliev.CustomerService.Api.Services.CompanyService>();
+    builder.Services.AddScoped<Maliev.CustomerService.Api.Services.INDAService, Maliev.CustomerService.Api.Services.NDAService>();
+    builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IDocumentService, Maliev.CustomerService.Api.Services.DocumentService>();
+    builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IInternalNoteService, Maliev.CustomerService.Api.Services.InternalNoteService>();
+
+    // Scripts
+    builder.Services.AddScoped<Maliev.CustomerService.Api.Scripts.MigrateToPrincipalsScript>();
+
+    // Background Services
+    builder.Services.AddHostedService<Maliev.CustomerService.Api.BackgroundServices.NDAExpirationBackgroundService>();
+    builder.Services.AddHostedService<Maliev.CustomerService.Api.BackgroundServices.DocumentDeletionRetryBackgroundService>();
+
+    // External Service Clients
+    builder.AddServiceClient<Maliev.CustomerService.Api.Services.External.ICountryServiceClient,
+        Maliev.CustomerService.Api.Services.External.CountryServiceClient>("CountryService");
+
+    builder.AddServiceClient<Maliev.CustomerService.Api.Services.External.IUploadServiceClient,
+        Maliev.CustomerService.Api.Services.External.UploadServiceClient>("UploadService");
+
+    // IAM Service Client
+    builder.AddServiceClient<Maliev.CustomerService.Api.Services.IIAMClient, Maliev.CustomerService.Api.Services.IAMClient>("IAM");
+
+    // IAM Registration Service
+    builder.AddIAMServiceClient("customer");
+    builder.Services.AddIAMRegistration<CustomerIAMRegistrationService>("customer");
+
+    // Controllers
+    builder.Services.AddControllers()
+        .AddJsonOptions(options =>
         {
-            PermitLimit = limit,
-            Window = TimeSpan.FromSeconds(1),
-            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-            QueueLimit = 0
+            options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
         });
+
+    builder.Services.AddAuthorization(options =>
+    {
+        // EmployeeOrHigher policy for internal notes
+        options.AddPolicy("EmployeeOrHigher", policy =>
+            policy.RequireRole("Employee", "Manager", "Admin"));
     });
 
-    options.OnRejected = async (context, cancellationToken) =>
+    // Rate Limiting
+    builder.Services.AddRateLimiter(options =>
     {
-        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-        await context.HttpContext.Response.WriteAsJsonAsync(new
+        options.AddPolicy("fixed-validation-policy", context =>
         {
-            code = "RATE_LIMIT_EXCEEDED",
-            message = "Too many requests. Please try again later.",
-            traceId = context.HttpContext.TraceIdentifier,
-            timestamp = DateTime.UtcNow
-        }, cancellationToken);
-    };
-});
-var app = builder.Build();
+            // Use an extremely aggressive rate limit for test environment to ensure it triggers
+            // The X-Test-ID header should make each test run use a separate rate limit counter
+            var testId = context.Request.Headers["X-Test-ID"].FirstOrDefault();
+            var key = !string.IsNullOrEmpty(testId) ? testId : context.Connection.RemoteIpAddress?.ToString() ?? "default-rate-limit-key";
 
-// --- CLI Command Handlers ---
-if (args.Contains("--migrate-principals"))
-{
-    using var scope = app.Services.CreateScope();
-    var migrator = scope.ServiceProvider.GetRequiredService<Maliev.CustomerService.Api.Scripts.MigrateToPrincipalsScript>();
-    var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
-    var cliLogger = loggerFactory.CreateLogger("CLI");
+            var limit = builder.Environment.IsDevelopment() ? 3 : 100;
+            return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = limit,
+                Window = TimeSpan.FromSeconds(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            });
+        });
 
-    try
+        options.OnRejected = async (context, cancellationToken) =>
+        {
+            context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+            await context.HttpContext.Response.WriteAsJsonAsync(new
+            {
+                code = "RATE_LIMIT_EXCEEDED",
+                message = "Too many requests. Please try again later.",
+                traceId = context.HttpContext.TraceIdentifier,
+                timestamp = DateTime.UtcNow
+            }, cancellationToken);
+        };
+    });
+    var app = builder.Build();
+
+    // --- CLI Command Handlers ---
+    if (args.Contains("--migrate-principals"))
     {
-        await migrator.ExecuteAsync();
-        cliLogger.LogInformation("Migration command completed successfully.");
+        using var scope = app.Services.CreateScope();
+        var migrator = scope.ServiceProvider.GetRequiredService<Maliev.CustomerService.Api.Scripts.MigrateToPrincipalsScript>();
+        var cliLoggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
+        var cliLogger = cliLoggerFactory.CreateLogger("CLI");
+
+        try
+        {
+            await migrator.ExecuteAsync();
+            cliLogger.LogInformation("Migration command completed successfully.");
+        }
+        catch (Exception ex)
+        {
+            cliLogger.LogCritical(ex, "Migration command failed with error.");
+            Environment.Exit(1);
+        }
+        return;
     }
-    catch (Exception ex)
+
+    var logger = app.Services.GetRequiredService<ILogger<Maliev.CustomerService.Api.Program>>();
+
+    // Run database migrations on startup
+    await app.MigrateDatabaseAsync<CustomerDbContext>();
+
+    // Force instantiation of MetricsService to ensure OpenTelemetry meters are created
+    var metricsService = app.Services.GetRequiredService<Maliev.CustomerService.Api.Services.MetricsService>();
+
+    // Middleware Pipeline
+    app.UseStandardMiddleware();
+    if (!app.Environment.IsDevelopment())
     {
-        cliLogger.LogCritical(ex, "Migration command failed with error.");
-        Environment.Exit(1);
+        app.UseHttpsRedirection();
     }
-    return;
+
+    app.UseRouting();
+    app.UseCors();
+    app.UseRateLimiter();
+
+    // Authentication and Authorization middleware
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    // Map endpoints after middleware
+    app.MapControllers();
+
+    // Map Aspire default endpoints (/health, /alive, /metrics)
+    app.MapDefaultEndpoints(servicePrefix: "customer");
+
+    // Map OpenAPI and Scalar documentation (dev/staging only)
+    app.MapApiDocumentation(servicePrefix: "customer");
+
+    logger.LogInformation("CustomerService started successfully");
+    await app.RunAsync();
 }
-
-var logger = app.Services.GetRequiredService<ILogger<Maliev.CustomerService.Api.Program>>();
-
-// Run database migrations on startup
-await app.MigrateDatabaseAsync<CustomerDbContext>();
-
-// Force instantiation of MetricsService to ensure OpenTelemetry meters are created
-var metricsService = app.Services.GetRequiredService<Maliev.CustomerService.Api.Services.MetricsService>();
-Maliev.CustomerService.Api.Program.Log.MetricsInitialized(logger);
-
-// Middleware Pipeline
-app.UseStandardMiddleware();
-if (!app.Environment.IsDevelopment())
+catch (Exception ex)
 {
-    app.UseHttpsRedirection();
+    bootstrapLogger.LogCritical(ex, "Customer Service host terminated unexpectedly during startup");
+    throw;
 }
-
-app.UseRouting();
-app.UseCors();
-app.UseRateLimiter();
-
-// Authentication and Authorization middleware
-app.UseAuthentication();
-app.UseAuthorization();
-
-// Map endpoints after middleware
-app.MapControllers();
-
-// Map Aspire default endpoints (/health, /alive, /metrics)
-app.MapDefaultEndpoints(servicePrefix: "customer");
-
-// Map OpenAPI and Scalar documentation (dev/staging only)
-app.MapApiDocumentation(servicePrefix: "customer");
-
-Maliev.CustomerService.Api.Program.Log.ServiceStarted(logger);
-await app.RunAsync();
+finally
+{
+    loggerFactory.Dispose();
+}
 
 namespace Maliev.CustomerService.Api
 {
