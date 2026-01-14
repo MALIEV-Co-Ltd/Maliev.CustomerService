@@ -1,4 +1,3 @@
-#pragma warning disable CA1848 // For improved performance, use the LoggerMessage delegates
 using System.Threading.RateLimiting;
 using Maliev.Aspire.ServiceDefaults;
 using Maliev.CustomerService.Api.Services;
@@ -12,7 +11,7 @@ var bootstrapLogger = loggerFactory.CreateLogger("Program");
 
 try
 {
-    bootstrapLogger.LogInformation("Starting Customer Service host");
+    Maliev.CustomerService.Api.Program.Log.StartingHost(bootstrapLogger, "Customer Service");
 
     var builder = WebApplication.CreateBuilder(args);
 
@@ -179,12 +178,12 @@ try
     // Map OpenAPI and Scalar documentation (dev/staging only)
     app.MapApiDocumentation(servicePrefix: "customer");
 
-    logger.LogInformation("CustomerService started successfully");
+    Maliev.CustomerService.Api.Program.Log.ServiceStarted(logger, "Customer Service");
     await app.RunAsync();
 }
 catch (Exception ex)
 {
-    bootstrapLogger.LogCritical(ex, "Customer Service host terminated unexpectedly during startup");
+    Maliev.CustomerService.Api.Program.Log.HostTerminated(bootstrapLogger, ex, "Customer Service");
     throw;
 }
 finally
@@ -201,8 +200,14 @@ namespace Maliev.CustomerService.Api
     {
         internal static partial class Log
         {
-            [LoggerMessage(Level = LogLevel.Information, Message = "CustomerService started successfully")]
-            public static partial void ServiceStarted(ILogger logger);
+            [LoggerMessage(Level = LogLevel.Information, Message = "Starting {ServiceName} host")]
+            public static partial void StartingHost(ILogger logger, string serviceName);
+
+            [LoggerMessage(Level = LogLevel.Critical, Message = "{ServiceName} host terminated unexpectedly during startup")]
+            public static partial void HostTerminated(ILogger logger, Exception ex, string serviceName);
+
+            [LoggerMessage(Level = LogLevel.Information, Message = "{ServiceName} started successfully")]
+            public static partial void ServiceStarted(ILogger logger, string serviceName);
 
             [LoggerMessage(Level = LogLevel.Error, Message = "Database migration failed - application may not function correctly")]
             public static partial void MigrationFailed(ILogger logger, Exception exception);
