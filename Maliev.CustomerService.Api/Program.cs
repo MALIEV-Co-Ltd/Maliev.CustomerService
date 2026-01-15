@@ -184,6 +184,9 @@ try
 catch (Exception ex)
 {
     Maliev.CustomerService.Api.Program.Log.HostTerminated(bootstrapLogger, ex, "Customer Service");
+    // Force flush to ensure Aspire captures the error before process exits
+    Console.Out.Flush();
+    Console.Error.Flush();
     throw;
 }
 finally
