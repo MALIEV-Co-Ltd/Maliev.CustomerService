@@ -81,17 +81,11 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         const int maxRetries = 60; // Increased to 60 for CI stability
         while (!postgresReady && retryCount < maxRetries)
         {
-            if (_postgresContainer.State != Testcontainers.Containers.TestcontainersState.Running)
-            {
-                await Task.Delay(1000);
-                retryCount++;
-                continue;
-            }
-
             try
             {
                 await using var conn = new Npgsql.NpgsqlConnection(_postgresContainer.GetConnectionString());
                 await conn.OpenAsync();
+
 
 
                 // Perform a simple ping to ensure the database is actually ready to execute queries
