@@ -75,6 +75,30 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
             _rabbitmqContainer.StartAsync()
         );
 
+        // Ensure PostgreSQL is fully ready and accepting connections
+        var postgresReady = false;
+        var retryCount = 0;
+        const int maxRetries = 10;
+        while (!postgresReady && retryCount < maxRetries)
+        {
+            try
+            {
+                await using var conn = new Npgsql.NpgsqlConnection(_postgresContainer.GetConnectionString());
+                await conn.OpenAsync();
+                postgresReady = true;
+            }
+            catch
+            {
+                retryCount++;
+                await Task.Delay(1000);
+            }
+        }
+
+        if (!postgresReady)
+        {
+            throw new Exception("PostgreSQL Testcontainer failed to become ready after multiple retries.");
+        }
+
         // Set environment variables immediately after containers start
         // This ensures they are available when Program.Main runs (which happens when .Server is accessed)
         Environment.SetEnvironmentVariable($"ConnectionStrings__{DbConnectionStringName}", _postgresContainer.GetConnectionString());
