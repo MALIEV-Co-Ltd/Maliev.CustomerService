@@ -78,13 +78,21 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         // Ensure PostgreSQL is fully ready and accepting connections
         var postgresReady = false;
         var retryCount = 0;
-        const int maxRetries = 30; // Increased from 10 to 30 for better reliability
+        const int maxRetries = 60; // Increased to 60 for CI stability
         while (!postgresReady && retryCount < maxRetries)
         {
+            if (_postgresContainer.State != Testcontainers.Containers.TestcontainersState.Running)
+            {
+                await Task.Delay(1000);
+                retryCount++;
+                continue;
+            }
+
             try
             {
                 await using var conn = new Npgsql.NpgsqlConnection(_postgresContainer.GetConnectionString());
                 await conn.OpenAsync();
+
 
                 // Perform a simple ping to ensure the database is actually ready to execute queries
                 await using var cmd = conn.CreateCommand();
@@ -102,8 +110,9 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
         if (!postgresReady)
         {
-            throw new Exception("PostgreSQL Testcontainer failed to become ready (Ping failed) after 30 seconds.");
+            throw new Exception("PostgreSQL Testcontainer failed to become ready (Ping failed) after 60 seconds.");
         }
+
 
         // Set environment variables immediately after containers start
         // This ensures they are available when Program.Main runs (which happens when .Server is accessed)
@@ -275,11 +284,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     [SuppressMessage("Security", "EF1002:Gaps in SQL queries", Justification = "Table names are retrieved from information_schema and are safe.")]
     public async Task CleanDatabaseAsync()
     {
-        // Explicitly close any existing connections and clear the pool
-        Npgsql.NpgsqlConnection.ClearAllPools();
-
         await using var context = CreateDbContext();
-
 
         // Get all table names from information_schema
         var tableNames = await context.Database
@@ -293,21 +298,13 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
             .ToListAsync();
 
         // Truncate all tables (CASCADE handles foreign keys)
-        foreach (var tableName in tableNames)
+        if (tableNames.Any())
         {
-            try
-            {
-                await context.Database.ExecuteSqlRawAsync($"TRUNCATE TABLE \"{tableName}\" RESTART IDENTITY CASCADE");
-            }
-            catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P01")
-            {
-                // Table doesn't exist - ignore this error
-            }
+            var truncateSql = $"TRUNCATE TABLE {string.Join(", ", tableNames.Select(t => $"\"{t}\""))} RESTART IDENTITY CASCADE";
+            await context.Database.ExecuteSqlRawAsync(truncateSql);
         }
-
-        // Explicitly close any connections and clear the pool after cleanup
-        Npgsql.NpgsqlConnection.ClearAllPools();
     }
+
 
 
     /// <summary>
