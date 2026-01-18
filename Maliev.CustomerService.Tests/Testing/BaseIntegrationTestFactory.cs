@@ -78,13 +78,19 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         // Ensure PostgreSQL is fully ready and accepting connections
         var postgresReady = false;
         var retryCount = 0;
-        const int maxRetries = 10;
+        const int maxRetries = 30; // Increased from 10 to 30 for better reliability
         while (!postgresReady && retryCount < maxRetries)
         {
             try
             {
                 await using var conn = new Npgsql.NpgsqlConnection(_postgresContainer.GetConnectionString());
                 await conn.OpenAsync();
+
+                // Perform a simple ping to ensure the database is actually ready to execute queries
+                await using var cmd = conn.CreateCommand();
+                cmd.CommandText = "SELECT 1";
+                await cmd.ExecuteScalarAsync();
+
                 postgresReady = true;
             }
             catch
@@ -96,7 +102,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
         if (!postgresReady)
         {
-            throw new Exception("PostgreSQL Testcontainer failed to become ready after multiple retries.");
+            throw new Exception("PostgreSQL Testcontainer failed to become ready (Ping failed) after 30 seconds.");
         }
 
         // Set environment variables immediately after containers start
@@ -109,6 +115,15 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         using (var connection = await StackExchange.Redis.ConnectionMultiplexer.ConnectAsync(_redisContainer.GetConnectionString()))
         {
             await connection.GetDatabase().PingAsync();
+        }
+
+        // Final Ping check before migrations to ensure connection stability
+        await using (var conn = new Npgsql.NpgsqlConnection(_postgresContainer.GetConnectionString()))
+        {
+            await conn.OpenAsync();
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT 1";
+            await cmd.ExecuteScalarAsync();
         }
 
         // Apply database migrations
@@ -157,10 +172,12 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         builder.UseEnvironment("Testing");
 
         builder.ConfigureAppConfiguration((context, config) =>
-
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
+                [$"ConnectionStrings:{DbConnectionStringName}"] = _postgresContainer.GetConnectionString(),
+                ["ConnectionStrings:redis"] = _redisContainer.GetConnectionString(),
+                ["ConnectionStrings:rabbitmq"] = _rabbitmqContainer.GetConnectionString(),
                 ["Jwt:SecurityKey"] = "test-secret-key-at-least-32-characters-long"
             });
         });
