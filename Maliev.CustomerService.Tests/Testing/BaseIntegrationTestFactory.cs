@@ -268,7 +268,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         };
 
         var optionsBuilder = new DbContextOptionsBuilder<TDbContext>();
-        optionsBuilder.UseNpgsql(builder.ConnectionString, o => o.EnableRetryOnFailure(3)); // Lower retry for tests
+        optionsBuilder.UseNpgsql(builder.ConnectionString, o => o.EnableRetryOnFailure(2)); // Lower retry for tests
         return (TDbContext)Activator.CreateInstance(typeof(TDbContext), optionsBuilder.Options)!;
     }
 
