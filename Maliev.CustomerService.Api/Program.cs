@@ -54,9 +54,10 @@ try
     builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IInternalNoteService, Maliev.CustomerService.Api.Services.InternalNoteService>();
 
     // Scripts
-    builder.Services.AddScoped<Maliev.CustomerService.Api.Scripts.MigrateToPrincipalsScript>();
+    // builder.Services.AddScoped<Maliev.CustomerService.Api.Scripts.MigrateToPrincipalsScript>();
 
     // Background Services
+
     builder.Services.AddHostedService<Maliev.CustomerService.Api.BackgroundServices.NDAExpirationBackgroundService>();
     builder.Services.AddHostedService<Maliev.CustomerService.Api.BackgroundServices.DocumentDeletionRetryBackgroundService>();
 
@@ -122,28 +123,8 @@ try
     });
     var app = builder.Build();
 
-    // --- CLI Command Handlers ---
-    if (args.Contains("--migrate-principals"))
-    {
-        using var scope = app.Services.CreateScope();
-        var migrator = scope.ServiceProvider.GetRequiredService<Maliev.CustomerService.Api.Scripts.MigrateToPrincipalsScript>();
-        var cliLoggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
-        var cliLogger = cliLoggerFactory.CreateLogger("CLI");
-
-        try
-        {
-            await migrator.ExecuteAsync();
-            cliLogger.LogInformation("Migration command completed successfully.");
-        }
-        catch (Exception ex)
-        {
-            cliLogger.LogCritical(ex, "Migration command failed with error.");
-            Environment.Exit(1);
-        }
-        return;
-    }
-
     var logger = app.Services.GetRequiredService<ILogger<Maliev.CustomerService.Api.Program>>();
+
 
     // Run database migrations on startup
     await app.MigrateDatabaseAsync<CustomerDbContext>();
