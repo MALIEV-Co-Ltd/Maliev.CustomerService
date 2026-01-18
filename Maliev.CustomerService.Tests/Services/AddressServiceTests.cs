@@ -16,16 +16,17 @@ namespace Maliev.CustomerService.Tests.Services;
 [Collection("Database Collection")]
 public class AddressServiceTests
 {
-    private readonly TestDatabaseFixture _fixture;
+    private readonly TestWebApplicationFactory _fixture;
     private readonly Mock<ILogger<AddressService>> _mockLogger;
     private readonly Mock<ICountryServiceClient> _mockCountryServiceClient;
 
-    public AddressServiceTests(TestDatabaseFixture fixture)
+    public AddressServiceTests(TestWebApplicationFactory fixture)
     {
         _fixture = fixture;
         _mockLogger = new Mock<ILogger<AddressService>>();
         _mockCountryServiceClient = new Mock<ICountryServiceClient>();
     }
+
 
     private AddressService CreateService()
     {

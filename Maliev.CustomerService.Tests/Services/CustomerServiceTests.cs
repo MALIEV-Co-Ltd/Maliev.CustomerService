@@ -19,19 +19,20 @@ namespace Maliev.CustomerService.Tests.Services;
 [Collection("Database Collection")]
 public class CustomerServiceTests
 {
-    private readonly TestDatabaseFixture _fixture;
+    private readonly TestWebApplicationFactory _fixture;
     private readonly Mock<IIAMClient> _mockIamClient;
     private readonly Mock<IConfiguration> _mockConfig;
     private readonly Mock<ILogger<Api.Services.CustomerService>> _mockLogger;
     private readonly Mock<Api.Services.MetricsService> _mockMetricsService;
     private readonly Mock<IPublishEndpoint> _mockPublishEndpoint;
 
-    public CustomerServiceTests(TestDatabaseFixture fixture)
+    public CustomerServiceTests(TestWebApplicationFactory fixture)
     {
         _fixture = fixture;
         _mockIamClient = new Mock<IIAMClient>();
         _mockConfig = new Mock<IConfiguration>();
         _mockPublishEndpoint = new Mock<IPublishEndpoint>();
+
 
         // Setup default configuration (enabled in final state)
         var mockSection = new Mock<IConfigurationSection>();

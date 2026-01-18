@@ -16,33 +16,21 @@ namespace Maliev.CustomerService.Tests.Integration;
 /// Tests all 8 acceptance scenarios using real HTTP requests
 /// </summary>
 [Collection("Database Collection")]
-public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
+public class US1_CustomerRegistrationIntegrationTests
 {
-    private readonly TestDatabaseFixture _databaseFixture;
-    private TestWebApplicationFactory _factory = null!;
-    private string _testId = null!;
+    private readonly TestWebApplicationFactory _factory;
 
     private static readonly string[] EmployeeRoles = { "roles.customer.representative" };
     private static readonly string[] CustomerRoles = { "roles.customer.viewer" };
 
-    public US1_CustomerRegistrationIntegrationTests(TestDatabaseFixture databaseFixture)
+    public US1_CustomerRegistrationIntegrationTests(TestWebApplicationFactory factory)
     {
-        _databaseFixture = databaseFixture;
+        _factory = factory;
     }
 
-    public async Task InitializeAsync()
-    {
-        _testId = Guid.NewGuid().ToString("N")[..8];
-        _factory = new TestWebApplicationFactory();
-        await _factory.InitializeAsync();
-    }
 
-    public async Task DisposeAsync()
-    {
-        await _factory.DisposeAsync();
-    }
+    private string UniqueEmail(string prefix) => $"{prefix}.{Guid.NewGuid():N}@example.com";
 
-    private string UniqueEmail(string prefix) => $"{prefix}.{_testId}@example.com";
 
     /// <summary>
     /// Scenario 1: Create customer with valid data → verify returned data
@@ -413,40 +401,47 @@ public class US1_CustomerRegistrationIntegrationTests : IAsyncLifetime
         var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
 
         // Create two customers
-        var request1 = new
+        var request1 = new CreateCustomerRequest
         {
-            firstName = "Frank",
-            lastName = "Castle",
-            email = UniqueEmail("frank.castle"),
-            phone = "+6621111111",
-            segment = "Retail",
-            tier = "Bronze",
-            preferredLanguage = "en",
-            timezone = "Asia/Bangkok"
+            FirstName = "Frank",
+            LastName = "Castle",
+            Email = UniqueEmail("frank.castle"),
+            Phone = "+6621111111",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
         };
-        var request2 = new
+        var request2 = new CreateCustomerRequest
         {
-            firstName = "Grace",
-            lastName = "Hopper",
-            email = UniqueEmail("grace.hopper"),
-            phone = "+6622222222",
-            segment = "Enterprise",
-            tier = "Gold",
-            preferredLanguage = "en",
-            timezone = "Asia/Bangkok"
+            FirstName = "Grace",
+            LastName = "Hopper",
+            Email = UniqueEmail("grace.hopper"),
+            Phone = "+6622222222",
+            Segment = "Enterprise",
+            Tier = "Gold",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
         };
+
 
         var response1 = await client.PostAsJsonAsync("/customer/v1/customers", request1);
+        Assert.Equal(HttpStatusCode.Created, response1.StatusCode);
         var customer1 = await response1.Content.ReadFromJsonAsync<CustomerResponse>();
-
-        var response2 = await client.PostAsJsonAsync("/customer/v1/customers", request2);
-        var customer2 = await response2.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Act - Soft delete the first customer
         var deleteResponse = await client.DeleteAsync($"/customer/v1/customers/{customer1!.Id}");
-
-        // Assert - Verify deletion was successful
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+
+        // Now create second customer
+        var response2 = await client.PostAsJsonAsync("/customer/v1/customers", request2);
+        if (response2.StatusCode != HttpStatusCode.Created)
+        {
+            var body = await response2.Content.ReadAsStringAsync();
+            throw new Exception($"Request 2 failed with {response2.StatusCode}: {body}");
+        }
+        var customer2 = await response2.Content.ReadFromJsonAsync<CustomerResponse>();
+
 
         // Verify customer is marked as deleted when retrieved directly
         var getDeletedResponse = await client.GetAsync($"/customer/v1/customers/{customer1.Id}");

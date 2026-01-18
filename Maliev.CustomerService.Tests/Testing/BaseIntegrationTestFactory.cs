@@ -130,7 +130,10 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseEnvironment("Testing");
+
         builder.ConfigureAppConfiguration((context, config) =>
+
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -231,7 +234,11 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     [SuppressMessage("Security", "EF1002:Gaps in SQL queries", Justification = "Table names are retrieved from information_schema and are safe.")]
     public async Task CleanDatabaseAsync()
     {
+        // Explicitly close any existing connections and clear the pool
+        Npgsql.NpgsqlConnection.ClearAllPools();
+
         await using var context = CreateDbContext();
+
 
         // Get all table names from information_schema
         var tableNames = await context.Database
@@ -256,7 +263,11 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
                 // Table doesn't exist - ignore this error
             }
         }
+
+        // Explicitly close any connections and clear the pool after cleanup
+        Npgsql.NpgsqlConnection.ClearAllPools();
     }
+
 
     /// <summary>
     /// Alias for CleanDatabaseAsync to support different naming conventions.

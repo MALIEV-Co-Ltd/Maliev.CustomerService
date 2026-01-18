@@ -14,30 +14,19 @@ namespace Maliev.CustomerService.Tests.Integration;
 /// Tests all 5 acceptance scenarios using real HTTP requests
 /// </summary>
 [Collection("Database Collection")]
-public class US2_MultiAddressManagementIntegrationTests : IAsyncLifetime
+public class US2_MultiAddressManagementIntegrationTests
 {
-    private readonly TestDatabaseFixture _databaseFixture;
-    private TestWebApplicationFactory _factory = null!;
-    private string _testId = null!;
+    private readonly TestWebApplicationFactory _factory;
+    private readonly string _testId;
 
     private static readonly string[] EmployeeRoles = { "roles.customer.representative" };
 
-    public US2_MultiAddressManagementIntegrationTests(TestDatabaseFixture databaseFixture)
+    public US2_MultiAddressManagementIntegrationTests(TestWebApplicationFactory factory)
     {
-        _databaseFixture = databaseFixture;
-    }
-
-    public async Task InitializeAsync()
-    {
+        _factory = factory;
         _testId = Guid.NewGuid().ToString("N")[..8];
-        _factory = new TestWebApplicationFactory();
-        await _factory.InitializeAsync();
     }
 
-    public async Task DisposeAsync()
-    {
-        await _factory.DisposeAsync();
-    }
 
     private string UniqueEmail(string prefix) => $"{prefix}.{_testId}@example.com";
 

@@ -11,26 +11,15 @@ using Xunit;
 namespace Maliev.CustomerService.Tests.Integration;
 
 [Collection("Database Collection")]
-public class MigrationScriptTests : IAsyncLifetime
+public class MigrationScriptTests
 {
-    private readonly TestDatabaseFixture _databaseFixture;
-    private TestWebApplicationFactory _factory = null!;
+    private readonly TestWebApplicationFactory _factory;
 
-    public MigrationScriptTests(TestDatabaseFixture databaseFixture)
+    public MigrationScriptTests(TestWebApplicationFactory factory)
     {
-        _databaseFixture = databaseFixture;
+        _factory = factory;
     }
 
-    public async Task InitializeAsync()
-    {
-        _factory = new TestWebApplicationFactory();
-        await _factory.InitializeAsync();
-    }
-
-    public async Task DisposeAsync()
-    {
-        await _factory.DisposeAsync();
-    }
 
     [Fact]
     public async Task ExecuteAsync_MigratesExistingCustomersWithoutPrincipalId()

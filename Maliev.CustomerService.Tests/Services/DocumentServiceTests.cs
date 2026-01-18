@@ -18,18 +18,19 @@ namespace Maliev.CustomerService.Tests.Services;
 [Collection("Database Collection")]
 public class DocumentServiceTests
 {
-    private readonly TestDatabaseFixture _fixture;
+    private readonly TestWebApplicationFactory _fixture;
     private readonly Mock<IUploadServiceClient> _mockUploadServiceClient;
     private readonly Mock<ILogger<DocumentService>> _mockLogger;
     private readonly Mock<MetricsService> _mockMetricsService;
 
-    public DocumentServiceTests(TestDatabaseFixture fixture)
+    public DocumentServiceTests(TestWebApplicationFactory fixture)
     {
         _fixture = fixture;
         _mockUploadServiceClient = new Mock<IUploadServiceClient>();
         _mockLogger = new Mock<ILogger<DocumentService>>();
         _mockMetricsService = new Mock<MetricsService>(MockBehavior.Loose, new object[] { Mock.Of<IHostEnvironment>() });
     }
+
 
     private DocumentService CreateService()
     {

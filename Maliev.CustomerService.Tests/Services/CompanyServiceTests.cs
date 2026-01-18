@@ -15,14 +15,15 @@ namespace Maliev.CustomerService.Tests.Services;
 [Collection("Database Collection")]
 public class CompanyServiceTests
 {
-    private readonly TestDatabaseFixture _fixture;
+    private readonly TestWebApplicationFactory _fixture;
     private readonly Mock<ILogger<CompanyService>> _mockLogger;
 
-    public CompanyServiceTests(TestDatabaseFixture fixture)
+    public CompanyServiceTests(TestWebApplicationFactory fixture)
     {
         _fixture = fixture;
         _mockLogger = new Mock<ILogger<CompanyService>>();
     }
+
 
     private CompanyService CreateService()
     {

@@ -9,26 +9,15 @@ using Xunit;
 namespace Maliev.CustomerService.Tests.Integration;
 
 [Collection("Database Collection")]
-public class CustomerControllerTests : IAsyncLifetime
+public class CustomerControllerTests
 {
-    private readonly TestDatabaseFixture _databaseFixture;
-    private TestWebApplicationFactory _factory = null!;
+    private readonly TestWebApplicationFactory _factory;
 
-    public CustomerControllerTests(TestDatabaseFixture databaseFixture)
+    public CustomerControllerTests(TestWebApplicationFactory factory)
     {
-        _databaseFixture = databaseFixture;
+        _factory = factory;
     }
 
-    public async Task InitializeAsync()
-    {
-        _factory = new TestWebApplicationFactory();
-        await _factory.InitializeAsync();
-    }
-
-    public async Task DisposeAsync()
-    {
-        await _factory.DisposeAsync();
-    }
 
     [Fact]
     public async Task GetByPrincipalId_ReturnsCustomer_WhenExists()
@@ -45,7 +34,7 @@ public class CustomerControllerTests : IAsyncLifetime
 
         // Seed customer with PrincipalId
         using var dbContext = _factory.GetDbContext();
-        var customer = new Data.Models.Customer
+        var customer = new Maliev.CustomerService.Data.Models.Customer
         {
             FirstName = "Lookup",
             LastName = "User",
@@ -104,7 +93,7 @@ public class CustomerControllerTests : IAsyncLifetime
 
         // Seed deleted customer with PrincipalId
         using var dbContext = _factory.GetDbContext();
-        var customer = new Data.Models.Customer
+        var customer = new Maliev.CustomerService.Data.Models.Customer
         {
             FirstName = "Deleted",
             LastName = "User",

@@ -27,10 +27,13 @@ public class TestWebApplicationFactory : BaseIntegrationTestFactory<Program, Cus
 
     protected override void ConfigureAdditionalServices(IServiceCollection services)
     {
+        base.ConfigureAdditionalServices(services);
+
         // Replace external services with mocks
         services.AddSingleton(MockCountryService.Object);
         services.AddSingleton(MockIAMClient.Object);
     }
+
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

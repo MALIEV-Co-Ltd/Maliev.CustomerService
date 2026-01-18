@@ -1,9 +1,6 @@
 using System.Threading.RateLimiting;
-using Maliev.Aspire.ServiceDefaults;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Data;
-using Maliev.CustomerService.Data.Models;
-using Microsoft.Extensions.Logging;
 
 // Initialize bootstrap logging
 using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
@@ -148,8 +145,12 @@ try
 
     var logger = app.Services.GetRequiredService<ILogger<Maliev.CustomerService.Api.Program>>();
 
-    // Run database migrations on startup
-    await app.MigrateDatabaseAsync<CustomerDbContext>();
+    // Run database migrations on startup (except in Testing environment where factory handles it)
+    if (!app.Environment.IsEnvironment("Testing"))
+    {
+        await app.MigrateDatabaseAsync<CustomerDbContext>();
+    }
+
 
     // Force instantiation of MetricsService to ensure OpenTelemetry meters are created
     var metricsService = app.Services.GetRequiredService<Maliev.CustomerService.Api.Services.MetricsService>();
