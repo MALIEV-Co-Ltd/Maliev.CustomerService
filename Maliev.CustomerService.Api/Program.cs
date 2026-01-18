@@ -145,14 +145,12 @@ try
 
     var logger = app.Services.GetRequiredService<ILogger<Maliev.CustomerService.Api.Program>>();
 
-    // Run database migrations on startup (except in Testing environment where factory handles it)
-    if (app.Environment.EnvironmentName != "Testing")
-    {
-        await app.MigrateDatabaseAsync<CustomerDbContext>();
-    }
+    // Run database migrations on startup
+    await app.MigrateDatabaseAsync<CustomerDbContext>();
 
 
     // Force instantiation of MetricsService to ensure OpenTelemetry meters are created
+
     var metricsService = app.Services.GetRequiredService<Maliev.CustomerService.Api.Services.MetricsService>();
 
     // Middleware Pipeline
