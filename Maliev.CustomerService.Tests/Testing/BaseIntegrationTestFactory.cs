@@ -244,6 +244,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     /// <summary>
     /// Gets the DbContext from the service provider for use in tests.
+    /// Note: Caller must dispose the returned DbContext.
     /// </summary>
     public TDbContext GetDbContext()
     {
@@ -253,14 +254,24 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     /// <summary>
     /// Creates a new DbContext instance for testing (not from DI container).
+    /// Recommended for tests to ensure clean connection management.
     /// </summary>
     public TDbContext CreateDbContext()
     {
         var connectionString = _postgresContainer.GetConnectionString();
+        // Disable rewriting and limit pool size for tests to avoid exhaustion
+        var builder = new Npgsql.NpgsqlConnectionStringBuilder(connectionString)
+        {
+            Pooling = true,
+            MaxPoolSize = 20, // Strict limit for tests
+            IncludeErrorDetail = true
+        };
+
         var optionsBuilder = new DbContextOptionsBuilder<TDbContext>();
-        optionsBuilder.UseNpgsql(connectionString);
+        optionsBuilder.UseNpgsql(builder.ConnectionString, o => o.EnableRetryOnFailure(3)); // Lower retry for tests
         return (TDbContext)Activator.CreateInstance(typeof(TDbContext), optionsBuilder.Options)!;
     }
+
 
     /// <summary>
     /// Applies all pending migrations to the test database.
