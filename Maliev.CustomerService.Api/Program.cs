@@ -146,7 +146,7 @@ try
     var logger = app.Services.GetRequiredService<ILogger<Maliev.CustomerService.Api.Program>>();
 
     // Run database migrations on startup (except in Testing environment where factory handles it)
-    if (!app.Environment.IsEnvironment("Testing"))
+    if (app.Environment.EnvironmentName != "Testing")
     {
         await app.MigrateDatabaseAsync<CustomerDbContext>();
     }
