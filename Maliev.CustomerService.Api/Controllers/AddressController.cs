@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Asp.Versioning;
 using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models;

@@ -31,11 +31,12 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     where TProgram : class
     where TDbContext : DbContext
 {
-    private readonly PostgreSqlContainer _postgresContainer;
-    private readonly RedisContainer _redisContainer;
-    private readonly RabbitMqContainer _rabbitmqContainer;
+    private static PostgreSqlContainer? _postgresContainer;
+    private static RedisContainer? _redisContainer;
+    private static RabbitMqContainer? _rabbitmqContainer;
+    private static bool _containersStarted;
+    private static readonly SemaphoreSlim _initLock = new(1, 1);
     private readonly RSA _testRsa;
-    private bool _containersStarted;
 
     /// <summary>
     /// Override this property if your DbContext connection string has a different name.
@@ -45,18 +46,6 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     public BaseIntegrationTestFactory()
     {
-        _postgresContainer = new PostgreSqlBuilder()
-            .WithImage("postgres:18-alpine")
-            .Build();
-
-        _redisContainer = new RedisBuilder()
-            .WithImage("redis:8.4-alpine")
-            .Build();
-
-        _rabbitmqContainer = new RabbitMqBuilder()
-            .WithImage("rabbitmq:4.2-alpine")
-            .Build();
-
         _testRsa = RSA.Create(2048);
 
         // Set environment variable EARLY so Program.cs picks it up during WebApplication.CreateBuilder
@@ -65,40 +54,97 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     public async Task InitializeAsync()
     {
-        if (_containersStarted)
-            return;
+        await _initLock.WaitAsync();
+        try
+        {
+            if (!_containersStarted)
+            {
+                _postgresContainer = new PostgreSqlBuilder()
+                    .WithImage("postgres:18-alpine")
+                    .Build();
 
-        // Start all containers in parallel
-        await Task.WhenAll(
-            _postgresContainer.StartAsync(),
-            _redisContainer.StartAsync(),
-            _rabbitmqContainer.StartAsync()
-        );
+                _redisContainer = new RedisBuilder()
+                    .WithImage("redis:8.4-alpine")
+                    .Build();
+
+                _rabbitmqContainer = new RabbitMqBuilder()
+                    .WithImage("rabbitmq:4.2-alpine")
+                    .Build();
+
+                // Start all containers in parallel
+                await Task.WhenAll(
+                    _postgresContainer.StartAsync(),
+                    _redisContainer.StartAsync(),
+                    _rabbitmqContainer.StartAsync()
+                );
+
+                // Ensure PostgreSQL is fully ready and accepting connections
+                var postgresReady = false;
+                var retryCount = 0;
+                const int maxRetries = 60; // Increased to 60 for CI stability
+                while (!postgresReady && retryCount < maxRetries)
+                {
+                    try
+                    {
+                        await using var conn = new Npgsql.NpgsqlConnection(_postgresContainer.GetConnectionString());
+                        await conn.OpenAsync();
+
+                        // Perform a simple ping to ensure the database is actually ready to execute queries
+                        await using var cmd = conn.CreateCommand();
+                        cmd.CommandText = "SELECT 1";
+                        await cmd.ExecuteScalarAsync();
+
+                        postgresReady = true;
+                    }
+                    catch
+                    {
+                        retryCount++;
+                        await Task.Delay(1000);
+                    }
+                }
+
+                if (!postgresReady)
+                {
+                    throw new Exception("PostgreSQL Testcontainer failed to become ready (Ping failed) after 60 seconds.");
+                }
+
+                // Wait for Redis to be ready
+                using (var connection = await StackExchange.Redis.ConnectionMultiplexer.ConnectAsync(_redisContainer.GetConnectionString()))
+                {
+                    await connection.GetDatabase().PingAsync();
+                }
+
+                // Final Ping check before migrations to ensure connection stability
+                await using (var conn = new Npgsql.NpgsqlConnection(_postgresContainer.GetConnectionString()))
+                {
+                    await conn.OpenAsync();
+                    await using var cmd = conn.CreateCommand();
+                    cmd.CommandText = "SELECT 1";
+                    await cmd.ExecuteScalarAsync();
+                }
+
+                // Apply database migrations
+                await ApplyMigrationsAsync();
+
+                _containersStarted = true;
+            }
+        }
+        finally
+        {
+            _initLock.Release();
+        }
 
         // Set environment variables immediately after containers start
         // This ensures they are available when Program.Main runs (which happens when .Server is accessed)
-        Environment.SetEnvironmentVariable($"ConnectionStrings__{DbConnectionStringName}", _postgresContainer.GetConnectionString());
-        Environment.SetEnvironmentVariable("ConnectionStrings__redis", _redisContainer.GetConnectionString());
-        Environment.SetEnvironmentVariable("ConnectionStrings__rabbitmq", _rabbitmqContainer.GetConnectionString());
-
-        // Wait for Redis to be ready
-        using (var connection = await StackExchange.Redis.ConnectionMultiplexer.ConnectAsync(_redisContainer.GetConnectionString()))
-        {
-            await connection.GetDatabase().PingAsync();
-        }
-
-        // Apply database migrations
-        await ApplyMigrationsAsync();
-
-        _containersStarted = true;
+        Environment.SetEnvironmentVariable($"ConnectionStrings__{DbConnectionStringName}", _postgresContainer!.GetConnectionString());
+        Environment.SetEnvironmentVariable("ConnectionStrings__redis", _redisContainer!.GetConnectionString());
+        Environment.SetEnvironmentVariable("ConnectionStrings__rabbitmq", _rabbitmqContainer!.GetConnectionString());
     }
 
     public new async Task DisposeAsync()
     {
         await base.DisposeAsync(); // Stop the Host (and MassTransit) before deleting containers
-        await _postgresContainer.DisposeAsync();
-        await _redisContainer.DisposeAsync();
-        await _rabbitmqContainer.DisposeAsync();
+        // Static containers are NOT disposed here to allow reuse across tests
         _testRsa.Dispose();
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", null); // Cleanup
     }
@@ -130,10 +176,15 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseEnvironment("Testing");
+
         builder.ConfigureAppConfiguration((context, config) =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
+                [$"ConnectionStrings:{DbConnectionStringName}"] = _postgresContainer!.GetConnectionString(),
+                ["ConnectionStrings:redis"] = _redisContainer!.GetConnectionString(),
+                ["ConnectionStrings:rabbitmq"] = _rabbitmqContainer!.GetConnectionString(),
                 ["Jwt:SecurityKey"] = "test-secret-key-at-least-32-characters-long"
             });
         });
@@ -197,6 +248,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     /// <summary>
     /// Gets the DbContext from the service provider for use in tests.
+    /// Note: Caller must dispose the returned DbContext.
     /// </summary>
     public TDbContext GetDbContext()
     {
@@ -206,14 +258,24 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     /// <summary>
     /// Creates a new DbContext instance for testing (not from DI container).
+    /// Recommended for tests to ensure clean connection management.
     /// </summary>
     public TDbContext CreateDbContext()
     {
-        var connectionString = _postgresContainer.GetConnectionString();
+        var connectionString = _postgresContainer!.GetConnectionString();
+        // Disable rewriting and limit pool size for tests to avoid exhaustion
+        var builder = new Npgsql.NpgsqlConnectionStringBuilder(connectionString)
+        {
+            Pooling = true,
+            MaxPoolSize = 100, // Reverted to 100
+            IncludeErrorDetail = true
+        };
+
         var optionsBuilder = new DbContextOptionsBuilder<TDbContext>();
-        optionsBuilder.UseNpgsql(connectionString);
+        optionsBuilder.UseNpgsql(builder.ConnectionString, o => o.EnableRetryOnFailure(2)); // Lower retry for tests
         return (TDbContext)Activator.CreateInstance(typeof(TDbContext), optionsBuilder.Options)!;
     }
+
 
     /// <summary>
     /// Applies all pending migrations to the test database.
@@ -245,18 +307,14 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
             .ToListAsync();
 
         // Truncate all tables (CASCADE handles foreign keys)
-        foreach (var tableName in tableNames)
+        if (tableNames.Any())
         {
-            try
-            {
-                await context.Database.ExecuteSqlRawAsync($"TRUNCATE TABLE \"{tableName}\" RESTART IDENTITY CASCADE");
-            }
-            catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P01")
-            {
-                // Table doesn't exist - ignore this error
-            }
+            var truncateSql = $"TRUNCATE TABLE {string.Join(", ", tableNames.Select(t => $"\"{t}\""))} RESTART IDENTITY CASCADE";
+            await context.Database.ExecuteSqlRawAsync(truncateSql);
         }
     }
+
+
 
     /// <summary>
     /// Alias for CleanDatabaseAsync to support different naming conventions.

@@ -15,14 +15,15 @@ namespace Maliev.CustomerService.Tests.Services;
 [Collection("Database Collection")]
 public class InternalNoteServiceTests
 {
-    private readonly TestDatabaseFixture _fixture;
+    private readonly TestWebApplicationFactory _fixture;
     private readonly Mock<ILogger<InternalNoteService>> _mockLogger;
 
-    public InternalNoteServiceTests(TestDatabaseFixture fixture)
+    public InternalNoteServiceTests(TestWebApplicationFactory fixture)
     {
         _fixture = fixture;
         _mockLogger = new Mock<ILogger<InternalNoteService>>();
     }
+
 
     private InternalNoteService CreateService()
     {

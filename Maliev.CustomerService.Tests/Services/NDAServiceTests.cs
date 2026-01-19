@@ -17,16 +17,17 @@ namespace Maliev.CustomerService.Tests.Services;
 [Collection("Database Collection")]
 public class NDAServiceTests
 {
-    private readonly TestDatabaseFixture _fixture;
+    private readonly TestWebApplicationFactory _fixture;
     private readonly Mock<ILogger<NDAService>> _mockLogger;
     private readonly Mock<MetricsService> _mockMetricsService;
 
-    public NDAServiceTests(TestDatabaseFixture fixture)
+    public NDAServiceTests(TestWebApplicationFactory fixture)
     {
         _fixture = fixture;
         _mockLogger = new Mock<ILogger<NDAService>>();
         _mockMetricsService = new Mock<MetricsService>(MockBehavior.Loose, new object[] { Mock.Of<IHostEnvironment>() });
     }
+
 
     private NDAService CreateService()
     {
