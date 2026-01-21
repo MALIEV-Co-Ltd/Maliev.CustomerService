@@ -89,32 +89,38 @@ public class TestDatabaseFixture : IAsyncLifetime
 
     /// <summary>
     /// Clears all data from the database (for test isolation)
-    /// Uses EF Core methods instead of raw SQL
     /// </summary>
     public async Task ClearDatabaseAsync()
     {
-        // Clear connection pool to ensure fresh connections
-        Npgsql.NpgsqlConnection.ClearAllPools();
-
         await using var context = CreateDbContext();
 
-        // Delete data using EF Core in correct FK order
+        // Dynamically get table names from model
+        var tableNames = context.Model.GetEntityTypes()
+            .Select(t => t.GetTableName())
+            .Where(t => t != null)
+            .Cast<string>()
+            .ToList();
 
-        // Clear application data
-        context.InternalNotes.RemoveRange(await context.InternalNotes.ToListAsync());
-        context.DocumentReferences.RemoveRange(await context.DocumentReferences.ToListAsync());
-        context.NDARecords.RemoveRange(await context.NDARecords.ToListAsync());
-        context.Addresses.RemoveRange(await context.Addresses.ToListAsync());
-        context.Customers.RemoveRange(await context.Customers.IgnoreQueryFilters().ToListAsync());
-        context.Companies.RemoveRange(await context.Companies.IgnoreQueryFilters().ToListAsync());
-        context.AuditLogs.RemoveRange(await context.AuditLogs.ToListAsync());
-
-        await context.SaveChangesAsync();
+        // Truncate all tables
+        foreach (var tableName in tableNames)
+        {
+            try
+            {
+                // Table names are from the model, not user input - safe from SQL injection
+#pragma warning disable EF1002, EF1003
+                await context.Database.ExecuteSqlRawAsync($"TRUNCATE TABLE \"{tableName}\" RESTART IDENTITY CASCADE");
+#pragma warning restore EF1002, EF1003
+            }
+            catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P01")
+            {
+                // Table doesn't exist - ignore this error
+            }
+        }
 
         // Clear EF Core change tracker
         context.ChangeTracker.Clear();
 
-        // Clear connection pool after cleanup
+        // Clear connection pool
         Npgsql.NpgsqlConnection.ClearAllPools();
     }
 
