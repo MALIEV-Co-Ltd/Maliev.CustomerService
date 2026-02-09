@@ -21,8 +21,18 @@ public class TestWebApplicationFactory : BaseIntegrationTestFactory<Program, Cus
         ConfigOverrides["Features:PrincipalBasedAuthEnabled"] = "true";
         ConfigOverrides["Features:PermissionBasedAuthEnabled"] = "false"; // Disable IAM registration in tests
 
+        SetupDefaults();
+    }
+
+    public void SetupDefaults()
+    {
+        MockIAMClient.Reset();
         MockIAMClient.Setup(x => x.CreatePrincipalAsync(It.IsAny<CreatePrincipalRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => new CreatePrincipalResponse { PrincipalId = Guid.NewGuid(), CreatedAt = DateTime.UtcNow });
+
+        MockCountryService.Reset();
+        MockCountryService.Setup(x => x.ValidateCountryIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(true);
     }
 
     protected override void ConfigureAdditionalServices(IServiceCollection services)

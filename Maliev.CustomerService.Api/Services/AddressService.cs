@@ -71,10 +71,14 @@ public class AddressService : IAddressService
             OwnerType = request.OwnerType,
             OwnerId = request.OwnerId,
             Type = request.Type,
+            IsDefault = request.IsDefault,
             AddressLine1 = request.AddressLine1,
             AddressLine2 = request.AddressLine2,
+            AddressLine3 = request.AddressLine3,
+            District = request.District,
             City = request.City,
-            Province = request.Province,
+            StateProvince = request.StateProvince,
+
             PostalCode = request.PostalCode,
             CountryId = request.CountryId,
             CreatedAt = DateTime.UtcNow,
@@ -97,10 +101,13 @@ public class AddressService : IAddressService
                 address.OwnerType,
                 address.OwnerId,
                 address.Type,
+                address.IsDefault,
                 address.AddressLine1,
                 address.AddressLine2,
+                address.AddressLine3,
+                address.District,
                 address.City,
-                address.Province,
+                address.StateProvince,
                 address.PostalCode,
                 address.CountryId
             })
@@ -167,10 +174,13 @@ public class AddressService : IAddressService
         var previousValues = new
         {
             address.Type,
+            address.IsDefault,
             address.AddressLine1,
             address.AddressLine2,
+            address.AddressLine3,
+            address.District,
             address.City,
-            address.Province,
+            address.StateProvince,
             address.PostalCode,
             address.CountryId
         };
@@ -203,6 +213,12 @@ public class AddressService : IAddressService
         }
 
         // Update fields if provided
+        if (request.IsDefault.HasValue && request.IsDefault != address.IsDefault)
+        {
+            changedFields["IsDefault"] = request.IsDefault.Value;
+            address.IsDefault = request.IsDefault.Value;
+        }
+
         if (!string.IsNullOrEmpty(request.Type) && request.Type != address.Type)
         {
             changedFields["Type"] = request.Type;
@@ -221,16 +237,28 @@ public class AddressService : IAddressService
             address.AddressLine2 = request.AddressLine2;
         }
 
+        if (request.AddressLine3 != null && request.AddressLine3 != address.AddressLine3)
+        {
+            changedFields["AddressLine3"] = request.AddressLine3;
+            address.AddressLine3 = request.AddressLine3;
+        }
+
+        if (request.District != null && request.District != address.District)
+        {
+            changedFields["District"] = request.District;
+            address.District = request.District;
+        }
+
         if (!string.IsNullOrEmpty(request.City) && request.City != address.City)
         {
             changedFields["City"] = request.City;
             address.City = request.City;
         }
 
-        if (!string.IsNullOrEmpty(request.Province) && request.Province != address.Province)
+        if (!string.IsNullOrEmpty(request.StateProvince) && request.StateProvince != address.StateProvince)
         {
-            changedFields["Province"] = request.Province;
-            address.Province = request.Province;
+            changedFields["StateProvince"] = request.StateProvince;
+            address.StateProvince = request.StateProvince;
         }
 
         if (!string.IsNullOrEmpty(request.PostalCode) && request.PostalCode != address.PostalCode)
@@ -319,10 +347,13 @@ public class AddressService : IAddressService
                 address.OwnerType,
                 address.OwnerId,
                 address.Type,
+                address.IsDefault,
                 address.AddressLine1,
                 address.AddressLine2,
+                address.AddressLine3,
+                address.District,
                 address.City,
-                address.Province,
+                address.StateProvince,
                 address.PostalCode,
                 address.CountryId
             })

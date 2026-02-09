@@ -148,7 +148,7 @@ public class CustomerServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            Phone = "+66-2-123-4567",
+            Mobile = "+66-2-123-4567",
             Segment = "Retail",
             Tier = "Bronze",
             PreferredLanguage = "en",
@@ -169,7 +169,7 @@ public class CustomerServiceTests
         Assert.Equal("John", result.FirstName);
         Assert.Equal("Doe", result.LastName);
         Assert.Equal("john.doe@example.com", result.Email);
-        Assert.Equal("+66-2-123-4567", result.Phone);
+        Assert.Equal("+66-2-123-4567", result.Mobile);
         Assert.Equal("Retail", result.Segment);
         Assert.Equal("Bronze", result.Tier);
         Assert.Equal("en", result.PreferredLanguage);
@@ -189,7 +189,7 @@ public class CustomerServiceTests
             FirstName = "Jane",
             LastName = "Smith",
             Email = "duplicate@example.com",
-            Phone = "+66-2-123-4567",
+            Mobile = "+66-2-123-4567",
             Segment = "Retail",
             Tier = "Bronze",
             PreferredLanguage = "en",
@@ -215,7 +215,7 @@ public class CustomerServiceTests
             FirstName = "Audit",
             LastName = "Test",
             Email = "audit.test@example.com",
-            Phone = "+66-2-123-4567",
+            Mobile = "+66-2-123-4567",
             Segment = "Wholesale",
             Tier = "Silver",
             PreferredLanguage = "th",
@@ -249,7 +249,7 @@ public class CustomerServiceTests
             FirstName = "Get",
             LastName = "Test",
             Email = "get.test@example.com",
-            Phone = "+66-2-123-4567",
+            Mobile = "+66-2-123-4567",
             Segment = "Enterprise",
             Tier = "Gold",
             PreferredLanguage = "en",
@@ -293,7 +293,7 @@ public class CustomerServiceTests
             FirstName = "Delete",
             LastName = "Test",
             Email = "delete.test@example.com",
-            Phone = "+66-2-123-4567",
+            Mobile = "+66-2-123-4567",
             Segment = "Retail",
             Tier = "Bronze",
             PreferredLanguage = "en",
@@ -321,7 +321,7 @@ public class CustomerServiceTests
             FirstName = "Update",
             LastName = "Test",
             Email = "update.test@example.com",
-            Phone = "+66-2-123-4567",
+            Mobile = "+66-2-123-4567",
             Segment = "Retail",
             Tier = "Bronze",
             PreferredLanguage = "en",
@@ -331,7 +331,7 @@ public class CustomerServiceTests
         var updateRequest = new UpdateCustomerRequest
         {
             FirstName = "Updated",
-            Phone = "+66-2-999-9999",
+            Mobile = "+66-2-999-9999",
             Tier = "Silver",
             Version = created.Version
         };
@@ -342,7 +342,7 @@ public class CustomerServiceTests
         // Assert
         Assert.NotNull(result);
         Assert.Equal("Updated", result.FirstName);
-        Assert.Equal("+66-2-999-9999", result.Phone);
+        Assert.Equal("+66-2-999-9999", result.Mobile);
         Assert.Equal("Silver", result.Tier);
         Assert.Equal("Test", result.LastName); // Unchanged
         Assert.Equal("update.test@example.com", result.Email); // Unchanged
@@ -378,7 +378,7 @@ public class CustomerServiceTests
             FirstName = "Concurrency",
             LastName = "Test",
             Email = "concurrency.test@example.com",
-            Phone = "+66-2-123-4567",
+            Mobile = "+66-2-123-4567",
             Segment = "Retail",
             Tier = "Bronze",
             PreferredLanguage = "en",
@@ -408,7 +408,7 @@ public class CustomerServiceTests
             FirstName = "Audit",
             LastName = "Update",
             Email = "audit.update@example.com",
-            Phone = "+66-2-123-4567",
+            Mobile = "+66-2-123-4567",
             Segment = "Retail",
             Tier = "Bronze",
             PreferredLanguage = "en",
@@ -449,7 +449,7 @@ public class CustomerServiceTests
             FirstName = "Delete",
             LastName = "Test",
             Email = "soft.delete@example.com",
-            Phone = "+66-2-123-4567",
+            Mobile = "+66-2-123-4567",
             Segment = "Retail",
             Tier = "Bronze",
             PreferredLanguage = "en",
@@ -464,7 +464,9 @@ public class CustomerServiceTests
 
         // Verify customer is marked as deleted
         await using var context = _fixture.CreateDbContext();
-        var customer = await context.Customers.FindAsync(created.Id);
+        var customer = await context.Customers
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(c => c.Id == created.Id);
         Assert.NotNull(customer);
         Assert.True(customer!.IsDeleted);
     }
@@ -495,7 +497,7 @@ public class CustomerServiceTests
             FirstName = "Audit",
             LastName = "Delete",
             Email = "audit.delete@example.com",
-            Phone = "+66-2-123-4567",
+            Mobile = "+66-2-123-4567",
             Segment = "Retail",
             Tier = "Bronze",
             PreferredLanguage = "en",
@@ -534,7 +536,7 @@ public class CustomerServiceTests
                 FirstName = $"Customer{i}",
                 LastName = "Test",
                 Email = $"customer{i}@example.com",
-                Phone = "+66-2-123-4567",
+                Mobile = "+66-2-123-4567",
                 Segment = "Retail",
                 Tier = "Bronze",
                 PreferredLanguage = "en",
@@ -565,7 +567,7 @@ public class CustomerServiceTests
             FirstName = "Retail",
             LastName = "Customer",
             Email = "retail@example.com",
-            Phone = "+66-2-123-4567",
+            Mobile = "+66-2-123-4567",
             Segment = "Retail",
             Tier = "Bronze",
             PreferredLanguage = "en",
@@ -577,7 +579,7 @@ public class CustomerServiceTests
             FirstName = "Enterprise",
             LastName = "Customer",
             Email = "enterprise@example.com",
-            Phone = "+66-2-123-4568",
+            Mobile = "+66-2-123-4568",
             Segment = "Enterprise",
             Tier = "Gold",
             PreferredLanguage = "en",
@@ -608,7 +610,7 @@ public class CustomerServiceTests
                 FirstName = $"Customer{i}",
                 LastName = "Test",
                 Email = $"page{i}@example.com",
-                Phone = "+66-2-123-4567",
+                Mobile = "+66-2-123-4567",
                 Segment = "Retail",
                 Tier = "Bronze",
                 PreferredLanguage = "en",
@@ -642,7 +644,7 @@ public class CustomerServiceTests
             FirstName = "ToDelete",
             LastName = "Customer",
             Email = "todelete@example.com",
-            Phone = "+66-2-123-4567",
+            Mobile = "+66-2-123-4567",
             Segment = "Retail",
             Tier = "Bronze",
             PreferredLanguage = "en",
@@ -671,7 +673,7 @@ public class CustomerServiceTests
             FirstName = "Preferences",
             LastName = "Test",
             Email = "prefs@example.com",
-            Phone = "+66-2-123-4567",
+            Mobile = "+66-2-123-4567",
             Segment = "Retail",
             Tier = "Bronze",
             PreferredLanguage = "th",

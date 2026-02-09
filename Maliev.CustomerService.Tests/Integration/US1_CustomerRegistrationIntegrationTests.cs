@@ -26,6 +26,7 @@ public class US1_CustomerRegistrationIntegrationTests
     public US1_CustomerRegistrationIntegrationTests(TestWebApplicationFactory factory)
     {
         _factory = factory;
+        _factory.SetupDefaults();
     }
 
 
@@ -47,7 +48,7 @@ public class US1_CustomerRegistrationIntegrationTests
             firstName = "John",
             lastName = "Doe",
             email,
-            phone = "+6621234567",
+            mobile = "+6621234567",
             segment = "Retail",
             tier = "Bronze",
             preferredLanguage = "en",
@@ -65,7 +66,7 @@ public class US1_CustomerRegistrationIntegrationTests
         Assert.Equal("John", customer.FirstName);
         Assert.Equal("Doe", customer.LastName);
         Assert.Equal(email, customer.Email);
-        Assert.Equal("+6621234567", customer.Phone);
+        Assert.Equal("+6621234567", customer.Mobile);
         Assert.Equal("Retail", customer.Segment);
         Assert.Equal("Bronze", customer.Tier);
         Assert.Equal("en", customer.PreferredLanguage);
@@ -89,7 +90,7 @@ public class US1_CustomerRegistrationIntegrationTests
             firstName = "Jane",
             lastName = "Smith",
             email = duplicateEmail,
-            phone = "+6621234567",
+            mobile = "+6621234567",
             segment = "Retail",
             tier = "Bronze",
             preferredLanguage = "en",
@@ -100,7 +101,7 @@ public class US1_CustomerRegistrationIntegrationTests
             firstName = "John",
             lastName = "Doe",
             email = duplicateEmail, // Duplicate email
-            phone = "+6629999999",
+            mobile = "+6629999999",
             segment = "Wholesale",
             tier = "Silver",
             preferredLanguage = "th",
@@ -135,7 +136,7 @@ public class US1_CustomerRegistrationIntegrationTests
             firstName = "Alice",
             lastName = "Johnson",
             email,
-            phone = "+6625555555",
+            mobile = "+6625555555",
             segment = "Enterprise",
             tier = "Gold",
             preferredLanguage = "th",
@@ -161,7 +162,7 @@ public class US1_CustomerRegistrationIntegrationTests
         Assert.Equal("Alice", customer.FirstName);
         Assert.Equal("Johnson", customer.LastName);
         Assert.Equal(email, customer.Email);
-        Assert.Equal("+6625555555", customer.Phone);
+        Assert.Equal("+6625555555", customer.Mobile);
         Assert.Equal("Enterprise", customer.Segment);
         Assert.Equal("Gold", customer.Tier);
         Assert.Equal("th", customer.PreferredLanguage);
@@ -187,7 +188,7 @@ public class US1_CustomerRegistrationIntegrationTests
             firstName = "Bob",
             lastName = "Wilson",
             email,
-            phone = "+6621111111",
+            mobile = "+6621111111",
             segment = "Retail",
             tier = "Bronze",
             preferredLanguage = "en",
@@ -199,7 +200,7 @@ public class US1_CustomerRegistrationIntegrationTests
 
         var updateRequest = new
         {
-            phone = "+6622222222",
+            mobile = "+6622222222",
             lastName = "Wilson-Updated",
             version = createdCustomer!.Version
         };
@@ -211,7 +212,7 @@ public class US1_CustomerRegistrationIntegrationTests
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
         var updatedCustomer = await updateResponse.Content.ReadFromJsonAsync<CustomerResponse>();
         Assert.NotNull(updatedCustomer);
-        Assert.Equal("+6622222222", updatedCustomer!.Phone);
+        Assert.Equal("+6622222222", updatedCustomer!.Mobile);
         Assert.Equal("Wilson-Updated", updatedCustomer.LastName);
         Assert.Equal("Bob", updatedCustomer.FirstName); // Unchanged
         Assert.True(updatedCustomer.UpdatedAt > updatedCustomer.CreatedAt);
@@ -241,7 +242,7 @@ public class US1_CustomerRegistrationIntegrationTests
             firstName = "Charlie",
             lastName = "Brown",
             email,
-            phone = "+6623333333",
+            mobile = "+6623333333",
             segment = "Retail",
             tier = "Bronze",
             preferredLanguage = "en",
@@ -255,7 +256,7 @@ public class US1_CustomerRegistrationIntegrationTests
         var customerClient = _factory.CreateAuthenticatedClient(createdCustomer!.Id.ToString(), CustomerRoles);
         var updateRequest = new
         {
-            phone = "+6624444444",
+            mobile = "+6624444444",
             version = createdCustomer.Version
         };
 
@@ -266,7 +267,7 @@ public class US1_CustomerRegistrationIntegrationTests
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
         var updatedCustomer = await updateResponse.Content.ReadFromJsonAsync<CustomerResponse>();
         Assert.NotNull(updatedCustomer);
-        Assert.Equal("+6624444444", updatedCustomer!.Phone);
+        Assert.Equal("+6624444444", updatedCustomer!.Mobile);
 
         // Verify audit log entry exists for customer actor
         using var dbContext = _factory.GetDbContext();
@@ -294,7 +295,7 @@ public class US1_CustomerRegistrationIntegrationTests
             firstName = "Diana",
             lastName = "Prince",
             email,
-            phone = "+6627777777",
+            mobile = "+6627777777",
             segment = "Wholesale",
             tier = "Silver",
             preferredLanguage = "en",
@@ -347,7 +348,7 @@ public class US1_CustomerRegistrationIntegrationTests
             firstName = "Edward",
             lastName = "Norton",
             email,
-            phone = "+6628888888",
+            mobile = "+6628888888",
             segment = "Government",
             tier = "Platinum",
             preferredLanguage = "en",
@@ -406,7 +407,7 @@ public class US1_CustomerRegistrationIntegrationTests
             FirstName = "Frank",
             LastName = "Castle",
             Email = UniqueEmail("frank.castle"),
-            Phone = "+6621111111",
+            Mobile = "+6621111111",
             Segment = "Retail",
             Tier = "Bronze",
             PreferredLanguage = "en",
@@ -417,7 +418,7 @@ public class US1_CustomerRegistrationIntegrationTests
             FirstName = "Grace",
             LastName = "Hopper",
             Email = UniqueEmail("grace.hopper"),
-            Phone = "+6622222222",
+            Mobile = "+6622222222",
             Segment = "Enterprise",
             Tier = "Gold",
             PreferredLanguage = "en",

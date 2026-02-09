@@ -101,6 +101,19 @@ public class NDAService : INDAService
         return nda.ToNDAResponse();
     }
 
+    /// <inheritdoc />
+    public async Task<List<NDAResponse>> GetByCustomerIdAsync(Guid customerId, CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Retrieving NDAs for customer {CustomerId}", customerId);
+
+        var ndas = await _context.NDARecords
+            .Where(n => n.CustomerId == customerId)
+            .OrderByDescending(n => n.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        return ndas.Select(n => n.ToNDAResponse()).ToList();
+    }
+
     /// <summary>
     /// Updates NDA status with lifecycle validation and audit logging
     /// </summary>

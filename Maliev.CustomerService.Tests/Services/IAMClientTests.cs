@@ -47,7 +47,7 @@ public class IAMClientTests
                 "SendAsync",
                 ItExpr.Is<HttpRequestMessage>(req =>
                     req.Method == HttpMethod.Post &&
-                    req.RequestUri!.ToString().EndsWith("/iam/v1/service-accounts")),
+                    req.RequestUri!.ToString().EndsWith("/iam/v1/principals")),
                 ItExpr.IsAny<CancellationToken>())
             .ReturnsAsync(new HttpResponseMessage
             {

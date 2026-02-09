@@ -1,4 +1,6 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
+using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models.InternalNotes;
 using Maliev.CustomerService.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -13,7 +15,6 @@ namespace Maliev.CustomerService.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("customer/v{version:apiVersion}/internal-notes")]
-[Authorize(Policy = "EmployeeOrHigher")]
 public class InternalNoteController : ControllerBase
 {
     private readonly IInternalNoteService _internalNoteService;
@@ -37,6 +38,7 @@ public class InternalNoteController : ControllerBase
     /// <summary>
     /// Create a new internal note
     /// </summary>
+    [RequirePermission(CustomerPermissions.NotesCreate)]
     [HttpPost]
     [ProducesResponseType(typeof(InternalNoteResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -77,6 +79,7 @@ public class InternalNoteController : ControllerBase
     /// <summary>
     /// Get internal notes by owner
     /// </summary>
+    [RequirePermission(CustomerPermissions.NotesRead)]
     [HttpGet]
     [ProducesResponseType(typeof(List<InternalNoteResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -99,6 +102,7 @@ public class InternalNoteController : ControllerBase
     /// <summary>
     /// Update an internal note
     /// </summary>
+    [RequirePermission(CustomerPermissions.NotesUpdate)]
     [HttpPatch("{id}")]
     [ProducesResponseType(typeof(InternalNoteResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -142,6 +146,7 @@ public class InternalNoteController : ControllerBase
     /// <summary>
     /// Delete an internal note
     /// </summary>
+    [RequirePermission(CustomerPermissions.NotesDelete)]
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

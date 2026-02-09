@@ -60,6 +60,7 @@ public interface ICustomerService
     /// Gets all customers with optional filtering and pagination (T119-T120, T126-T127)
     /// </summary>
     Task<PaginatedResponse<CustomerResponse>> GetAllAsync(
+        string? query = null,
         string? segment = null,
         string? tier = null,
         string? preferredLanguage = null,
@@ -79,4 +80,12 @@ public interface ICustomerService
         int page = 1,
         int pageSize = 100,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Checks if a customer with the specified email already exists
+    /// </summary>
+    /// <param name="email">Email address to check (will be normalized to lowercase)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if email exists, false otherwise</returns>
+    Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default);
 }

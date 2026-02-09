@@ -59,13 +59,13 @@ public class CustomerController : ControllerBase
             // ModelState validation via DataAnnotations
             if (!ModelState.IsValid)
             {
-                _logger.LogWarning("Validation failed for customer creation: {Errors}",
-                    string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
+                var errors = string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage));
+                _logger.LogWarning("Validation failed for customer creation: {Errors}", errors);
 
                 var errorResponse = new ErrorResponse
                 {
                     Code = "VALIDATION_ERROR",
-                    Message = "One or more validation errors occurred",
+                    Message = "One or more validation errors occurred: " + errors,
                     Details = ModelState
                         .Where(ms => ms.Value?.Errors.Count > 0)
                         .ToDictionary(
@@ -95,6 +95,17 @@ public class CustomerController : ControllerBase
                 Timestamp = DateTime.UtcNow
             });
         }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("identity in central system"))
+        {
+            _logger.LogWarning(ex, "Central identity failure");
+            return BadRequest(new ErrorResponse
+            {
+                Code = "IAM_FAILURE",
+                Message = ex.Message,
+                TraceId = HttpContext.TraceIdentifier,
+                Timestamp = DateTime.UtcNow
+            });
+        }
         catch (ArgumentException ex)
         {
             _logger.LogWarning(ex, "Domain validation failed");
@@ -109,7 +120,13 @@ public class CustomerController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error creating customer");
-            throw; // Let global exception handler deal with it
+            return StatusCode(500, new ErrorResponse
+            {
+                Code = "INTERNAL_SERVER_ERROR",
+                Message = "An unexpected error occurred while creating the customer: " + ex.Message,
+                TraceId = HttpContext.TraceIdentifier,
+                Timestamp = DateTime.UtcNow
+            });
         }
     }
 
@@ -317,6 +334,7 @@ public class CustomerController : ControllerBase
     [ProducesResponseType(typeof(PaginatedResponse<CustomerResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetAll(
+        [FromQuery] string? query = null,
         [FromQuery] string? segment = null,
         [FromQuery] string? tier = null,
         [FromQuery] string? preferredLanguage = null,
@@ -331,10 +349,11 @@ public class CustomerController : ControllerBase
     {
         try
         {
-            _logger.LogInformation("Getting all customers with filters: segment={Segment}, tier={Tier}, language={Language}, email={Email}, companyId={CompanyId}",
-                segment, tier, preferredLanguage, email, companyId);
+            _logger.LogInformation("Getting all customers with filters: query={Query}, segment={Segment}, tier={Tier}, language={Language}, email={Email}, companyId={CompanyId}",
+                query, segment, tier, preferredLanguage, email, companyId);
 
             var result = await _customerService.GetAllAsync(
+                query,
                 segment,
                 tier,
                 preferredLanguage,
@@ -421,6 +440,40 @@ public class CustomerController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting customer {CustomerId}", id);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Checks if a customer with the specified email already exists
+    /// </summary>
+    /// <param name="email">Email address to check</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Email existence check result</returns>
+    /// <response code="200">Check completed successfully</response>
+    /// <response code="401">Unauthorized</response>
+    [HttpGet("check-email")]
+    [ProducesResponseType(typeof(EmailExistsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<EmailExistsResponse>> CheckEmail([FromQuery] string email, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return Ok(new EmailExistsResponse { Exists = false });
+            }
+
+            // Trim whitespace and normalize email
+            email = email.Trim().ToLowerInvariant();
+
+            var exists = await _customerService.EmailExistsAsync(email, cancellationToken);
+
+            return Ok(new EmailExistsResponse { Exists = exists, Email = email });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking email existence for {Email}", email);
             throw;
         }
     }

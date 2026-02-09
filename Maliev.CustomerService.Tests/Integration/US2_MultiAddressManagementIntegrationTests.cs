@@ -69,8 +69,10 @@ public class US2_MultiAddressManagementIntegrationTests
             type = "Billing",
             addressLine1 = "123 Main Street",
             addressLine2 = "Suite 100",
+            addressLine3 = "Floor 10",
+            district = "Pathum Wan",
             city = "Bangkok",
-            province = "Bangkok",
+            stateProvince = "Bangkok",
             postalCode = "10110",
             countryId = mockCountryId
         };
@@ -88,8 +90,10 @@ public class US2_MultiAddressManagementIntegrationTests
         Assert.Equal("Billing", address.Type);
         Assert.Equal("123 Main Street", address.AddressLine1);
         Assert.Equal("Suite 100", address.AddressLine2);
+        Assert.Equal("Floor 10", address.AddressLine3);
+        Assert.Equal("Pathum Wan", address.District);
         Assert.Equal("Bangkok", address.City);
-        Assert.Equal("Bangkok", address.Province);
+        Assert.Equal("Bangkok", address.StateProvince);
         Assert.Equal("10110", address.PostalCode);
         Assert.Equal(mockCountryId, address.CountryId);
         Assert.True(Math.Abs((address.CreatedAt - DateTime.UtcNow).TotalSeconds) < 5);
@@ -139,7 +143,7 @@ public class US2_MultiAddressManagementIntegrationTests
             type = "Shipping",
             addressLine1 = "456 Warehouse Road",
             city = "Bangkok",
-            province = "Bangkok",
+            stateProvince = "Bangkok",
             postalCode = "10220",
             countryId = mockCountryId1
         };
@@ -152,7 +156,7 @@ public class US2_MultiAddressManagementIntegrationTests
             type = "Shipping",
             addressLine1 = "789 Distribution Center",
             city = "Chiang Mai",
-            province = "Chiang Mai",
+            stateProvince = "Chiang Mai",
             postalCode = "50000",
             countryId = mockCountryId2
         };
@@ -225,7 +229,7 @@ public class US2_MultiAddressManagementIntegrationTests
             type = "Billing",
             addressLine1 = "100 Business Plaza",
             city = "Bangkok",
-            province = "Bangkok",
+            stateProvince = "Bangkok",
             postalCode = "10100",
             countryId = mockCountryId
         };
@@ -236,7 +240,7 @@ public class US2_MultiAddressManagementIntegrationTests
         var updateRequest = new
         {
             postalCode = "10330",
-            province = "Nonthaburi",
+            stateProvince = "Nonthaburi",
             version = createdAddress!.Version
         };
 
@@ -248,7 +252,7 @@ public class US2_MultiAddressManagementIntegrationTests
         var updatedAddress = await updateResponse.Content.ReadFromJsonAsync<AddressResponse>();
         Assert.NotNull(updatedAddress);
         Assert.Equal("10330", updatedAddress!.PostalCode);
-        Assert.Equal("Nonthaburi", updatedAddress.Province);
+        Assert.Equal("Nonthaburi", updatedAddress.StateProvince);
         Assert.Equal("100 Business Plaza", updatedAddress.AddressLine1); // Unchanged
         Assert.Equal("Bangkok", updatedAddress.City); // Unchanged
         Assert.True(updatedAddress.UpdatedAt > updatedAddress.CreatedAt);
@@ -292,7 +296,7 @@ public class US2_MultiAddressManagementIntegrationTests
             type = "Billing",
             addressLine1 = "200 Government Complex",
             city = "Bangkok",
-            province = "Bangkok",
+            stateProvince = "Bangkok",
             postalCode = "10400",
             countryId = mockCountryId
         };
@@ -305,7 +309,7 @@ public class US2_MultiAddressManagementIntegrationTests
             type = "Shipping",
             addressLine1 = "300 Warehouse A",
             city = "Samut Prakan",
-            province = "Samut Prakan",
+            stateProvince = "Samut Prakan",
             postalCode = "10540",
             countryId = mockCountryId
         };
@@ -317,7 +321,7 @@ public class US2_MultiAddressManagementIntegrationTests
             type = "Shipping",
             addressLine1 = "400 Warehouse B",
             city = "Chonburi",
-            province = "Chonburi",
+            stateProvince = "Chonburi",
             postalCode = "20000",
             countryId = mockCountryId
         };
@@ -384,7 +388,7 @@ public class US2_MultiAddressManagementIntegrationTests
             type = "Shipping",
             addressLine1 = "500 Old Address",
             city = "Bangkok",
-            province = "Bangkok",
+            stateProvince = "Bangkok",
             postalCode = "10500",
             countryId = mockCountryId
         };
@@ -396,7 +400,7 @@ public class US2_MultiAddressManagementIntegrationTests
             type = "Shipping",
             addressLine1 = "600 New Address",
             city = "Bangkok",
-            province = "Bangkok",
+            stateProvince = "Bangkok",
             postalCode = "10600",
             countryId = mockCountryId
         };

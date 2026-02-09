@@ -34,12 +34,27 @@ public class CreateCustomerRequest
     public string Email { get; set; } = string.Empty;
 
     /// <summary>
-    /// Customer's phone number (optional, E.164 format)
+    /// Customer's mobile phone number (optional, E.164 format)
     /// </summary>
-    [Phone(ErrorMessage = "Phone must be a valid phone number")]
-    [MaxLength(20, ErrorMessage = "Phone must not exceed 20 characters")]
-    [JsonPropertyName("phone")]
-    public string? Phone { get; set; }
+    [Phone(ErrorMessage = "Mobile must be a valid phone number")]
+    [MaxLength(20, ErrorMessage = "Mobile must not exceed 20 characters")]
+    [JsonPropertyName("mobile")]
+    public string? Mobile { get; set; }
+
+    /// <summary>
+    /// Extension number for reaching the customer via company landline (optional)
+    /// </summary>
+    [MaxLength(10, ErrorMessage = "Extension must not exceed 10 characters")]
+    [JsonPropertyName("extension")]
+    public string? Extension { get; set; }
+
+    /// <summary>
+    /// Customer's personal or direct landline phone number (optional, E.164 format)
+    /// </summary>
+    [Phone(ErrorMessage = "Landline must be a valid phone number")]
+    [MaxLength(20, ErrorMessage = "Landline must not exceed 20 characters")]
+    [JsonPropertyName("landline")]
+    public string? Landline { get; set; }
 
     /// <summary>
     /// Customer segmentation: Retail, Wholesale, Enterprise, Government (default: Retail)
@@ -82,4 +97,10 @@ public class CreateCustomerRequest
     /// </summary>
     [JsonPropertyName("companyId")]
     public Guid? CompanyId { get; set; }
+
+    /// <summary>
+    /// Whether to use the company's billing address
+    /// </summary>
+    [JsonPropertyName("usesCompanyBillingAddress")]
+    public bool UsesCompanyBillingAddress { get; set; } = true;
 }

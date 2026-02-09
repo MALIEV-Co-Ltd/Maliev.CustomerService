@@ -1,4 +1,3 @@
-using System.Threading.RateLimiting;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Data;
 
@@ -23,7 +22,7 @@ try
     });
     builder.AddServiceMeters("customers-meter"); // Register service meters for OpenTelemetry business metrics
 
-    builder.AddRedisDistributedCache(instanceName: "customer:");
+    builder.AddStandardCache("customer:"); // Redis + in-memory fallback, memory-optimized
     builder.AddMassTransitWithRabbitMq(configure: x =>
     {
         x.AddConsumer<Maliev.CustomerService.Api.Consumers.GetCustomerDetailsConsumer>();
@@ -32,8 +31,10 @@ try
     builder.AddPostgresDbContext<CustomerDbContext>(connectionName: "CustomerDbContext"); // PostgreSQL with retry logic
 
     // --- API Configuration ---
-    builder.AddDefaultCors(); // CORS from CORS:AllowedOrigins config
+    builder.AddStandardCors(); // CORS with fail-fast validation
     builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
+
+    builder.Services.AddMemoryCache(); // Required for CountryServiceClient caching
 
     // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
     builder.AddJwtAuthentication();
@@ -61,19 +62,18 @@ try
     builder.Services.AddHostedService<Maliev.CustomerService.Api.BackgroundServices.NDAExpirationBackgroundService>();
     builder.Services.AddHostedService<Maliev.CustomerService.Api.BackgroundServices.DocumentDeletionRetryBackgroundService>();
 
+    // IAM Service Client (now with Service Account authentication)
+    builder.AddIAMServiceClient("customer");
+    builder.Services.AddIAMRegistration<CustomerIAMRegistrationService>("customer");
+    builder.Services.AddHttpClient<Maliev.CustomerService.Api.Services.IIAMClient,
+        Maliev.CustomerService.Api.Services.IAMClient>("IAMService");
+
     // External Service Clients
-    builder.AddServiceClient<Maliev.CustomerService.Api.Services.External.ICountryServiceClient,
-        Maliev.CustomerService.Api.Services.External.CountryServiceClient>("CountryService");
+    builder.AddAuthenticatedServiceClient<Maliev.CustomerService.Api.Services.External.ICountryServiceClient,
+        Maliev.CustomerService.Api.Services.External.CountryServiceClient>("CountryService", sourceServiceName: "customer");
 
     builder.AddServiceClient<Maliev.CustomerService.Api.Services.External.IUploadServiceClient,
         Maliev.CustomerService.Api.Services.External.UploadServiceClient>("UploadService");
-
-    // IAM Service Client
-    builder.AddServiceClient<Maliev.CustomerService.Api.Services.IIAMClient, Maliev.CustomerService.Api.Services.IAMClient>("IAM");
-
-    // IAM Registration Service
-    builder.AddIAMServiceClient("customer");
-    builder.Services.AddIAMRegistration<CustomerIAMRegistrationService>("customer");
 
     // Controllers
     builder.Services.AddControllers()
@@ -82,45 +82,8 @@ try
             options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
         });
 
-    builder.Services.AddAuthorization(options =>
-    {
-        // EmployeeOrHigher policy for internal notes
-        options.AddPolicy("EmployeeOrHigher", policy =>
-            policy.RequireRole("Employee", "Manager", "Admin"));
-    });
-
-    // Rate Limiting
-    builder.Services.AddRateLimiter(options =>
-    {
-        options.AddPolicy("fixed-validation-policy", context =>
-        {
-            // Use an extremely aggressive rate limit for test environment to ensure it triggers
-            // The X-Test-ID header should make each test run use a separate rate limit counter
-            var testId = context.Request.Headers["X-Test-ID"].FirstOrDefault();
-            var key = !string.IsNullOrEmpty(testId) ? testId : context.Connection.RemoteIpAddress?.ToString() ?? "default-rate-limit-key";
-
-            var limit = builder.Environment.IsDevelopment() ? 3 : 100;
-            return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = limit,
-                Window = TimeSpan.FromSeconds(1),
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = 0
-            });
-        });
-
-        options.OnRejected = async (context, cancellationToken) =>
-        {
-            context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-            await context.HttpContext.Response.WriteAsJsonAsync(new
-            {
-                code = "RATE_LIMIT_EXCEEDED",
-                message = "Too many requests. Please try again later.",
-                traceId = context.HttpContext.TraceIdentifier,
-                timestamp = DateTime.UtcNow
-            }, cancellationToken);
-        };
-    });
+    // Rate Limiting (memory-optimized for low-spec nodes)
+    builder.AddStandardRateLimiting();
     var app = builder.Build();
 
     var logger = app.Services.GetRequiredService<ILogger<Maliev.CustomerService.Api.Program>>();

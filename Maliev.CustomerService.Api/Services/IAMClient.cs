@@ -30,7 +30,7 @@ public class IAMClient : IIAMClient
 
         try
         {
-            var response = await _httpClient.PostAsJsonAsync("/iam/v1/service-accounts", request, cancellationToken);
+            var response = await _httpClient.PostAsJsonAsync("/iam/v1/principals", request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -62,6 +62,38 @@ public class IAMClient : IIAMClient
         {
             _logger.LogError(ex, "Unexpected error occurred while creating IAM principal for email {Email}", request.Email);
             throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<CreatePrincipalResponse?> GetPrincipalByEmailAsync(
+        string email,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Retrieving IAM principal for email {Email}", email);
+
+        try
+        {
+            var response = await _httpClient.GetAsync($"/iam/v1/principals/by-email/{Uri.EscapeDataString(email)}", cancellationToken);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogError("IAM service returned error while getting principal by email: {StatusCode}, Content: {Content}", response.StatusCode, errorContent);
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<CreatePrincipalResponse>(cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error occurred while retrieving IAM principal for email {Email}", email);
+            return null;
         }
     }
 

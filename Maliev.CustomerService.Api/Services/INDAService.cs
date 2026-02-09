@@ -26,6 +26,14 @@ public interface INDAService
     Task<NDAResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Retrieves all NDA records for a specific customer
+    /// </summary>
+    /// <param name="customerId">Customer ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>List of NDA responses</returns>
+    Task<List<NDAResponse>> GetByCustomerIdAsync(Guid customerId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Updates NDA status with lifecycle validation and audit logging
     /// </summary>
     /// <param name="id">NDA ID</param>

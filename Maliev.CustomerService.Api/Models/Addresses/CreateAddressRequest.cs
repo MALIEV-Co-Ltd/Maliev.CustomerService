@@ -32,6 +32,12 @@ public class CreateAddressRequest
     public string Type { get; set; } = string.Empty;
 
     /// <summary>
+    /// Whether this is the default address
+    /// </summary>
+    [JsonPropertyName("isDefault")]
+    public bool IsDefault { get; set; } = false;
+
+    /// <summary>
     /// First line of address
     /// </summary>
     [Required(ErrorMessage = "Address line 1 is required")]
@@ -47,6 +53,20 @@ public class CreateAddressRequest
     public string? AddressLine2 { get; set; }
 
     /// <summary>
+    /// Third line of address (optional)
+    /// </summary>
+    [MaxLength(255)]
+    [JsonPropertyName("addressLine3")]
+    public string? AddressLine3 { get; set; }
+
+    /// <summary>
+    /// District name
+    /// </summary>
+    [MaxLength(100)]
+    [JsonPropertyName("district")]
+    public string? District { get; set; }
+
+    /// <summary>
     /// City name
     /// </summary>
     [Required(ErrorMessage = "City is required")]
@@ -55,12 +75,12 @@ public class CreateAddressRequest
     public string City { get; set; } = string.Empty;
 
     /// <summary>
-    /// Province/State name
+    /// State or Province name
     /// </summary>
-    [Required(ErrorMessage = "Province is required")]
+    [Required(ErrorMessage = "State/Province is required")]
     [MaxLength(100)]
-    [JsonPropertyName("province")]
-    public string Province { get; set; } = string.Empty;
+    [JsonPropertyName("stateProvince")]
+    public string StateProvince { get; set; } = string.Empty;
 
     /// <summary>
     /// Postal/ZIP code

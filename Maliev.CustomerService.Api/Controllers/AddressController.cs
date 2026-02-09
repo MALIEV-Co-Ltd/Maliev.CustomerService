@@ -55,13 +55,13 @@ public class AddressController : ControllerBase
             // ModelState validation via DataAnnotations
             if (!ModelState.IsValid)
             {
-                _logger.LogWarning("Validation failed for address creation: {Errors}",
-                    string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
+                var errors = string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage));
+                _logger.LogWarning("Validation failed for address creation: {Errors}", errors);
 
                 var errorResponse = new ErrorResponse
                 {
                     Code = "VALIDATION_ERROR",
-                    Message = "One or more validation errors occurred",
+                    Message = "One or more validation errors occurred: " + errors,
                     Details = ModelState
                         .Where(ms => ms.Value?.Errors.Count > 0)
                         .ToDictionary(

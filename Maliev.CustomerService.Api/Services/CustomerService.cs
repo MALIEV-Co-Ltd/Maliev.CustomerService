@@ -78,20 +78,32 @@ public class CustomerService : ICustomerService
 
         _logger.LogInformation("Creating IAM principal for new customer with email {Email}", request.Email);
         Guid principalId;
+        bool isNewPrincipal = false;
         try
         {
-            var principalResponse = await _iamClient.CreatePrincipalAsync(new CreatePrincipalRequest
+            // Check if principal already exists (e.g. for employees)
+            var existingPrincipal = await _iamClient.GetPrincipalByEmailAsync(request.Email, cancellationToken);
+            if (existingPrincipal != null)
             {
-                Email = request.Email,
-                DisplayName = $"{request.FirstName} {request.LastName}",
-                PrincipalType = "user",
-                LinkedService = "CustomerService"
-            }, cancellationToken);
-            principalId = principalResponse.PrincipalId;
+                _logger.LogInformation("Using existing IAM principal {PrincipalId} for email {Email}", existingPrincipal.PrincipalId, request.Email);
+                principalId = existingPrincipal.PrincipalId;
+            }
+            else
+            {
+                var principalResponse = await _iamClient.CreatePrincipalAsync(new CreatePrincipalRequest
+                {
+                    Email = request.Email,
+                    DisplayName = $"{request.FirstName} {request.LastName}",
+                    PrincipalType = "user",
+                    LinkedService = "CustomerService"
+                }, cancellationToken);
+                principalId = principalResponse.PrincipalId;
+                isNewPrincipal = true;
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create IAM principal for email {Email}", request.Email);
+            _logger.LogError(ex, "Failed to create or retrieve IAM principal for email {Email}", request.Email);
             throw new InvalidOperationException("Failed to create customer identity in central system", ex);
         }
 
@@ -102,7 +114,9 @@ public class CustomerService : ICustomerService
             FirstName = request.FirstName,
             LastName = request.LastName,
             Email = request.Email,
-            Phone = request.Phone,
+            Mobile = request.Mobile,
+            Extension = request.Extension,
+            Landline = request.Landline,
             Segment = request.Segment,
             Tier = request.Tier,
             PreferredLanguage = request.PreferredLanguage,
@@ -111,6 +125,7 @@ public class CustomerService : ICustomerService
                 ? JsonSerializer.Serialize(request.CommunicationPreferences)
                 : null,
             CompanyId = request.CompanyId,
+            UsesCompanyBillingAddress = request.UsesCompanyBillingAddress,
             IsDeleted = false,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -132,13 +147,16 @@ public class CustomerService : ICustomerService
                 customer.FirstName,
                 customer.LastName,
                 customer.Email,
-                customer.Phone,
+                customer.Mobile,
+                customer.Extension,
+                customer.Landline,
                 customer.Segment,
                 customer.Tier,
                 customer.PreferredLanguage,
                 customer.Timezone,
                 customer.CommunicationPreferences,
-                customer.CompanyId
+                customer.CompanyId,
+                customer.UsesCompanyBillingAddress
             })
         };
 
@@ -151,12 +169,19 @@ public class CustomerService : ICustomerService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to save customer to database. Attempting to delete orphaned IAM principal {PrincipalId}", principalId);
+            if (isNewPrincipal)
+            {
+                _logger.LogError(ex, "Failed to save customer to database. Attempting to delete orphaned IAM principal {PrincipalId}", principalId);
+                // Compensation: Delete the IAM principal to avoid orphaned identity
+                await _iamClient.DeletePrincipalAsync(principalId, cancellationToken);
+            }
+            else
+            {
+                _logger.LogError(ex, "Failed to save customer to database. Keeping existing IAM principal {PrincipalId}", principalId);
+            }
 
-            // Compensation: Delete the IAM principal to avoid orphaned identity
-            await _iamClient.DeletePrincipalAsync(principalId, cancellationToken);
-
-            throw new InvalidOperationException("Failed to create customer due to database error. IAM principal has been cleaned up.", ex);
+            var innerMessage = ex.InnerException?.Message ?? ex.Message;
+            throw new InvalidOperationException($"Failed to create customer due to database error: {innerMessage}", ex);
         }
 
         // Record metrics
@@ -180,7 +205,9 @@ public class CustomerService : ICustomerService
                 FirstName: customer.FirstName,
                 LastName: customer.LastName,
                 Email: customer.Email,
-                Phone: customer.Phone,
+                Mobile: customer.Mobile,
+                Extension: customer.Extension,
+                Landline: customer.Landline,
                 Segment: customer.Segment,
                 Tier: customer.Tier,
                 CompanyId: customer.CompanyId,
@@ -213,7 +240,28 @@ public class CustomerService : ICustomerService
             return null;
         }
 
-        return customer.ToCustomerResponse();
+        Company? company = null;
+        if (customer.CompanyId.HasValue)
+        {
+            company = await _context.Companies
+                .Where(c => c.Id == customer.CompanyId.Value)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        var nda = await _context.NDARecords
+            .Where(n => n.CustomerId == id)
+            .OrderByDescending(n => n.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // Fetch creator from audit logs (T240)
+        var creationAudit = await _context.AuditLogs
+            .Where(a => a.EntityType == nameof(Customer) && a.EntityId == id.ToString() && a.Action == AuditAction.Create)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var response = customer.ToCustomerResponse(company, nda);
+        response.CreatedBy = creationAudit?.ActorId ?? "System";
+
+        return response;
     }
 
     /// <inheritdoc/>
@@ -231,7 +279,20 @@ public class CustomerService : ICustomerService
             return null;
         }
 
-        return customer.ToCustomerResponse();
+        Company? company = null;
+        if (customer.CompanyId.HasValue)
+        {
+            company = await _context.Companies
+                .Where(c => c.Id == customer.CompanyId.Value)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        var nda = await _context.NDARecords
+            .Where(n => n.CustomerId == customer.Id)
+            .OrderByDescending(n => n.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return customer.ToCustomerResponse(company, nda);
     }
 
     /// <summary>
@@ -266,7 +327,8 @@ public class CustomerService : ICustomerService
             customer.FirstName,
             customer.LastName,
             customer.Email,
-            customer.Phone,
+            customer.Mobile,
+            customer.Extension,
             customer.Segment,
             customer.Tier,
             customer.PreferredLanguage,
@@ -308,10 +370,22 @@ public class CustomerService : ICustomerService
             customer.Email = request.Email;
         }
 
-        if (request.Phone != null && request.Phone != customer.Phone)
+        if (request.Mobile != null && request.Mobile != customer.Mobile)
         {
-            changedFields["Phone"] = request.Phone;
-            customer.Phone = request.Phone;
+            changedFields["Mobile"] = request.Mobile;
+            customer.Mobile = request.Mobile;
+        }
+
+        if (request.Extension != null && request.Extension != customer.Extension)
+        {
+            changedFields["Extension"] = request.Extension;
+            customer.Extension = request.Extension;
+        }
+
+        if (request.Landline != null && request.Landline != customer.Landline)
+        {
+            changedFields["Landline"] = request.Landline;
+            customer.Landline = request.Landline;
         }
 
         if (!string.IsNullOrEmpty(request.Segment) && request.Segment != customer.Segment)
@@ -493,6 +567,7 @@ public class CustomerService : ICustomerService
     /// <summary>
     /// Gets all customers with optional filtering and pagination
     /// </summary>
+    /// <param name="query">Optional search query for name or email</param>
     /// <param name="segment">Optional segment filter</param>
     /// <param name="tier">Optional tier filter</param>
     /// <param name="preferredLanguage">Optional preferred language filter</param>
@@ -506,6 +581,7 @@ public class CustomerService : ICustomerService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Paginated response containing customer list and pagination metadata</returns>
     public async Task<PaginatedResponse<CustomerResponse>> GetAllAsync(
+        string? query = null,
         string? segment = null,
         string? tier = null,
         string? preferredLanguage = null,
@@ -518,8 +594,8 @@ public class CustomerService : ICustomerService
         int pageSize = 50,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Querying customers with filters: segment={Segment}, tier={Tier}, language={Language}, email={Email}, companyId={CompanyId}, page={Page}, pageSize={PageSize}",
-            segment, tier, preferredLanguage, email, companyId, page, pageSize);
+        _logger.LogDebug("Querying customers with filters: query={Query}, segment={Segment}, tier={Tier}, language={Language}, email={Email}, companyId={CompanyId}, page={Page}, pageSize={PageSize}",
+            query, segment, tier, preferredLanguage, email, companyId, page, pageSize);
 
         // Log for integration tracking (T125)
         if (!string.IsNullOrEmpty(segment) || !string.IsNullOrEmpty(tier))
@@ -529,71 +605,100 @@ public class CustomerService : ICustomerService
         }
 
         // Base query with isDeleted filter (T126, T128)
-        var query = _context.Customers
+        var customersQuery = _context.Customers
             .Where(c => includeDeleted || !c.IsDeleted)
             .AsQueryable();
+
+        // Apply search query (T126, T128)
+        if (!string.IsNullOrEmpty(query))
+        {
+            var searchTerm = $"%{query}%";
+            customersQuery = customersQuery.Where(c =>
+                EF.Functions.ILike(c.FirstName, searchTerm) ||
+                EF.Functions.ILike(c.LastName, searchTerm) ||
+                EF.Functions.ILike(c.Email, searchTerm) ||
+                (c.FirstName + " " + c.LastName).Contains(query)); // Fallback for name concat
+        }
 
         // Apply filters (T119, T126)
         if (!string.IsNullOrEmpty(segment))
         {
-            query = query.Where(c => c.Segment == segment);
+            customersQuery = customersQuery.Where(c => c.Segment == segment);
         }
 
         if (!string.IsNullOrEmpty(tier))
         {
-            query = query.Where(c => c.Tier == tier);
+            customersQuery = customersQuery.Where(c => c.Tier == tier);
         }
 
         if (!string.IsNullOrEmpty(preferredLanguage))
         {
-            query = query.Where(c => c.PreferredLanguage == preferredLanguage);
+            customersQuery = customersQuery.Where(c => c.PreferredLanguage == preferredLanguage);
         }
 
         // Email partial match using LIKE (T126, T128)
-        // Note: Requires pg_trgm extension and a GIN index in the database:
-        // CREATE INDEX idx_customer_email_trgm ON customers USING gin (email gin_trgm_ops);
         if (!string.IsNullOrEmpty(email))
         {
-            query = query.Where(c => EF.Functions.Like(c.Email, $"%{email}%"));
+            customersQuery = customersQuery.Where(c => EF.Functions.ILike(c.Email, $"%{email}%"));
         }
 
         // Filter by company ID (T126)
         if (companyId.HasValue)
         {
-            query = query.Where(c => c.CompanyId == companyId.Value);
+            customersQuery = customersQuery.Where(c => c.CompanyId == companyId.Value);
         }
 
         // Filter by creation date range (T126, T128)
         if (createdFrom.HasValue)
         {
-            query = query.Where(c => c.CreatedAt >= createdFrom.Value);
+            customersQuery = customersQuery.Where(c => c.CreatedAt >= createdFrom.Value);
         }
 
         if (createdTo.HasValue)
         {
-            query = query.Where(c => c.CreatedAt <= createdTo.Value);
+            customersQuery = customersQuery.Where(c => c.CreatedAt <= createdTo.Value);
         }
 
         // Get total count for pagination
-        var totalCount = await query.CountAsync(cancellationToken);
+        var totalCount = await customersQuery.CountAsync(cancellationToken);
 
         // Calculate pagination
         var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
         var skip = (page - 1) * pageSize;
 
         // Get page data with default ordering by created_at DESC
-        var customers = await query
+        var customers = await customersQuery
             .OrderByDescending(c => c.CreatedAt)
             .Skip(skip)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
+
+        // Batch fetch related data for performance
+        var customerIds = customers.Select(c => c.Id).ToList();
+        var companyIds = customers
+            .Where(c => c.CompanyId.HasValue)
+            .Select(c => c.CompanyId!.Value)
+            .Distinct()
+            .ToList();
+
+        var companies = await _context.Companies
+            .Where(comp => companyIds.Contains(comp.Id))
+            .ToDictionaryAsync(comp => comp.Id, cancellationToken);
+
+        var ndas = await _context.NDARecords
+            .Where(n => customerIds.Contains(n.CustomerId))
+            .GroupBy(n => n.CustomerId)
+            .Select(g => g.OrderByDescending(n => n.CreatedAt).First())
+            .ToDictionaryAsync(n => n.CustomerId, cancellationToken);
 
         _logger.LogDebug("Retrieved {Count} customers (page {Page}/{TotalPages}, total {TotalCount})",
             customers.Count, page, totalPages, totalCount);
 
         return new PaginatedResponse<CustomerResponse>
         {
-            Items = customers.Select(c => c.ToCustomerResponse()).ToList(),
+            Items = customers.Select(c => c.ToCustomerResponse(
+                c.CompanyId.HasValue && companies.TryGetValue(c.CompanyId.Value, out var comp) ? comp : null,
+                ndas.TryGetValue(c.Id, out var nda) ? nda : null)).ToList(),
             TotalCount = totalCount,
             Page = page,
             PageSize = pageSize,
@@ -656,5 +761,37 @@ public class CustomerService : ICustomerService
             PageSize = pageSize,
             TotalPages = totalPages
         };
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = email.ToLowerInvariant();
+
+        // Check in local Customers table
+        var existsLocally = await _context.Customers
+            .Where(c => !c.IsDeleted)
+            .AnyAsync(c => c.Email.ToLower() == normalizedEmail, cancellationToken);
+
+        if (existsLocally)
+        {
+            _logger.LogDebug("Email check for {Email}: Exists in Customers table", normalizedEmail);
+            return true;
+        }
+
+        // Check in IAM system (central identity)
+        var iamPrincipal = await _iamClient.GetPrincipalByEmailAsync(normalizedEmail, cancellationToken);
+        if (iamPrincipal != null)
+        {
+            // If it exists in IAM but NOT in Customers table, it means they are an employee or similar
+            // We return false here because THEY CAN be registered as a customer
+            // But we should probably distinguish between "Exists as Customer" and "Exists in System"
+            _logger.LogDebug("Email check for {Email}: Found in IAM but not in Customers table (allowed for onboarding)", normalizedEmail);
+            return false;
+        }
+
+        _logger.LogDebug("Email existence check for {Email}: Not found in system", normalizedEmail);
+
+        return false;
     }
 }

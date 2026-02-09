@@ -56,13 +56,13 @@ public class CompanyController : ControllerBase
             // ModelState validation via DataAnnotations
             if (!ModelState.IsValid)
             {
-                _logger.LogWarning("Validation failed for company creation: {Errors}",
-                    string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
+                var errors = string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage));
+                _logger.LogWarning("Validation failed for company creation: {Errors}", errors);
 
                 var errorResponse = new ErrorResponse
                 {
                     Code = "VALIDATION_ERROR",
-                    Message = "One or more validation errors occurred",
+                    Message = "One or more validation errors occurred: " + errors,
                     Details = ModelState
                         .Where(ms => ms.Value?.Errors.Count > 0)
                         .ToDictionary(
@@ -185,8 +185,43 @@ public class CompanyController : ControllerBase
     }
 
     /// <summary>
+    /// Searches for companies by name or VAT number and includes their default billing address
+    /// </summary>
+    /// <param name="query">Search query (name or VAT)</param>
+    /// <param name="limit">Maximum number of results to return (default: 10)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>List of company search results with addresses</returns>
+    /// <response code="200">Search results retrieved successfully</response>
+    /// <response code="401">Unauthorized</response>
+    [HttpGet("search")]
+    [ProducesResponseType(typeof(List<CompanySearchResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<List<CompanySearchResultDto>>> Search(
+        [FromQuery] string query,
+        [FromQuery] int limit = 10,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                return Ok(new List<CompanySearchResultDto>());
+            }
+
+            var results = await _companyService.SearchWithAddressAsync(query, limit, cancellationToken);
+            return Ok(results);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error searching companies for query {Query}", query);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Updates an existing company
     /// </summary>
+
     /// <param name="id">Company ID</param>
     /// <param name="request">Company update request</param>
     /// <param name="cancellationToken">Cancellation token</param>

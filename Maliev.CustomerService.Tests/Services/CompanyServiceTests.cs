@@ -82,7 +82,7 @@ public class CompanyServiceTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.CreateAsync(request, "test-actor", "Employee"));
 
-        Assert.Contains("VAT number must be in format", exception.Message);
+        Assert.Contains("VAT number must be either 10-15 digits", exception.Message);
     }
 
     [Fact]
@@ -260,7 +260,7 @@ public class CompanyServiceTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.UpdateAsync(created.Id, updateRequest, "test-actor", "Employee"));
 
-        Assert.Contains("VAT number must be in format", exception.Message);
+        Assert.Contains("VAT number must be either 10-15 digits", exception.Message);
     }
 
     [Fact]
@@ -536,7 +536,7 @@ public class CompanyServiceTests
                 FirstName = "John",
                 LastName = "Doe",
                 Email = "john@company.com",
-                Phone = "+66-2-123-4567",
+                Mobile = "+66-2-123-4567",
                 Segment = "Enterprise",
                 Tier = "Gold",
                 PreferredLanguage = "en",
@@ -554,7 +554,7 @@ public class CompanyServiceTests
                 FirstName = "Jane",
                 LastName = "Smith",
                 Email = "jane@company.com",
-                Phone = "+66-2-123-4568",
+                Mobile = "+66-2-123-4568",
                 Segment = "Enterprise",
                 Tier = "Gold",
                 PreferredLanguage = "en",
@@ -620,7 +620,7 @@ public class CompanyServiceTests
                 FirstName = "Active",
                 LastName = "Customer",
                 Email = "active@company.com",
-                Phone = "+66-2-123-4567",
+                Mobile = "+66-2-123-4567",
                 Segment = "Enterprise",
                 Tier = "Gold",
                 PreferredLanguage = "en",
@@ -638,7 +638,7 @@ public class CompanyServiceTests
                 FirstName = "Deleted",
                 LastName = "Customer",
                 Email = "deleted@company.com",
-                Phone = "+66-2-123-4568",
+                Mobile = "+66-2-123-4568",
                 Segment = "Enterprise",
                 Tier = "Gold",
                 PreferredLanguage = "en",

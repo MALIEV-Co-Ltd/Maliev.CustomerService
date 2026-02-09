@@ -29,24 +29,41 @@ public class Address
     public string Type { get; set; } = Models.AddressType.Billing;
 
     /// <summary>
+    /// Whether this is the default address of its type for the owner
+    /// </summary>
+    public bool IsDefault { get; set; } = false;
+
+
+    /// <summary>
     /// First line of address
     /// </summary>
     public string AddressLine1 { get; set; } = string.Empty;
 
     /// <summary>
-    /// Second line of address (optional)
+    /// Second line of address
     /// </summary>
     public string? AddressLine2 { get; set; }
 
     /// <summary>
-    /// City name
+    /// Third line of address
+    /// </summary>
+    public string? AddressLine3 { get; set; }
+
+    /// <summary>
+    /// District name (Tambon in Thailand)
+    /// </summary>
+    public string? District { get; set; }
+
+    /// <summary>
+    /// City name (Amphoe in Thailand)
     /// </summary>
     public string City { get; set; } = string.Empty;
 
+
     /// <summary>
-    /// Province/State name
+    /// State or Province name (Changwat in Thailand)
     /// </summary>
-    public string Province { get; set; } = string.Empty;
+    public string StateProvince { get; set; } = string.Empty;
 
     /// <summary>
     /// Postal/ZIP code

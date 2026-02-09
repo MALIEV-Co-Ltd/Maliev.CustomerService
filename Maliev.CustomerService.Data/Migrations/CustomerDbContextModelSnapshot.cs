@@ -17,7 +17,7 @@ namespace Maliev.CustomerService.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.1")
+                .HasAnnotation("ProductVersion", "10.0.2")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -27,68 +27,79 @@ namespace Maliev.CustomerService.Data.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
-                        .HasColumnName("id");
+                        .HasColumnOrder(0);
 
                     b.Property<string>("AddressLine1")
                         .IsRequired()
                         .HasColumnType("text")
-                        .HasColumnName("address_line1");
+                        .HasColumnOrder(5);
 
                     b.Property<string>("AddressLine2")
                         .HasColumnType("text")
-                        .HasColumnName("address_line2");
+                        .HasColumnOrder(6);
+
+                    b.Property<string>("AddressLine3")
+                        .HasColumnType("text")
+                        .HasColumnOrder(7);
 
                     b.Property<string>("City")
                         .IsRequired()
                         .HasColumnType("text")
-                        .HasColumnName("city");
+                        .HasColumnOrder(9);
 
                     b.Property<Guid>("CountryId")
                         .HasColumnType("uuid")
-                        .HasColumnName("country_id");
+                        .HasColumnOrder(12);
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
+                        .HasColumnOrder(13);
+
+                    b.Property<string>("District")
+                        .HasColumnType("text")
+                        .HasColumnOrder(8);
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnOrder(4);
 
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid")
-                        .HasColumnName("owner_id");
+                        .HasColumnOrder(2);
 
                     b.Property<string>("OwnerType")
                         .IsRequired()
                         .HasColumnType("text")
-                        .HasColumnName("owner_type");
+                        .HasColumnOrder(1);
 
                     b.Property<string>("PostalCode")
                         .IsRequired()
                         .HasColumnType("text")
-                        .HasColumnName("postal_code");
+                        .HasColumnOrder(11);
 
-                    b.Property<string>("Province")
+                    b.Property<string>("StateProvince")
                         .IsRequired()
                         .HasColumnType("text")
-                        .HasColumnName("province");
+                        .HasColumnOrder(10);
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasColumnType("text")
-                        .HasColumnName("type");
+                        .HasColumnOrder(3);
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
+                        .HasColumnOrder(14);
 
                     b.Property<byte[]>("Version")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("bytea")
-                        .HasColumnName("version")
+                        .HasColumnOrder(15)
                         .HasDefaultValueSql("'\\x0000000000000001'::bytea");
 
-                    b.HasKey("Id")
-                        .HasName("pk_addresses");
+                    b.HasKey("Id");
 
                     b.HasIndex("CountryId")
                         .HasDatabaseName("ix_address_country_id");
@@ -96,11 +107,11 @@ namespace Maliev.CustomerService.Data.Migrations
                     b.HasIndex("OwnerType", "OwnerId")
                         .HasDatabaseName("ix_address_owner_type_owner_id");
 
-                    b.ToTable("addresses", t =>
+                    b.ToTable("Addresses", t =>
                         {
-                            t.HasCheckConstraint("ck_address_owner_type", "owner_type IN ('Customer', 'Company')");
+                            t.HasCheckConstraint("ck_address_owner_type", "\"OwnerType\" IN ('Customer', 'Company')");
 
-                            t.HasCheckConstraint("ck_address_type", "type IN ('Billing', 'Shipping')");
+                            t.HasCheckConstraint("ck_address_type", "\"Type\" IN ('Billing', 'Shipping')");
                         });
                 });
 
@@ -108,264 +119,191 @@ namespace Maliev.CustomerService.Data.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Action")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("action");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("ActorId")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("actor_id");
+                        .HasColumnType("text");
 
                     b.Property<string>("ActorType")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("actor_type");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("ChangedFields")
-                        .HasColumnType("text")
-                        .HasColumnName("changed_fields");
+                        .HasColumnType("text");
 
                     b.Property<string>("EntityId")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("entity_id");
+                        .HasColumnType("text");
 
                     b.Property<string>("EntityType")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("PreviousValues")
-                        .HasColumnType("text")
-                        .HasColumnName("previous_values");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("Timestamp")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("timestamp");
+                        .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("Id")
-                        .HasName("pk_audit_logs");
+                    b.HasKey("Id");
 
-                    b.HasIndex("ActorId")
-                        .HasDatabaseName("ix_auditlog_actor_id");
+                    b.HasIndex("Timestamp");
 
-                    b.HasIndex("ActorType")
-                        .HasDatabaseName("ix_auditlog_actor_type");
+                    b.HasIndex("EntityType", "EntityId");
 
-                    b.HasIndex("Timestamp")
-                        .HasDatabaseName("ix_auditlog_timestamp");
-
-                    b.HasIndex("EntityType", "EntityId")
-                        .HasDatabaseName("ix_auditlog_entity_type_entity_id");
-
-                    b.ToTable("audit_logs");
+                    b.ToTable("AuditLogs");
                 });
 
             modelBuilder.Entity("Maliev.CustomerService.Data.Models.Company", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ContactEmail")
-                        .HasColumnType("text")
-                        .HasColumnName("contact_email");
+                        .HasColumnType("text");
 
                     b.Property<string>("ContactPhone")
-                        .HasColumnType("text")
-                        .HasColumnName("contact_phone");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("name");
+                        .HasColumnType("text");
 
                     b.Property<string>("RegistrationNumber")
-                        .HasColumnType("text")
-                        .HasColumnName("registration_number");
+                        .HasColumnType("text");
 
                     b.Property<string>("Segment")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("segment");
+                        .HasColumnType("text");
 
                     b.Property<string>("Tier")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("tier");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("VatNumber")
-                        .HasColumnType("text")
-                        .HasColumnName("vat_number");
+                        .HasColumnType("text");
 
                     b.Property<byte[]>("Version")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("bytea")
-                        .HasColumnName("version")
                         .HasDefaultValueSql("'\\x0000000000000001'::bytea");
 
-                    b.HasKey("Id")
-                        .HasName("pk_companies");
-
-                    b.HasIndex("Name")
-                        .HasDatabaseName("ix_company_name");
-
-                    b.HasIndex("Segment")
-                        .HasDatabaseName("ix_company_segment");
-
-                    b.HasIndex("Tier")
-                        .HasDatabaseName("ix_company_tier");
+                    b.HasKey("Id");
 
                     b.HasIndex("VatNumber")
-                        .HasDatabaseName("ix_company_vat_number");
+                        .IsUnique()
+                        .HasFilter("\"VatNumber\" IS NOT NULL");
 
-                    b.ToTable("companies", t =>
-                        {
-                            t.HasCheckConstraint("ck_company_segment", "segment IN ('Retail', 'Wholesale', 'Enterprise', 'Government')");
-
-                            t.HasCheckConstraint("ck_company_tier", "tier IN ('Bronze', 'Silver', 'Gold', 'Platinum', 'VIP')");
-                        });
+                    b.ToTable("Companies");
                 });
 
             modelBuilder.Entity("Maliev.CustomerService.Data.Models.Customer", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("CommunicationPreferences")
-                        .HasColumnType("text")
-                        .HasColumnName("communication_preferences");
+                        .HasColumnType("text");
 
                     b.Property<Guid?>("CompanyId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("company_id");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("email");
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("Extension")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("first_name");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Landline")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("last_name");
+                        .HasColumnType("character varying(100)");
 
-                    b.Property<string>("Phone")
+                    b.Property<string>("Mobile")
                         .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("phone");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("PreferredLanguage")
                         .IsRequired()
                         .HasMaxLength(2)
-                        .HasColumnType("character varying(2)")
-                        .HasColumnName("preferred_language");
+                        .HasColumnType("character varying(2)");
 
                     b.Property<Guid>("PrincipalId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("principal_id");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Segment")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("segment");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Tier")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("tier");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Timezone")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("timezone");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("UsesCompanyBillingAddress")
+                        .HasColumnType("boolean");
 
                     b.Property<byte[]>("Version")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("bytea")
-                        .HasColumnName("version")
                         .HasDefaultValueSql("'\\x0000000000000001'::bytea");
 
-                    b.HasKey("Id")
-                        .HasName("pk_customers");
-
-                    b.HasIndex("CompanyId")
-                        .HasDatabaseName("ix_customer_company_id");
-
-                    b.HasIndex("CreatedAt")
-                        .HasDatabaseName("ix_customer_created_at");
+                    b.HasKey("Id");
 
                     b.HasIndex("Email")
-                        .IsUnique()
-                        .HasDatabaseName("ix_customer_email_unique_active")
-                        .HasFilter("is_deleted = false");
-
-                    b.HasIndex("PreferredLanguage")
-                        .HasDatabaseName("ix_customer_preferred_language");
+                        .IsUnique();
 
                     b.HasIndex("PrincipalId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_customer_principal_lookup")
-                        .HasFilter("is_deleted = false AND principal_id != '00000000-0000-0000-0000-000000000000'");
+                        .IsUnique();
 
-                    b.HasIndex("Segment")
-                        .HasDatabaseName("ix_customer_segment");
-
-                    b.HasIndex("Tier")
-                        .HasDatabaseName("ix_customer_tier");
-
-                    b.ToTable("customers", t =>
-                        {
-                            t.HasCheckConstraint("ck_customer_segment", "segment IN ('Retail', 'Wholesale', 'Enterprise', 'Government')");
-
-                            t.HasCheckConstraint("ck_customer_tier", "tier IN ('Bronze', 'Silver', 'Gold', 'Platinum', 'VIP')");
-                        });
+                    b.ToTable("Customers");
                 });
 
             modelBuilder.Entity("Maliev.CustomerService.Data.Models.DocumentReference", b =>
@@ -438,24 +376,11 @@ namespace Maliev.CustomerService.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("version");
 
-                    b.HasKey("Id")
-                        .HasName("pk_document_references");
+                    b.HasKey("Id");
 
-                    b.HasIndex("DocumentType")
-                        .HasDatabaseName("ix_documentreference_document_type");
+                    b.HasIndex("OwnerType", "OwnerId");
 
-                    b.HasIndex("Status")
-                        .HasDatabaseName("ix_documentreference_status");
-
-                    b.HasIndex("OwnerType", "OwnerId")
-                        .HasDatabaseName("ix_documentreference_owner_type_owner_id");
-
-                    b.ToTable("document_references", t =>
-                        {
-                            t.HasCheckConstraint("ck_documentreference_owner_type", "owner_type IN ('Customer', 'Company')");
-
-                            t.HasCheckConstraint("ck_documentreference_status", "status IN ('Pending', 'Complete', 'PendingDeletion', 'Orphaned', 'MissingFile')");
-                        });
+                    b.ToTable("document_references");
                 });
 
             modelBuilder.Entity("Maliev.CustomerService.Data.Models.InternalNote", b =>
@@ -503,92 +428,59 @@ namespace Maliev.CustomerService.Data.Migrations
                         .HasColumnName("version")
                         .HasDefaultValueSql("'\\x0000000000000001'::bytea");
 
-                    b.HasKey("Id")
-                        .HasName("pk_internal_notes");
+                    b.HasKey("Id");
 
-                    b.HasIndex("CreatedAt")
-                        .HasDatabaseName("ix_internalnote_created_at");
+                    b.HasIndex("OwnerType", "OwnerId");
 
-                    b.HasIndex("CreatedBy")
-                        .HasDatabaseName("ix_internalnote_created_by");
-
-                    b.HasIndex("OwnerType", "OwnerId")
-                        .HasDatabaseName("ix_internalnote_owner_type_owner_id");
-
-                    b.ToTable("internal_notes", t =>
-                        {
-                            t.HasCheckConstraint("ck_internalnote_owner_type", "owner_type IN ('Customer', 'Company')");
-                        });
+                    b.ToTable("internal_notes");
                 });
 
             modelBuilder.Entity("Maliev.CustomerService.Data.Models.NDARecord", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("CustomerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("customer_id");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("DocumentReferenceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("document_reference_id");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("RevokedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("revoked_at");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("SignedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("signed_at");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("SignedBy")
-                        .HasColumnType("text")
-                        .HasColumnName("signed_by");
+                        .HasColumnType("text");
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("status");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<byte[]>("Version")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("bytea")
-                        .HasColumnName("version")
                         .HasDefaultValueSql("'\\x0000000000000001'::bytea");
 
-                    b.HasKey("Id")
-                        .HasName("pk_nda_records");
+                    b.HasKey("Id");
 
-                    b.HasIndex("CustomerId")
-                        .HasDatabaseName("ix_ndarecord_customer_id");
+                    b.HasIndex("CustomerId");
 
-                    b.HasIndex("ExpiresAt")
-                        .HasDatabaseName("ix_ndarecord_expires_at");
-
-                    b.HasIndex("Status")
-                        .HasDatabaseName("ix_ndarecord_status");
-
-                    b.ToTable("nda_records", t =>
-                        {
-                            t.HasCheckConstraint("ck_ndarecord_status", "status IN ('Draft', 'Signed', 'Expired', 'Revoked')");
-                        });
+                    b.ToTable("NDARecords");
                 });
 #pragma warning restore 612, 618
         }

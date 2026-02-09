@@ -15,9 +15,9 @@ namespace Maliev.CustomerService.Api.Mapping;
 public static class DomainToDtoMapper
 {
     /// <summary>
-    /// Maps a Customer entity to CustomerResponse DTO
+    /// Maps a Customer entity to CustomerResponse DTO with optional company and NDA data
     /// </summary>
-    public static CustomerResponse ToCustomerResponse(this Customer customer)
+    public static CustomerResponse ToCustomerResponse(this Customer customer, Company? company = null, NDARecord? nda = null)
     {
         return new CustomerResponse
         {
@@ -26,16 +26,23 @@ public static class DomainToDtoMapper
             FirstName = customer.FirstName,
             LastName = customer.LastName,
             Email = customer.Email,
-            Phone = customer.Phone,
+            Mobile = customer.Mobile,
+            Extension = customer.Extension,
+            Landline = customer.Landline,
             Segment = customer.Segment,
             Tier = customer.Tier,
             PreferredLanguage = customer.PreferredLanguage,
             Timezone = customer.Timezone,
             CommunicationPreferences = !string.IsNullOrEmpty(customer.CommunicationPreferences)
-                ? JsonSerializer.Deserialize<Dictionary<string, object>>(customer.CommunicationPreferences)
+                ? JsonSerializer.Deserialize<Dictionary<string, bool>>(customer.CommunicationPreferences)
                 : null,
             CompanyId = customer.CompanyId,
+            CompanyName = company?.Name,
+            CompanyPhone = company?.ContactPhone,
+            NDAStatus = nda?.Status,
+            UsesCompanyBillingAddress = customer.UsesCompanyBillingAddress,
             IsDeleted = customer.IsDeleted,
+
             CreatedAt = customer.CreatedAt,
             UpdatedAt = customer.UpdatedAt,
             Version = customer.Version
@@ -74,10 +81,13 @@ public static class DomainToDtoMapper
             OwnerType = address.OwnerType,
             OwnerId = address.OwnerId,
             Type = address.Type,
+            IsDefault = address.IsDefault,
             AddressLine1 = address.AddressLine1,
             AddressLine2 = address.AddressLine2,
+            AddressLine3 = address.AddressLine3,
+            District = address.District,
             City = address.City,
-            Province = address.Province,
+            StateProvince = address.StateProvince,
             PostalCode = address.PostalCode,
             CountryId = address.CountryId,
             CreatedAt = address.CreatedAt,
@@ -85,6 +95,25 @@ public static class DomainToDtoMapper
             Version = address.Version
         };
     }
+
+    /// <summary>
+    /// Maps an Address entity to AddressSummaryDto
+    /// </summary>
+    public static AddressSummaryDto ToAddressSummaryDto(this Address address)
+    {
+        return new AddressSummaryDto
+        {
+            IsDefault = address.IsDefault,
+            AddressLine1 = address.AddressLine1,
+            AddressLine2 = address.AddressLine2,
+            AddressLine3 = address.AddressLine3,
+            District = address.District,
+            City = address.City,
+            StateProvince = address.StateProvince,
+            PostalCode = address.PostalCode
+        };
+    }
+
 
     /// <summary>
     /// Maps an NDARecord entity to NDAResponse DTO

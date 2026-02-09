@@ -17,7 +17,7 @@ public class CreateCompanyRequest
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// VAT number with country prefix (e.g., "TH-1234567890")
+    /// VAT/Tax ID number - supports 10-15 digits (e.g., "0125561001573") or country code format (e.g., "TH-0125561001573")
     /// </summary>
     [MaxLength(50)]
     [JsonPropertyName("vatNumber")]

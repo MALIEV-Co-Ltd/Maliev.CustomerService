@@ -1,56 +1,35 @@
-using Maliev.Aspire.ServiceDefaults.Database;
 using Maliev.CustomerService.Data.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.CustomerService.Data;
 
 /// <summary>
-/// Database context for Customer Service
+/// Database context for the Customer microservice.
+/// Handles Customers, Companies, Addresses, NDAs, and Documents.
 /// </summary>
 public class CustomerDbContext : DbContext
 {
-    /// <summary>
-    /// Initializes a new instance of the <see cref="CustomerDbContext"/> class.
-    /// </summary>
-    /// <param name="options">The options for this context.</param>
-    public CustomerDbContext(DbContextOptions<CustomerDbContext> options)
-        : base(options)
+    /// <summary>System principal ID</summary>
+    public const string SystemPrincipalId = "00000000-0000-0000-0000-000000000001";
+
+    /// <summary>Initializes a new instance of the CustomerDbContext class</summary>
+    public CustomerDbContext(DbContextOptions<CustomerDbContext> options) : base(options)
     {
     }
 
-    /// <summary>
-    /// Gets or sets the customers.
-    /// </summary>
+    /// <summary>Customers set</summary>
     public DbSet<Customer> Customers => Set<Customer>();
-
-    /// <summary>
-    /// Gets or sets the audit logs.
-    /// </summary>
-    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
-
-    /// <summary>
-    /// Gets or sets the addresses.
-    /// </summary>
-    public DbSet<Address> Addresses => Set<Address>();
-
-    /// <summary>
-    /// Gets or sets the companies.
-    /// </summary>
+    /// <summary>Companies set</summary>
     public DbSet<Company> Companies => Set<Company>();
-
-    /// <summary>
-    /// Gets or sets the NDA records.
-    /// </summary>
+    /// <summary>Addresses set</summary>
+    public DbSet<Address> Addresses => Set<Address>();
+    /// <summary>NDAs set</summary>
     public DbSet<NDARecord> NDARecords => Set<NDARecord>();
-
-    /// <summary>
-    /// Gets or sets the document references.
-    /// </summary>
+    /// <summary>Document references set</summary>
     public DbSet<DocumentReference> DocumentReferences => Set<DocumentReference>();
-
-    /// <summary>
-    /// Gets or sets the internal notes.
-    /// </summary>
+    /// <summary>Audit logs set</summary>
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    /// <summary>Internal notes set</summary>
     public DbSet<InternalNote> InternalNotes => Set<InternalNote>();
 
     /// <inheritdoc />
@@ -58,39 +37,15 @@ public class CustomerDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Configure Customer entity (T023)
+        // Configure Customer entity (T001, T034, T035)
         modelBuilder.Entity<Customer>(entity =>
         {
             entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Email).IsUnique();
+            entity.HasIndex(e => e.PrincipalId).IsUnique();
 
-            // Configure table with CHECK constraints for segment and tier enums
-            entity.ToTable(t =>
-            {
-                t.HasCheckConstraint("ck_customer_segment",
-                    $"segment IN ('{CustomerSegment.Retail}', '{CustomerSegment.Wholesale}', '{CustomerSegment.Enterprise}', '{CustomerSegment.Government}')");
-
-                t.HasCheckConstraint("ck_customer_tier",
-                    $"tier IN ('{CustomerTier.Bronze}', '{CustomerTier.Silver}', '{CustomerTier.Gold}', '{CustomerTier.Platinum}', '{CustomerTier.VIP}')");
-            });
-
-            // Unique index on email WHERE is_deleted = false
-            entity.HasIndex(e => e.Email)
-                .IsUnique()
-                .HasFilter("is_deleted = false")
-                .HasDatabaseName("ix_customer_email_unique_active");
-
-            // Index for PrincipalId lookup
-            entity.HasIndex(e => e.PrincipalId)
-                .IsUnique()
-                .HasFilter("is_deleted = false AND principal_id != '00000000-0000-0000-0000-000000000000'")
-                .HasDatabaseName("ix_customer_principal_lookup");
-
-            // Indexes for performance
-            entity.HasIndex(e => e.CompanyId).HasDatabaseName("ix_customer_company_id");
-            entity.HasIndex(e => e.CreatedAt).HasDatabaseName("ix_customer_created_at");
-            entity.HasIndex(e => e.Segment).HasDatabaseName("ix_customer_segment");
-            entity.HasIndex(e => e.Tier).HasDatabaseName("ix_customer_tier");
-            entity.HasIndex(e => e.PreferredLanguage).HasDatabaseName("ix_customer_preferred_language");
+            // Soft delete filter (T003)
+            entity.HasQueryFilter(e => !e.IsDeleted);
 
             // Concurrency token (PostgreSQL bytea with default value)
             entity.Property(e => e.Version)
@@ -99,38 +54,37 @@ public class CustomerDbContext : DbContext
                 .ValueGeneratedOnAddOrUpdate();
         });
 
-        // Configure AuditLog entity (T024)
-        modelBuilder.Entity<AuditLog>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-
-            // Composite index on entity_type and entity_id for quick lookups
-            entity.HasIndex(e => new { e.EntityType, e.EntityId })
-                .HasDatabaseName("ix_auditlog_entity_type_entity_id");
-
-            // Index on actor_id for actor-based queries
-            entity.HasIndex(e => e.ActorId).HasDatabaseName("ix_auditlog_actor_id");
-
-            // Index on timestamp for time-based queries
-            entity.HasIndex(e => e.Timestamp).HasDatabaseName("ix_auditlog_timestamp");
-
-            // Index on actor_type for filtering by actor type
-            entity.HasIndex(e => e.ActorType).HasDatabaseName("ix_auditlog_actor_type");
-        });
-
         // Configure Address entity (T037)
         modelBuilder.Entity<Address>(entity =>
         {
             entity.HasKey(e => e.Id);
 
+            // Column Ordering
+            entity.Property(e => e.Id).HasColumnOrder(0);
+            entity.Property(e => e.OwnerType).HasColumnOrder(1);
+            entity.Property(e => e.OwnerId).HasColumnOrder(2);
+            entity.Property(e => e.Type).HasColumnOrder(3);
+            entity.Property(e => e.IsDefault).HasColumnOrder(4);
+            entity.Property(e => e.AddressLine1).HasColumnOrder(5);
+            entity.Property(e => e.AddressLine2).HasColumnOrder(6);
+            entity.Property(e => e.AddressLine3).HasColumnOrder(7);
+            entity.Property(e => e.District).HasColumnOrder(8);
+            entity.Property(e => e.City).HasColumnOrder(9);
+            entity.Property(e => e.StateProvince).HasColumnOrder(10);
+            entity.Property(e => e.PostalCode).HasColumnOrder(11);
+            entity.Property(e => e.CountryId).HasColumnOrder(12);
+            entity.Property(e => e.CreatedAt).HasColumnOrder(13);
+            entity.Property(e => e.UpdatedAt).HasColumnOrder(14);
+            entity.Property(e => e.Version).HasColumnOrder(15);
+
             // Configure table with CHECK constraints for owner_type and type enums
             entity.ToTable(t =>
             {
                 t.HasCheckConstraint("ck_address_owner_type",
-                    $"owner_type IN ('{OwnerType.Customer}', '{OwnerType.Company}')");
+                    "\"OwnerType\" IN ('Customer', 'Company')");
 
                 t.HasCheckConstraint("ck_address_type",
-                    $"type IN ('{AddressType.Billing}', '{AddressType.Shipping}')");
+                    "\"Type\" IN ('Billing', 'Shipping')");
             });
 
             // Composite index on (owner_type, owner_id) for efficient owner-based queries
@@ -151,28 +105,7 @@ public class CustomerDbContext : DbContext
         modelBuilder.Entity<Company>(entity =>
         {
             entity.HasKey(e => e.Id);
-
-            // Configure table with CHECK constraints for segment and tier enums
-            entity.ToTable(t =>
-            {
-                t.HasCheckConstraint("ck_company_segment",
-                    $"segment IN ('{CustomerSegment.Retail}', '{CustomerSegment.Wholesale}', '{CustomerSegment.Enterprise}', '{CustomerSegment.Government}')");
-
-                t.HasCheckConstraint("ck_company_tier",
-                    $"tier IN ('{CustomerTier.Bronze}', '{CustomerTier.Silver}', '{CustomerTier.Gold}', '{CustomerTier.Platinum}', '{CustomerTier.VIP}')");
-            });
-
-            // Index on vat_number for VAT-based queries
-            entity.HasIndex(e => e.VatNumber).HasDatabaseName("ix_company_vat_number");
-
-            // Index on name for name-based searches
-            entity.HasIndex(e => e.Name).HasDatabaseName("ix_company_name");
-
-            // Index on segment for segment-based filtering
-            entity.HasIndex(e => e.Segment).HasDatabaseName("ix_company_segment");
-
-            // Index on tier for tier-based filtering
-            entity.HasIndex(e => e.Tier).HasDatabaseName("ix_company_tier");
+            entity.HasIndex(e => e.VatNumber).IsUnique().HasFilter("\"VatNumber\" IS NOT NULL");
 
             // Concurrency token (PostgreSQL bytea with default value)
             entity.Property(e => e.Version)
@@ -181,26 +114,11 @@ public class CustomerDbContext : DbContext
                 .ValueGeneratedOnAddOrUpdate();
         });
 
-        // Configure NDARecord entity (T078)
+        // Configure NDARecord (T069)
         modelBuilder.Entity<NDARecord>(entity =>
         {
             entity.HasKey(e => e.Id);
-
-            // Configure table with CHECK constraint for status enum
-            entity.ToTable(t =>
-            {
-                t.HasCheckConstraint("ck_ndarecord_status",
-                    $"status IN ('{NDAStatus.Draft}', '{NDAStatus.Signed}', '{NDAStatus.Expired}', '{NDAStatus.Revoked}')");
-            });
-
-            // Index on customer_id for customer-based queries
-            entity.HasIndex(e => e.CustomerId).HasDatabaseName("ix_ndarecord_customer_id");
-
-            // Index on status for status-based filtering
-            entity.HasIndex(e => e.Status).HasDatabaseName("ix_ndarecord_status");
-
-            // Index on expires_at for expiration checking
-            entity.HasIndex(e => e.ExpiresAt).HasDatabaseName("ix_ndarecord_expires_at");
+            entity.HasIndex(e => e.CustomerId);
 
             // Concurrency token (PostgreSQL bytea with default value)
             entity.Property(e => e.Version)
@@ -209,59 +127,32 @@ public class CustomerDbContext : DbContext
                 .ValueGeneratedOnAddOrUpdate();
         });
 
-        // Configure DocumentReference entity (T091)
+        // Configure DocumentReference (T071)
         modelBuilder.Entity<DocumentReference>(entity =>
         {
             entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.OwnerType, e.OwnerId });
 
-            // Configure table with CHECK constraints for owner_type and status enums
-            entity.ToTable(t =>
-            {
-                t.HasCheckConstraint("ck_documentreference_owner_type",
-                    $"owner_type IN ('{OwnerType.Customer}', '{OwnerType.Company}')");
-
-                t.HasCheckConstraint("ck_documentreference_status",
-                    $"status IN ('{DocumentStatus.Pending}', '{DocumentStatus.Complete}', '{DocumentStatus.PendingDeletion}', '{DocumentStatus.Orphaned}', '{DocumentStatus.MissingFile}')");
-            });
-
-            // Composite index on (owner_type, owner_id) for efficient owner-based queries
-            entity.HasIndex(e => new { e.OwnerType, e.OwnerId })
-                .HasDatabaseName("ix_documentreference_owner_type_owner_id");
-
-            // Index on document_type for document type filtering
-            entity.HasIndex(e => e.DocumentType).HasDatabaseName("ix_documentreference_document_type");
-
-            // Index on status for status-based filtering (e.g., PendingDeletion for background jobs)
-            entity.HasIndex(e => e.Status).HasDatabaseName("ix_documentreference_status");
-
-            // Concurrency token
+            // Concurrency token (PostgreSQL bytea with default value)
             entity.Property(e => e.RowVersion)
                 .IsRowVersion()
                 .HasDefaultValueSql("'\\x0000000000000001'::bytea")
                 .ValueGeneratedOnAddOrUpdate();
         });
 
-        // Configure InternalNote entity (T107)
+        // Configure AuditLog
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.EntityType, e.EntityId });
+            entity.HasIndex(e => e.Timestamp);
+        });
+
+        // Configure InternalNote
         modelBuilder.Entity<InternalNote>(entity =>
         {
             entity.HasKey(e => e.Id);
-
-            // Configure table with CHECK constraint for owner_type enum
-            entity.ToTable(t =>
-            {
-                t.HasCheckConstraint("ck_internalnote_owner_type",
-                    $"owner_type IN ('{OwnerType.Customer}', '{OwnerType.Company}')");
-            });
-
-            // Composite index on (owner_type, owner_id) for efficient owner-based queries
-            entity.HasIndex(e => new { e.OwnerType, e.OwnerId })
-                .HasDatabaseName("ix_internalnote_owner_type_owner_id");
-
-            // Index on created_at for time-based sorting
-            entity.HasIndex(e => e.CreatedAt).HasDatabaseName("ix_internalnote_created_at");
-
-            // Index on created_by for filtering by author
-            entity.HasIndex(e => e.CreatedBy).HasDatabaseName("ix_internalnote_created_by");
+            entity.HasIndex(e => new { e.OwnerType, e.OwnerId });
 
             // Concurrency token (PostgreSQL bytea with default value)
             entity.Property(e => e.Version)
@@ -269,16 +160,5 @@ public class CustomerDbContext : DbContext
                 .HasDefaultValueSql("'\\x0000000000000001'::bytea")
                 .ValueGeneratedOnAddOrUpdate();
         });
-
-        // Apply PostgreSQL snake_case naming convention globally
-        SnakeCaseNamingHelper.ApplySnakeCaseNaming(modelBuilder);
-    }
-
-    /// <inheritdoc />
-    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
-    {
-        base.ConfigureConventions(configurationBuilder);
-
-        // Additional convention configurations can be added here
     }
 }

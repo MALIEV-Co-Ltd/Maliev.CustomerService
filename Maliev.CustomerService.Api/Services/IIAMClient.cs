@@ -8,13 +8,23 @@ namespace Maliev.CustomerService.Api.Services;
 public interface IIAMClient
 {
     /// <summary>
-    /// Creates a new principal in the IAM service
+    /// Response containing the created PrincipalId
     /// </summary>
     /// <param name="request">Principal creation details</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Response containing the created PrincipalId</returns>
     Task<CreatePrincipalResponse> CreatePrincipalAsync(
         CreatePrincipalRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves a principal by email address from the IAM service
+    /// </summary>
+    /// <param name="email">The email address to search for</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Response containing the PrincipalId if found; otherwise null</returns>
+    Task<CreatePrincipalResponse?> GetPrincipalByEmailAsync(
+        string email,
         CancellationToken cancellationToken = default);
 
     /// <summary>

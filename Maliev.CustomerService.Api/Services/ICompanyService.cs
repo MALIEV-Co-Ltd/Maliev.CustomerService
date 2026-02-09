@@ -58,4 +58,13 @@ public interface ICompanyService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Tuple containing list of company responses and total count</returns>
     Task<(List<CompanyResponse> Companies, int TotalCount)> GetAllAsync(int page, int pageSize, string? segment = null, string? tier = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Searches for companies by name or VAT number and includes their default billing address
+    /// </summary>
+    /// <param name="query">Search query (name or VAT)</param>
+    /// <param name="limit">Maximum number of results to return</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>List of company search results with addresses</returns>
+    Task<List<CompanySearchResultDto>> SearchWithAddressAsync(string query, int limit = 10, CancellationToken cancellationToken = default);
 }

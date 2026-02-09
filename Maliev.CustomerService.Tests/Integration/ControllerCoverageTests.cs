@@ -22,14 +22,7 @@ public class ControllerCoverageTests
     public ControllerCoverageTests(TestWebApplicationFactory factory)
     {
         _factory = factory;
-        _client = _factory.CreateAuthenticatedClient("test-admin", new[] { "Admin" }, new[] {
-            "customer.customers.read", "customer.customers.write", "customer.customers.delete",
-            "customer.companies.read", "customer.companies.write",
-            "customer.addresses.read", "customer.addresses.write",
-            "customer.documents.read", "customer.documents.write",
-            "customer.ndas.read", "customer.ndas.write",
-            "customer.notes.read", "customer.notes.write"
-        });
+        _client = _factory.CreateAuthenticatedClient("test-admin", new[] { "Admin" }, Maliev.CustomerService.Api.Authorization.CustomerPermissions.All);
     }
 
     [Fact]
@@ -135,7 +128,7 @@ public class ControllerCoverageTests
             Type = "Billing",
             AddressLine1 = "123 St",
             City = "BKK",
-            Province = "BKK",
+            StateProvince = "BKK",
             PostalCode = "10110",
             CountryId = Guid.NewGuid()
         };
@@ -257,7 +250,7 @@ public class ControllerCoverageTests
     public async Task InternalNoteController_Update_Succeeds()
     {
         await _factory.ClearDatabaseAsync();
-        var createRequest = new CreateInternalNoteRequest { OwnerType = "Customer", OwnerId = Guid.NewGuid(), NoteText = "Test" };
+        var createRequest = new CreateInternalNoteRequest { OwnerType = "Customer", OwnerId = Guid.NewGuid(), NoteText = "Test Note" };
         var createResponse = await _client.PostAsJsonAsync("/customer/v1/internal-notes", createRequest);
         var note = await createResponse.Content.ReadFromJsonAsync<InternalNoteResponse>();
 

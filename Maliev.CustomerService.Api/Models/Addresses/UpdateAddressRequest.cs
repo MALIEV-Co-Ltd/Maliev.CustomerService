@@ -16,6 +16,12 @@ public class UpdateAddressRequest
     public string? Type { get; set; }
 
     /// <summary>
+    /// Whether this is the default address
+    /// </summary>
+    [JsonPropertyName("isDefault")]
+    public bool? IsDefault { get; set; }
+
+    /// <summary>
     /// First line of address
     /// </summary>
     [MaxLength(255)]
@@ -30,6 +36,20 @@ public class UpdateAddressRequest
     public string? AddressLine2 { get; set; }
 
     /// <summary>
+    /// Third line of address
+    /// </summary>
+    [MaxLength(255)]
+    [JsonPropertyName("addressLine3")]
+    public string? AddressLine3 { get; set; }
+
+    /// <summary>
+    /// District name
+    /// </summary>
+    [MaxLength(100)]
+    [JsonPropertyName("district")]
+    public string? District { get; set; }
+
+    /// <summary>
     /// City name
     /// </summary>
     [MaxLength(100)]
@@ -37,11 +57,11 @@ public class UpdateAddressRequest
     public string? City { get; set; }
 
     /// <summary>
-    /// Province/State name
+    /// State or Province name
     /// </summary>
     [MaxLength(100)]
-    [JsonPropertyName("province")]
-    public string? Province { get; set; }
+    [JsonPropertyName("stateProvince")]
+    public string? StateProvince { get; set; }
 
     /// <summary>
     /// Postal/ZIP code

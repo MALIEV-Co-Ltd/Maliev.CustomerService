@@ -126,6 +126,31 @@ public class NDAController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves all NDA records for a specific customer
+    /// </summary>
+    /// <param name="customerId">Customer ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>List of NDA responses</returns>
+    /// <response code="200">NDAs found</response>
+    /// <response code="401">Unauthorized</response>
+    [HttpGet("customer/{customerId:guid}")]
+    [ProducesResponseType(typeof(List<NDAResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<List<NDAResponse>>> GetByCustomerId(Guid customerId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var ndas = await _ndaService.GetByCustomerIdAsync(customerId, cancellationToken);
+            return Ok(ndas);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving NDAs for customer {CustomerId}", customerId);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Updates NDA status with lifecycle validation
     /// </summary>
     /// <param name="id">NDA ID</param>

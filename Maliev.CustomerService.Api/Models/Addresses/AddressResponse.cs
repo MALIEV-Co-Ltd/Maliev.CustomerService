@@ -32,6 +32,12 @@ public class AddressResponse
     public string Type { get; set; } = string.Empty;
 
     /// <summary>
+    /// Whether this is the default address
+    /// </summary>
+    [JsonPropertyName("isDefault")]
+    public bool IsDefault { get; set; }
+
+    /// <summary>
     /// First line of address
     /// </summary>
     [JsonPropertyName("addressLine1")]
@@ -44,16 +50,28 @@ public class AddressResponse
     public string? AddressLine2 { get; set; }
 
     /// <summary>
+    /// Third line of address
+    /// </summary>
+    [JsonPropertyName("addressLine3")]
+    public string? AddressLine3 { get; set; }
+
+    /// <summary>
+    /// District name
+    /// </summary>
+    [JsonPropertyName("district")]
+    public string? District { get; set; }
+
+    /// <summary>
     /// City name
     /// </summary>
     [JsonPropertyName("city")]
     public string City { get; set; } = string.Empty;
 
     /// <summary>
-    /// Province/State name
+    /// State or Province name
     /// </summary>
-    [JsonPropertyName("province")]
-    public string Province { get; set; } = string.Empty;
+    [JsonPropertyName("stateProvince")]
+    public string StateProvince { get; set; } = string.Empty;
 
     /// <summary>
     /// Postal/ZIP code

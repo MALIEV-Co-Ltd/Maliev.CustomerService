@@ -40,10 +40,22 @@ public class Customer
     public string Email { get; set; } = string.Empty;
 
     /// <summary>
-    /// Customer's phone number (E.164 format)
+    /// Customer's mobile phone number (E.164 format)
     /// </summary>
     [MaxLength(20)]
-    public string? Phone { get; set; }
+    public string? Mobile { get; set; }
+
+    /// <summary>
+    /// Extension number for reaching the customer via the company landline
+    /// </summary>
+    [MaxLength(10)]
+    public string? Extension { get; set; }
+
+    /// <summary>
+    /// Customer's personal or direct landline phone number (E.164 format)
+    /// </summary>
+    [MaxLength(20)]
+    public string? Landline { get; set; }
 
     /// <summary>
     /// Customer segmentation: Retail, Wholesale, Enterprise, Government
@@ -82,6 +94,12 @@ public class Customer
     /// Optional link to Company entity
     /// </summary>
     public Guid? CompanyId { get; set; }
+
+    /// <summary>
+    /// Whether to use the company's billing address instead of a personal one
+    /// </summary>
+    public bool UsesCompanyBillingAddress { get; set; } = true;
+
 
     /// <summary>
     /// Soft delete flag

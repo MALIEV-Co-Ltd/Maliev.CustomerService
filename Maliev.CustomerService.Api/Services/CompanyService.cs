@@ -17,8 +17,8 @@ public class CompanyService : ICompanyService
     private readonly CustomerDbContext _context;
     private readonly ILogger<CompanyService> _logger;
 
-    // VAT format: Country code (2 letters) followed by hyphen and digits
-    private static readonly Regex VatFormatRegex = new Regex(@"^[A-Z]{2}-\d+$", RegexOptions.Compiled);
+    // VAT format: Either country code + hyphen + digits (e.g., "TH-0125561001573") or 10-15 digits (e.g., "0125561001573")
+    private static readonly Regex VatFormatRegex = new Regex(@"^([A-Z]{2}-\d+|\d{10,15})$", RegexOptions.Compiled);
 
     /// <summary>
     /// Initializes a new instance of the CompanyService class
@@ -49,7 +49,7 @@ public class CompanyService : ICompanyService
         if (!string.IsNullOrEmpty(request.VatNumber) && !VatFormatRegex.IsMatch(request.VatNumber))
         {
             _logger.LogWarning("Invalid VAT format {VatNumber}", request.VatNumber);
-            throw new InvalidOperationException($"VAT number must be in format 'XX-NNNNNN' (e.g., 'TH-1234567890')");
+            throw new InvalidOperationException($"VAT number must be either 10-15 digits (e.g., '0125561001573') or country code format 'XX-NNNNNN' (e.g., 'TH-0125561001573')");
         }
 
         var company = new Company
@@ -151,7 +151,7 @@ public class CompanyService : ICompanyService
         if (!string.IsNullOrEmpty(request.VatNumber) && !VatFormatRegex.IsMatch(request.VatNumber))
         {
             _logger.LogWarning("Invalid VAT format {VatNumber}", request.VatNumber);
-            throw new InvalidOperationException($"VAT number must be in format 'XX-NNNNNN' (e.g., 'TH-1234567890')");
+            throw new InvalidOperationException($"VAT number must be either 10-15 digits (e.g., '0125561001573') or country code format 'XX-NNNNNN' (e.g., 'TH-0125561001573')");
         }
 
         // Store previous values for audit log
@@ -327,5 +327,40 @@ public class CompanyService : ICompanyService
         _logger.LogDebug("Retrieved {Count} companies out of {TotalCount}", companyResponses.Count, totalCount);
 
         return (companyResponses, totalCount);
+    }
+
+    /// <inheritdoc />
+    public async Task<List<CompanySearchResultDto>> SearchWithAddressAsync(string query, int limit = 10, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Searching companies with address for query {Query} (limit {Limit})", query, limit);
+
+        var companies = await _context.Companies
+            .Where(c => EF.Functions.ILike(c.Name, $"%{query}%") || (c.VatNumber != null && EF.Functions.ILike(c.VatNumber, $"%{query}%")))
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
+        var companyIds = companies.Select(c => c.Id).ToList();
+
+        // Fetch default billing addresses for these companies
+        var addresses = await _context.Addresses
+            .Where(a => a.OwnerType == OwnerType.Company &&
+                        companyIds.Contains(a.OwnerId) &&
+                        a.Type == AddressType.Billing &&
+                        a.IsDefault)
+            .ToListAsync(cancellationToken);
+
+        var addressMap = addresses.ToDictionary(a => a.OwnerId);
+
+        var results = companies.Select(c => new CompanySearchResultDto
+        {
+            Id = c.Id,
+            Name = c.Name,
+            VatNumber = c.VatNumber,
+            Segment = c.Segment,
+            Source = CompanySource.Internal,
+            BillingAddress = addressMap.TryGetValue(c.Id, out var addr) ? addr.ToAddressSummaryDto() : null
+        }).ToList();
+
+        return results;
     }
 }

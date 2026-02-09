@@ -6,6 +6,7 @@ using Maliev.CustomerService.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Xunit;
 
 namespace Maliev.CustomerService.Tests.Services;
 
@@ -51,8 +52,10 @@ public class AddressServiceTests
             Type = "Billing",
             AddressLine1 = "123 Main Street",
             AddressLine2 = "Suite 100",
+            AddressLine3 = "Floor 2",
+            District = "Klong Toey",
             City = "Bangkok",
-            Province = "Bangkok",
+            StateProvince = "Bangkok",
             PostalCode = "10110",
             CountryId = countryId
         };
@@ -68,8 +71,10 @@ public class AddressServiceTests
         Assert.Equal("Billing", result.Type);
         Assert.Equal("123 Main Street", result.AddressLine1);
         Assert.Equal("Suite 100", result.AddressLine2);
+        Assert.Equal("Floor 2", result.AddressLine3);
+        Assert.Equal("Klong Toey", result.District);
         Assert.Equal("Bangkok", result.City);
-        Assert.Equal("Bangkok", result.Province);
+        Assert.Equal("Bangkok", result.StateProvince);
         Assert.Equal("10110", result.PostalCode);
         Assert.Equal(countryId, result.CountryId);
         Assert.True(result.CreatedAt > DateTime.UtcNow.AddSeconds(-5) && result.CreatedAt <= DateTime.UtcNow.AddSeconds(5));
@@ -93,7 +98,7 @@ public class AddressServiceTests
             Type = "Billing",
             AddressLine1 = "123 Main Street",
             City = "Bangkok",
-            Province = "Bangkok",
+            StateProvince = "Bangkok",
             PostalCode = "10110",
             CountryId = invalidCountryId
         };
@@ -123,7 +128,7 @@ public class AddressServiceTests
             Type = "Billing",
             AddressLine1 = "123 Main Street",
             City = "Bangkok",
-            Province = "Bangkok",
+            StateProvince = "Bangkok",
             PostalCode = "10110",
             CountryId = countryId
         };
@@ -152,7 +157,7 @@ public class AddressServiceTests
             Type = "Shipping",
             AddressLine1 = "456 Business Rd",
             City = "Chiang Mai",
-            Province = "Chiang Mai",
+            StateProvince = "Chiang Mai",
             PostalCode = "50000",
             CountryId = countryId
         };
@@ -192,7 +197,7 @@ public class AddressServiceTests
             Type = "Billing",
             AddressLine1 = "123 Main Street",
             City = "Bangkok",
-            Province = "Bangkok",
+            StateProvince = "Bangkok",
             PostalCode = "10110",
             CountryId = countryId
         }, "test-actor", "Employee");
@@ -204,7 +209,7 @@ public class AddressServiceTests
             Type = "Shipping",
             AddressLine1 = "456 Business Rd",
             City = "Chiang Mai",
-            Province = "Chiang Mai",
+            StateProvince = "Chiang Mai",
             PostalCode = "50000",
             CountryId = countryId
         }, "test-actor", "Employee");
@@ -255,7 +260,7 @@ public class AddressServiceTests
             Type = "Billing",
             AddressLine1 = "123 Main Street",
             City = "Bangkok",
-            Province = "Bangkok",
+            StateProvince = "Bangkok",
             PostalCode = "10110",
             CountryId = countryId
         }, "test-actor", "Employee");
@@ -268,7 +273,7 @@ public class AddressServiceTests
             Type = "Billing",
             AddressLine1 = "789 Corporate Ave",
             City = "Phuket",
-            Province = "Phuket",
+            StateProvince = "Phuket",
             PostalCode = "83000",
             CountryId = countryId
         }, "test-actor", "Employee");
@@ -304,7 +309,7 @@ public class AddressServiceTests
             Type = "Billing",
             AddressLine1 = "123 Main Street",
             City = "Bangkok",
-            Province = "Bangkok",
+            StateProvince = "Bangkok",
             PostalCode = "10110",
             CountryId = countryId
         }, "test-actor", "Employee");
@@ -325,7 +330,7 @@ public class AddressServiceTests
         Assert.Equal("999 Updated Street", result.AddressLine1);
         Assert.Equal("Chiang Mai", result.City);
         Assert.Equal("50000", result.PostalCode);
-        Assert.Equal("Bangkok", result.Province); // Unchanged
+        Assert.Equal("Bangkok", result.StateProvince); // Unchanged
         Assert.True(result.UpdatedAt > created.UpdatedAt);
     }
 
@@ -349,7 +354,7 @@ public class AddressServiceTests
             Type = "Billing",
             AddressLine1 = "123 Main Street",
             City = "Bangkok",
-            Province = "Bangkok",
+            StateProvince = "Bangkok",
             PostalCode = "10110",
             CountryId = oldCountryId
         }, "test-actor", "Employee");
@@ -388,7 +393,7 @@ public class AddressServiceTests
             Type = "Billing",
             AddressLine1 = "123 Main Street",
             City = "Bangkok",
-            Province = "Bangkok",
+            StateProvince = "Bangkok",
             PostalCode = "10110",
             CountryId = oldCountryId
         }, "test-actor", "Employee");
@@ -441,7 +446,7 @@ public class AddressServiceTests
             Type = "Billing",
             AddressLine1 = "123 Main Street",
             City = "Bangkok",
-            Province = "Bangkok",
+            StateProvince = "Bangkok",
             PostalCode = "10110",
             CountryId = countryId
         }, "test-actor", "Employee");
@@ -476,7 +481,7 @@ public class AddressServiceTests
             Type = "Billing",
             AddressLine1 = "123 Main Street",
             City = "Bangkok",
-            Province = "Bangkok",
+            StateProvince = "Bangkok",
             PostalCode = "10110",
             CountryId = countryId
         }, "test-actor", "Employee");
@@ -502,6 +507,7 @@ public class AddressServiceTests
         Assert.Equal("customer-456", updateAudit.ActorId);
         Assert.Equal("Customer", updateAudit.ActorType);
         Assert.Equal(AuditAction.Update, updateAudit.Action);
+        Assert.Equal("Address", updateAudit.EntityType);
     }
 
     [Fact]
@@ -521,7 +527,7 @@ public class AddressServiceTests
             Type = "Billing",
             AddressLine1 = "123 Main Street",
             City = "Bangkok",
-            Province = "Bangkok",
+            StateProvince = "Bangkok",
             PostalCode = "10110",
             CountryId = countryId
         }, "test-actor", "Employee");
@@ -570,7 +576,7 @@ public class AddressServiceTests
             Type = "Billing",
             AddressLine1 = "123 Main Street",
             City = "Bangkok",
-            Province = "Bangkok",
+            StateProvince = "Bangkok",
             PostalCode = "10110",
             CountryId = countryId
         }, "test-actor", "Employee");
@@ -590,5 +596,6 @@ public class AddressServiceTests
         Assert.Equal("manager-999", deleteAudit.ActorId);
         Assert.Equal("Manager", deleteAudit.ActorType);
         Assert.Equal(AuditAction.Delete, deleteAudit.Action);
+        Assert.Equal("Address", deleteAudit.EntityType);
     }
 }

@@ -32,16 +32,58 @@ public class CustomerResponse
     public string LastName { get; set; } = string.Empty;
 
     /// <summary>
+    /// Calculated full name
+    /// </summary>
+    [JsonPropertyName("name")]
+    public string Name => $"{FirstName} {LastName}".Trim();
+
+    /// <summary>
     /// Customer's email address
     /// </summary>
     [JsonPropertyName("email")]
     public string Email { get; set; } = string.Empty;
 
     /// <summary>
-    /// Customer's phone number
+    /// Customer status (Active/Inactive)
     /// </summary>
-    [JsonPropertyName("phone")]
-    public string? Phone { get; set; }
+    [JsonPropertyName("status")]
+    public string Status => IsDeleted ? "Inactive" : "Active";
+
+    /// <summary>
+    /// Customer's mobile phone number
+    /// </summary>
+    [JsonPropertyName("mobile")]
+    public string? Mobile { get; set; }
+
+    /// <summary>
+    /// Extension number for reaching the customer via company landline
+    /// </summary>
+    [JsonPropertyName("extension")]
+    public string? Extension { get; set; }
+
+    /// <summary>
+    /// Customer's personal or direct landline phone number
+    /// </summary>
+    [JsonPropertyName("landline")]
+    public string? Landline { get; set; }
+
+    /// <summary>
+    /// Company name associated with the customer
+    /// </summary>
+    [JsonPropertyName("companyName")]
+    public string? CompanyName { get; set; }
+
+    /// <summary>
+    /// Company's landline phone number
+    /// </summary>
+    [JsonPropertyName("companyPhone")]
+    public string? CompanyPhone { get; set; }
+
+    /// <summary>
+    /// Status of the Non-Disclosure Agreement
+    /// </summary>
+    [JsonPropertyName("ndaStatus")]
+    public string? NDAStatus { get; set; }
 
     /// <summary>
     /// Customer segmentation: Retail, Wholesale, Enterprise, Government
@@ -71,7 +113,7 @@ public class CustomerResponse
     /// Communication preferences (JSON object)
     /// </summary>
     [JsonPropertyName("communicationPreferences")]
-    public Dictionary<string, object>? CommunicationPreferences { get; set; }
+    public Dictionary<string, bool>? CommunicationPreferences { get; set; }
 
     /// <summary>
     /// Optional link to Company entity
@@ -80,10 +122,23 @@ public class CustomerResponse
     public Guid? CompanyId { get; set; }
 
     /// <summary>
+    /// Whether to use the company's billing address
+    /// </summary>
+    [JsonPropertyName("usesCompanyBillingAddress")]
+    public bool UsesCompanyBillingAddress { get; set; }
+
+
+    /// <summary>
     /// Soft delete flag
     /// </summary>
     [JsonPropertyName("isDeleted")]
     public bool IsDeleted { get; set; }
+
+    /// <summary>
+    /// ID of the user who created this record
+    /// </summary>
+    [JsonPropertyName("createdBy")]
+    public string? CreatedBy { get; set; }
 
     /// <summary>
     /// Record creation timestamp
