@@ -90,6 +90,8 @@ public static class DomainToDtoMapper
             StateProvince = address.StateProvince,
             PostalCode = address.PostalCode,
             CountryId = address.CountryId,
+            RecipientName = address.RecipientName,
+            RecipientPhone = address.RecipientPhone,
             CreatedAt = address.CreatedAt,
             UpdatedAt = address.UpdatedAt,
             Version = address.Version

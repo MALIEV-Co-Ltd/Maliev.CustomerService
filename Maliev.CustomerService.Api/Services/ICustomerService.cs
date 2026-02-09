@@ -88,4 +88,9 @@ public interface ICustomerService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if email exists, false otherwise</returns>
     Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets activity history for a customer
+    /// </summary>
+    Task<List<CustomerActivityResponse>> GetActivityAsync(Guid id, CancellationToken cancellationToken = default);
 }

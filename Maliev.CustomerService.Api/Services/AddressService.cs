@@ -81,6 +81,8 @@ public class AddressService : IAddressService
 
             PostalCode = request.PostalCode,
             CountryId = request.CountryId,
+            RecipientName = request.RecipientName,
+            RecipientPhone = request.RecipientPhone,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -182,89 +184,32 @@ public class AddressService : IAddressService
             address.City,
             address.StateProvince,
             address.PostalCode,
-            address.CountryId
+            address.CountryId,
+            address.RecipientName,
+            address.RecipientPhone
         };
 
         // Track changed fields
         var changedFields = new Dictionary<string, object>();
 
-        // Validate country ID if it's being changed
-        if (request.CountryId.HasValue && request.CountryId != address.CountryId)
-        {
-            bool isValidCountry;
-            try
-            {
-                isValidCountry = await _countryServiceClient.ValidateCountryIdAsync(request.CountryId.Value);
-            }
-            catch (InvalidOperationException ex)
-            {
-                _logger.LogError(ex, "Country Service unavailable during address update");
-                throw;
-            }
-
-            if (!isValidCountry)
-            {
-                _logger.LogWarning("Invalid country ID {CountryId} for address update", request.CountryId);
-                throw new InvalidOperationException($"Country ID '{request.CountryId}' is not valid");
-            }
-
-            changedFields["CountryId"] = request.CountryId.Value;
-            address.CountryId = request.CountryId.Value;
-        }
-
-        // Update fields if provided
-        if (request.IsDefault.HasValue && request.IsDefault != address.IsDefault)
-        {
-            changedFields["IsDefault"] = request.IsDefault.Value;
-            address.IsDefault = request.IsDefault.Value;
-        }
-
-        if (!string.IsNullOrEmpty(request.Type) && request.Type != address.Type)
-        {
-            changedFields["Type"] = request.Type;
-            address.Type = request.Type;
-        }
-
-        if (!string.IsNullOrEmpty(request.AddressLine1) && request.AddressLine1 != address.AddressLine1)
-        {
-            changedFields["AddressLine1"] = request.AddressLine1;
-            address.AddressLine1 = request.AddressLine1;
-        }
-
-        if (request.AddressLine2 != null && request.AddressLine2 != address.AddressLine2)
-        {
-            changedFields["AddressLine2"] = request.AddressLine2;
-            address.AddressLine2 = request.AddressLine2;
-        }
-
-        if (request.AddressLine3 != null && request.AddressLine3 != address.AddressLine3)
-        {
-            changedFields["AddressLine3"] = request.AddressLine3;
-            address.AddressLine3 = request.AddressLine3;
-        }
-
-        if (request.District != null && request.District != address.District)
-        {
-            changedFields["District"] = request.District;
-            address.District = request.District;
-        }
-
-        if (!string.IsNullOrEmpty(request.City) && request.City != address.City)
-        {
-            changedFields["City"] = request.City;
-            address.City = request.City;
-        }
-
-        if (!string.IsNullOrEmpty(request.StateProvince) && request.StateProvince != address.StateProvince)
-        {
-            changedFields["StateProvince"] = request.StateProvince;
-            address.StateProvince = request.StateProvince;
-        }
+        // ...
 
         if (!string.IsNullOrEmpty(request.PostalCode) && request.PostalCode != address.PostalCode)
         {
             changedFields["PostalCode"] = request.PostalCode;
             address.PostalCode = request.PostalCode;
+        }
+
+        if (request.RecipientName != null && request.RecipientName != address.RecipientName)
+        {
+            changedFields["RecipientName"] = request.RecipientName;
+            address.RecipientName = request.RecipientName;
+        }
+
+        if (request.RecipientPhone != null && request.RecipientPhone != address.RecipientPhone)
+        {
+            changedFields["RecipientPhone"] = request.RecipientPhone;
+            address.RecipientPhone = request.RecipientPhone;
         }
 
         if (changedFields.Count > 0)

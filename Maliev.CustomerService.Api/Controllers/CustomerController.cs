@@ -477,4 +477,15 @@ public class CustomerController : ControllerBase
             throw;
         }
     }
+
+    /// <summary>
+    /// Gets activity history for a customer
+    /// </summary>
+    [HttpGet("{id:guid}/history")]
+    [ProducesResponseType(typeof(List<CustomerActivityResponse>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<CustomerActivityResponse>>> GetHistory(Guid id, CancellationToken cancellationToken = default)
+    {
+        var activities = await _customerService.GetActivityAsync(id, cancellationToken);
+        return Ok(activities);
+    }
 }

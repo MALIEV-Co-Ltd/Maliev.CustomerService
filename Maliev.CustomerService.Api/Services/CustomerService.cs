@@ -838,4 +838,65 @@ public class CustomerService : ICustomerService
 
         return false;
     }
+
+    /// <inheritdoc />
+    public async Task<List<CustomerActivityResponse>> GetActivityAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Retrieving activity history for customer {CustomerId}", id);
+
+        var auditLogs = await _context.AuditLogs
+            .Where(a => a.EntityType == nameof(Customer) && a.EntityId == id.ToString())
+            .OrderByDescending(a => a.Timestamp)
+            .Take(50)
+            .ToListAsync(cancellationToken);
+
+        var activities = new List<CustomerActivityResponse>();
+
+        // Resolve actor names
+        var actorIds = auditLogs
+            .Where(a => Guid.TryParse(a.ActorId, out _))
+            .Select(a => Guid.Parse(a.ActorId))
+            .Distinct()
+            .ToList();
+
+        var actorMap = new Dictionary<Guid, Maliev.CustomerService.Api.Models.IAM.PrincipalResponse>();
+        foreach (var actorId in actorIds)
+        {
+            var principal = await _iamClient.GetPrincipalByIdAsync(actorId, cancellationToken);
+            if (principal != null) actorMap[actorId] = principal;
+        }
+
+        foreach (var audit in auditLogs)
+        {
+            string description = audit.Action switch
+            {
+                AuditAction.Create => "Customer profile created",
+                AuditAction.Update => "Customer profile updated",
+                AuditAction.SoftDelete => "Customer profile deactivated",
+                _ => $"Action: {audit.Action}"
+            };
+
+            string? actorName = null;
+            string? actorEmail = null;
+
+            if (Guid.TryParse(audit.ActorId, out var pId) && actorMap.TryGetValue(pId, out var p))
+            {
+                actorName = p.DisplayName;
+                actorEmail = p.Email;
+            }
+
+            activities.Add(new CustomerActivityResponse
+            {
+                Action = audit.Action,
+                Description = description,
+                ActorId = audit.ActorId,
+                ActorName = actorName,
+                ActorEmail = actorEmail,
+                Timestamp = audit.Timestamp,
+                Details = audit.ChangedFields
+            });
+        }
+
+        return activities;
+    }
 }

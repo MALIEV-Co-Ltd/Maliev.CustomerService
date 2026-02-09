@@ -96,4 +96,18 @@ public class CreateAddressRequest
     [Required(ErrorMessage = "Country ID is required")]
     [JsonPropertyName("countryId")]
     public Guid CountryId { get; set; }
+
+    /// <summary>
+    /// Name of the recipient (e.g. for shipping)
+    /// </summary>
+    [JsonPropertyName("recipientName")]
+    [MaxLength(200)]
+    public string? RecipientName { get; set; }
+
+    /// <summary>
+    /// Phone number of the recipient
+    /// </summary>
+    [JsonPropertyName("recipientPhone")]
+    [MaxLength(20)]
+    public string? RecipientPhone { get; set; }
 }
