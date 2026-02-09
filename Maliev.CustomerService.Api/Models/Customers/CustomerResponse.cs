@@ -141,6 +141,18 @@ public class CustomerResponse
     public string? CreatedBy { get; set; }
 
     /// <summary>
+    /// Display name of the user who created this record
+    /// </summary>
+    [JsonPropertyName("createdByName")]
+    public string? CreatedByName { get; set; }
+
+    /// <summary>
+    /// Email of the user who created this record
+    /// </summary>
+    [JsonPropertyName("createdByEmail")]
+    public string? CreatedByEmail { get; set; }
+
+    /// <summary>
     /// Record creation timestamp
     /// </summary>
     [JsonPropertyName("createdAt")]

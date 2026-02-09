@@ -28,7 +28,8 @@ public class InternalNoteServiceTests
     private InternalNoteService CreateService()
     {
         var context = _fixture.CreateDbContext();
-        return new InternalNoteService(context, _mockLogger.Object);
+        var mockIam = new Mock<IIAMClient>();
+        return new InternalNoteService(context, mockIam.Object, _mockLogger.Object);
     }
 
     #region CreateAsync Tests

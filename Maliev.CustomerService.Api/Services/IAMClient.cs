@@ -66,7 +66,7 @@ public class IAMClient : IIAMClient
     }
 
     /// <inheritdoc/>
-    public async Task<CreatePrincipalResponse?> GetPrincipalByEmailAsync(
+    public async Task<PrincipalResponse?> GetPrincipalByEmailAsync(
         string email,
         CancellationToken cancellationToken = default)
     {
@@ -88,11 +88,43 @@ public class IAMClient : IIAMClient
                 return null;
             }
 
-            return await response.Content.ReadFromJsonAsync<CreatePrincipalResponse>(cancellationToken: cancellationToken);
+            return await response.Content.ReadFromJsonAsync<PrincipalResponse>(cancellationToken: cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error occurred while retrieving IAM principal for email {Email}", email);
+            return null;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<PrincipalResponse?> GetPrincipalByIdAsync(
+        Guid principalId,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Retrieving IAM principal for ID {PrincipalId}", principalId);
+
+        try
+        {
+            var response = await _httpClient.GetAsync($"/iam/v1/principals/{principalId}", cancellationToken);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogError("IAM service returned error while getting principal by ID: {StatusCode}, Content: {Content}", response.StatusCode, errorContent);
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<PrincipalResponse>(cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error occurred while retrieving IAM principal for ID {PrincipalId}", principalId);
             return null;
         }
     }

@@ -38,6 +38,18 @@ public class InternalNoteResponse
     public string CreatedBy { get; set; } = string.Empty;
 
     /// <summary>
+    /// Display name of the user who created the note
+    /// </summary>
+    [JsonPropertyName("createdByName")]
+    public string? CreatedByName { get; set; }
+
+    /// <summary>
+    /// Email of the user who created the note
+    /// </summary>
+    [JsonPropertyName("createdByEmail")]
+    public string? CreatedByEmail { get; set; }
+
+    /// <summary>
     /// Creation timestamp
     /// </summary>
     [JsonPropertyName("createdAt")]

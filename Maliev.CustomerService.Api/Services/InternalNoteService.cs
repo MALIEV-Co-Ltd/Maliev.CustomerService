@@ -13,25 +13,22 @@ namespace Maliev.CustomerService.Api.Services;
 public class InternalNoteService : IInternalNoteService
 {
     private readonly CustomerDbContext _context;
+    private readonly IIAMClient _iamClient;
     private readonly ILogger<InternalNoteService> _logger;
 
     /// <summary>
     /// Initializes a new instance of the InternalNoteService class
     /// </summary>
-    /// <param name="context">Database context for Customer Service</param>
-    /// <param name="logger">Logger instance</param>
-    public InternalNoteService(CustomerDbContext context, ILogger<InternalNoteService> logger)
+    public InternalNoteService(CustomerDbContext context, IIAMClient iamClient, ILogger<InternalNoteService> logger)
     {
         _context = context;
+        _iamClient = iamClient;
         _logger = logger;
     }
 
     /// <summary>
     /// Creates a new internal note with audit logging
     /// </summary>
-    /// <param name="request">Internal note creation request</param>
-    /// <param name="createdBy">ID of the employee creating the note</param>
-    /// <returns>Created internal note response</returns>
     public async Task<InternalNoteResponse> CreateAsync(CreateInternalNoteRequest request, string createdBy)
     {
         _logger.LogInformation("Creating internal note for owner {OwnerType}/{OwnerId} by {CreatedBy}",
@@ -70,15 +67,24 @@ public class InternalNoteService : IInternalNoteService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Internal note {NoteId} created successfully", note.Id);
-        return note.ToInternalNoteResponse();
+
+        var response = note.ToInternalNoteResponse();
+        if (Guid.TryParse(createdBy, out var principalId))
+        {
+            var principal = await _iamClient.GetPrincipalByIdAsync(principalId);
+            if (principal != null)
+            {
+                response.CreatedByName = principal.DisplayName;
+                response.CreatedByEmail = principal.Email;
+            }
+        }
+
+        return response;
     }
 
     /// <summary>
     /// Retrieves all internal notes for a specific owner
     /// </summary>
-    /// <param name="ownerType">Type of owner (Customer or Company)</param>
-    /// <param name="ownerId">Owner ID</param>
-    /// <returns>List of internal notes ordered by creation date descending</returns>
     public async Task<List<InternalNoteResponse>> GetByOwnerAsync(string ownerType, Guid ownerId)
     {
         _logger.LogDebug("Retrieving internal notes for owner {OwnerType}/{OwnerId}", ownerType, ownerId);
@@ -88,7 +94,35 @@ public class InternalNoteService : IInternalNoteService
             .OrderByDescending(n => n.CreatedAt)
             .ToListAsync();
 
-        return notes.Select(n => n.ToInternalNoteResponse()).ToList();
+        var responses = new List<InternalNoteResponse>();
+
+        // Collect unique principal IDs
+        var principalIds = notes
+            .Where(n => Guid.TryParse(n.CreatedBy, out _))
+            .Select(n => Guid.Parse(n.CreatedBy))
+            .Distinct()
+            .ToList();
+
+        // Resolve them (simplistic for now, batching would be better if IAM supported it)
+        var principalMap = new Dictionary<Guid, Maliev.CustomerService.Api.Models.IAM.PrincipalResponse>();
+        foreach (var pId in principalIds)
+        {
+            var principal = await _iamClient.GetPrincipalByIdAsync(pId);
+            if (principal != null) principalMap[pId] = principal;
+        }
+
+        foreach (var note in notes)
+        {
+            var response = note.ToInternalNoteResponse();
+            if (Guid.TryParse(note.CreatedBy, out var pId) && principalMap.TryGetValue(pId, out var p))
+            {
+                response.CreatedByName = p.DisplayName;
+                response.CreatedByEmail = p.Email;
+            }
+            responses.Add(response);
+        }
+
+        return responses;
     }
 
     /// <summary>

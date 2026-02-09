@@ -259,7 +259,25 @@ public class CustomerService : ICustomerService
             .FirstOrDefaultAsync(cancellationToken);
 
         var response = customer.ToCustomerResponse(company, nda);
-        response.CreatedBy = creationAudit?.ActorId ?? "System";
+
+        if (creationAudit != null && Guid.TryParse(creationAudit.ActorId, out var creatorPrincipalId))
+        {
+            var creator = await _iamClient.GetPrincipalByIdAsync(creatorPrincipalId, cancellationToken);
+            if (creator != null)
+            {
+                response.CreatedBy = creator.PrincipalId.ToString();
+                response.CreatedByName = creator.DisplayName;
+                response.CreatedByEmail = creator.Email;
+            }
+            else
+            {
+                response.CreatedBy = creationAudit.ActorId;
+            }
+        }
+        else
+        {
+            response.CreatedBy = creationAudit?.ActorId ?? "System";
+        }
 
         return response;
     }
@@ -292,7 +310,33 @@ public class CustomerService : ICustomerService
             .OrderByDescending(n => n.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-        return customer.ToCustomerResponse(company, nda);
+        // Fetch creator from audit logs (T240)
+        var creationAudit = await _context.AuditLogs
+            .Where(a => a.EntityType == nameof(Customer) && a.EntityId == customer.Id.ToString() && a.Action == AuditAction.Create)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var response = customer.ToCustomerResponse(company, nda);
+
+        if (creationAudit != null && Guid.TryParse(creationAudit.ActorId, out var creatorPrincipalId))
+        {
+            var creator = await _iamClient.GetPrincipalByIdAsync(creatorPrincipalId, cancellationToken);
+            if (creator != null)
+            {
+                response.CreatedBy = creator.PrincipalId.ToString();
+                response.CreatedByName = creator.DisplayName;
+                response.CreatedByEmail = creator.Email;
+            }
+            else
+            {
+                response.CreatedBy = creationAudit.ActorId;
+            }
+        }
+        else
+        {
+            response.CreatedBy = creationAudit?.ActorId ?? "System";
+        }
+
+        return response;
     }
 
     /// <summary>

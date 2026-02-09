@@ -22,9 +22,19 @@ public interface IIAMClient
     /// </summary>
     /// <param name="email">The email address to search for</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Response containing the PrincipalId if found; otherwise null</returns>
-    Task<CreatePrincipalResponse?> GetPrincipalByEmailAsync(
+    /// <returns>Response containing the principal details if found; otherwise null</returns>
+    Task<PrincipalResponse?> GetPrincipalByEmailAsync(
         string email,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves a principal by ID from the IAM service
+    /// </summary>
+    /// <param name="principalId">The principal ID to look up</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Response containing the principal details if found; otherwise null</returns>
+    Task<PrincipalResponse?> GetPrincipalByIdAsync(
+        Guid principalId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
