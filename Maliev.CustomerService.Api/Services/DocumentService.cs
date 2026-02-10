@@ -14,6 +14,7 @@ namespace Maliev.CustomerService.Api.Services;
 public class DocumentService : IDocumentService
 {
     private readonly CustomerDbContext _context;
+    private readonly IIAMClient _iamClient;
     private readonly IUploadServiceClient _uploadServiceClient;
     private readonly ILogger<DocumentService> _logger;
     private readonly MetricsService _metricsService;
@@ -22,20 +23,24 @@ public class DocumentService : IDocumentService
     /// Initializes a new instance of the DocumentService class
     /// </summary>
     /// <param name="context">Database context for Customer Service</param>
+    /// <param name="iamClient">Client for IAM integration</param>
     /// <param name="uploadServiceClient">Client for Upload Service integration</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="metricsService">Metrics service for recording operations</param>
     public DocumentService(
         CustomerDbContext context,
+        IIAMClient iamClient,
         IUploadServiceClient uploadServiceClient,
         ILogger<DocumentService> logger,
         MetricsService metricsService)
     {
         _context = context;
+        _iamClient = iamClient;
         _uploadServiceClient = uploadServiceClient;
         _logger = logger;
         _metricsService = metricsService;
     }
+
 
     /// <summary>
     /// Creates a new document reference with Upload Service validation
@@ -67,11 +72,15 @@ public class DocumentService : IDocumentService
             DocumentType = request.DocumentType,
             FileReference = request.FileReference,
             Filename = request.Filename,
+            FileSize = request.FileSize,
+            MimeType = request.MimeType,
             Status = DocumentStatus.Pending,
             Version = 1,
+            CreatedBy = actorId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
+
 
         _context.DocumentReferences.Add(document);
 
@@ -118,11 +127,41 @@ public class DocumentService : IDocumentService
         _logger.LogDebug("Retrieving documents for owner {OwnerType}/{OwnerId}", ownerType, ownerId);
 
         var documents = await _context.DocumentReferences
-            .Where(d => d.OwnerType == ownerType && d.OwnerId == ownerId)
+            .Where(d => d.OwnerId == ownerId)
             .OrderByDescending(d => d.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return documents.Select(d => d.ToDocumentResponse()).ToList();
+        var filteredDocs = documents
+            .Where(d => d.OwnerType.Equals(ownerType, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        // Resolve creator names
+        var creatorIds = filteredDocs
+            .Where(d => Guid.TryParse(d.CreatedBy, out _))
+            .Select(d => Guid.Parse(d.CreatedBy))
+            .Distinct()
+            .ToList();
+
+        var creatorMap = new Dictionary<Guid, Maliev.CustomerService.Api.Models.IAM.PrincipalResponse>();
+        foreach (var cId in creatorIds)
+        {
+            var principal = await _iamClient.GetPrincipalByIdAsync(cId, cancellationToken);
+            if (principal != null) creatorMap[cId] = principal;
+        }
+
+        var responses = new List<DocumentResponse>();
+        foreach (var doc in filteredDocs)
+        {
+            var res = doc.ToDocumentResponse();
+            if (Guid.TryParse(doc.CreatedBy, out var pId) && creatorMap.TryGetValue(pId, out var p))
+            {
+                res.CreatedByName = p.DisplayName;
+                res.CreatedByEmail = p.Email;
+            }
+            responses.Add(res);
+        }
+
+        return responses;
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Models.IAM;
@@ -66,14 +67,24 @@ public class CustomerService : ICustomerService
         // This application-level check provides a fast-fail for common cases.
 
         // Check for duplicate email (active customers only)
-        var existingCustomer = await _context.Customers
-            .Where(c => c.Email == request.Email && !c.IsDeleted)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (existingCustomer != null)
+        if (!string.IsNullOrEmpty(request.Email))
         {
-            _logger.LogWarning("Duplicate email {Email} for active customer", request.Email);
-            throw new InvalidOperationException($"A customer with email '{request.Email}' already exists");
+            // Validate email format
+            if (!Regex.IsMatch(request.Email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.IgnoreCase))
+            {
+                _logger.LogWarning("Invalid email format for creation: {Email}", request.Email);
+                throw new InvalidOperationException($"'{request.Email}' is not a valid email address.");
+            }
+
+            var existingCustomer = await _context.Customers
+                .Where(c => c.Email == request.Email && !c.IsDeleted)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (existingCustomer != null)
+            {
+                _logger.LogWarning("Duplicate email {Email} for active customer", request.Email);
+                throw new InvalidOperationException($"A customer with email '{request.Email}' already exists");
+            }
         }
 
         _logger.LogInformation("Creating IAM principal for new customer with email {Email}", request.Email);
@@ -399,6 +410,13 @@ public class CustomerService : ICustomerService
 
         if (!string.IsNullOrEmpty(request.Email) && request.Email != customer.Email)
         {
+            // Validate email format
+            if (!Regex.IsMatch(request.Email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.IgnoreCase))
+            {
+                _logger.LogWarning("Invalid email format: {Email}", request.Email);
+                throw new InvalidOperationException($"'{request.Email}' is not a valid email address.");
+            }
+
             // Check for duplicate email
             var existingCustomer = await _context.Customers
                 .Where(c => c.Email == request.Email && c.Id != id && !c.IsDeleted)
@@ -844,8 +862,18 @@ public class CustomerService : ICustomerService
     {
         _logger.LogDebug("Retrieving activity history for customer {CustomerId}", id);
 
+        var customerIdStr = id.ToString();
+
+        // We want to fetch audit logs where:
+        // 1. EntityType = Customer and EntityId = customerId
+        // 2. EntityType = Address/InternalNote/NDARecord/DocumentReference and the ChangedFields contains the ownerId = customerId
+        // Since we can't easily query JSON in a cross-provider way efficiently without specialized functions,
+        // and we only want the last 50, we'll fetch a bit more and filter or use a broader query.
+
         var auditLogs = await _context.AuditLogs
-            .Where(a => a.EntityType == nameof(Customer) && a.EntityId == id.ToString())
+            .Where(a => (a.EntityType == nameof(Customer) && a.EntityId == customerIdStr) ||
+                        (a.EntityType != nameof(Customer) && a.ChangedFields != null && a.ChangedFields.Contains($"\"{customerIdStr}\"")) ||
+                        (a.EntityType != nameof(Customer) && a.PreviousValues != null && a.PreviousValues.Contains($"\"{customerIdStr}\"")))
             .OrderByDescending(a => a.Timestamp)
             .Take(50)
             .ToListAsync(cancellationToken);
@@ -870,10 +898,11 @@ public class CustomerService : ICustomerService
         {
             string description = audit.Action switch
             {
-                AuditAction.Create => "Customer profile created",
-                AuditAction.Update => "Customer profile updated",
-                AuditAction.SoftDelete => "Customer profile deactivated",
-                _ => $"Action: {audit.Action}"
+                AuditAction.Create => GetCreateDescription(audit),
+                AuditAction.Update => GetUpdateDescription(audit.EntityType, audit.ChangedFields, audit.PreviousValues),
+                AuditAction.SoftDelete => $"{GetEntityDisplayName(audit.EntityType)} deactivated",
+                AuditAction.Delete => $"{GetEntityDisplayName(audit.EntityType)} deleted",
+                _ => $"Action: {audit.Action} on {GetEntityDisplayName(audit.EntityType)}"
             };
 
             string? actorName = null;
@@ -898,5 +927,165 @@ public class CustomerService : ICustomerService
         }
 
         return activities;
+    }
+
+    private static string GetEntityDisplayName(string entityType) => entityType switch
+    {
+        nameof(Customer) => "Customer profile",
+        nameof(Address) => "Address",
+        nameof(InternalNote) => "Internal note",
+        nameof(NDARecord) => "NDA record",
+        nameof(DocumentReference) => "Document",
+        _ => entityType
+    };
+
+    private static string GetCreateDescription(AuditLog audit)
+    {
+        return audit.EntityType switch
+        {
+            nameof(Customer) => "Customer profile created",
+            nameof(InternalNote) => "Added an internal note",
+            nameof(Address) => GetAddressCreateDescription(audit.ChangedFields),
+            nameof(NDARecord) => "Created NDA record",
+            nameof(DocumentReference) => "Uploaded a document",
+            _ => $"Created {GetEntityDisplayName(audit.EntityType)}"
+        };
+    }
+
+    private static string GetAddressCreateDescription(string? changedFieldsJson)
+    {
+        if (!string.IsNullOrEmpty(changedFieldsJson))
+        {
+            try
+            {
+                var fields = JsonSerializer.Deserialize<Dictionary<string, object>>(changedFieldsJson);
+                if (fields != null && fields.TryGetValue("Type", out var typeObj))
+                {
+                    var type = typeObj.ToString();
+                    return $"Added a new {type?.ToLowerInvariant()} address";
+                }
+            }
+            catch { }
+        }
+        return "Added a new address";
+    }
+
+    private static string GetUpdateDescription(string entityType, string? changedFieldsJson, string? previousValuesJson)
+    {
+        var entityDisplayName = GetEntityDisplayName(entityType);
+        if (string.IsNullOrEmpty(changedFieldsJson)) return $"{entityDisplayName} updated";
+
+        try
+        {
+            var changedFields = JsonSerializer.Deserialize<Dictionary<string, object>>(changedFieldsJson);
+            if (changedFields == null || changedFields.Count == 0) return $"{entityDisplayName} updated";
+
+            // Support both flat and nested structure (T240 fix for AddressService inconsistency)
+            if (changedFields.ContainsKey("Fields") && changedFields["Fields"] is JsonElement fieldsElement)
+            {
+                changedFields = JsonSerializer.Deserialize<Dictionary<string, object>>(fieldsElement.GetRawText()) ?? changedFields;
+            }
+
+            var previousValues = new Dictionary<string, object>();
+            if (!string.IsNullOrEmpty(previousValuesJson))
+            {
+                var prevObj = JsonSerializer.Deserialize<Dictionary<string, object>>(previousValuesJson);
+                if (prevObj != null)
+                {
+                    if (prevObj.ContainsKey("Fields") && prevObj["Fields"] is JsonElement prevFieldsElement)
+                    {
+                        previousValues = JsonSerializer.Deserialize<Dictionary<string, object>>(prevFieldsElement.GetRawText()) ?? previousValues;
+                    }
+                    else
+                    {
+                        previousValues = prevObj;
+                    }
+                }
+            }
+
+            // Detect address type for better description
+            string prefix = entityDisplayName;
+            if (entityType == nameof(Address))
+            {
+                object? typeObj = null;
+                if (changedFields.TryGetValue("Type", out typeObj) || previousValues.TryGetValue("Type", out typeObj))
+                {
+                    prefix = $"{typeObj?.ToString()} address";
+                }
+            }
+
+            var lines = new List<string>();
+
+            foreach (var field in changedFields.Keys)
+            {
+                var newValueObj = changedFields[field];
+                var newValue = newValueObj?.ToString() ?? "empty";
+
+                object? oldValueObj = null;
+                previousValues?.TryGetValue(field, out oldValueObj);
+                var oldValue = oldValueObj?.ToString() ?? "empty";
+
+                // Robust comparison to skip unchanged fields
+                if (newValue.Equals(oldValue, StringComparison.OrdinalIgnoreCase)) continue;
+
+                // Special handling for GUIDs (OwnerId, etc.) - compare as GUIDs if possible
+                if (field.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (Guid.TryParse(newValue, out var newGuid) && Guid.TryParse(oldValue, out var oldGuid))
+                    {
+                        if (newGuid == oldGuid) continue;
+                    }
+                }
+
+                string fieldDisplayName = field switch
+                {
+                    "FirstName" => "first name",
+                    "LastName" => "last name",
+                    "Email" => "email",
+                    "Mobile" => "mobile number",
+                    "Landline" => "landline",
+                    "Segment" => "segment",
+                    "Tier" => "tier",
+                    "PreferredLanguage" => "language",
+                    "Timezone" => "timezone",
+                    "NoteText" => "note content",
+                    "Status" => "status",
+                    "AddressLine1" => "address line 1",
+                    "AddressLine2" => "address line 2",
+                    "District" => "district",
+                    "City" => "city",
+                    "PostalCode" => "postal code",
+                    _ => field.ToLowerInvariant()
+                };
+
+                // Truncate long values for readability
+                var displayOld = oldValue.Length > 30 ? oldValue.Substring(0, 27) + "..." : oldValue;
+                var displayNew = newValue.Length > 30 ? newValue.Substring(0, 27) + "..." : newValue;
+
+                if (oldValue == "empty")
+                {
+                    lines.Add($"set {fieldDisplayName} to '{displayNew}'");
+                }
+                else
+                {
+                    lines.Add($"changed {fieldDisplayName} from '{displayOld}' to '{displayNew}'");
+                }
+            }
+
+            if (lines.Count == 0) return $"{prefix} updated";
+
+            if (lines.Count == 1)
+            {
+                // Capitalize first letter
+                var detail = lines[0];
+                return char.ToUpper(prefix[0]) + prefix.Substring(1) + " update: " + detail;
+            }
+
+            return $"Updated {prefix.ToLowerInvariant()}:\n• {string.Join("\n• ", lines.Select(l => char.ToUpper(l[0]) + l.Substring(1)))}";
+        }
+        catch
+        {
+            return $"{GetEntityDisplayName(entityType)} updated";
+        }
     }
 }

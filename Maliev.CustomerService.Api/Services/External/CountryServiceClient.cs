@@ -96,7 +96,12 @@ public class CountryServiceClient : ICountryServiceClient
 
             // Cache both valid and invalid results to prevent downstream spam
             var expiration = isValid ? CacheExpiration : TimeSpan.FromMinutes(10);
-            _cache.Set(cacheKey, isValid, expiration);
+            var cacheOptions = new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = expiration,
+                Size = 1
+            };
+            _cache.Set(cacheKey, isValid, cacheOptions);
 
             if (isValid)
             {

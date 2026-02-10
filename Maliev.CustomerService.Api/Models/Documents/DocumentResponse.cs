@@ -44,8 +44,21 @@ public class DocumentResponse
     public string Filename { get; set; } = string.Empty;
 
     /// <summary>
+    /// File size in bytes
+    /// </summary>
+    [JsonPropertyName("fileSize")]
+    public long FileSize { get; set; }
+
+    /// <summary>
+    /// MIME type of the file
+    /// </summary>
+    [JsonPropertyName("mimeType")]
+    public string MimeType { get; set; } = "application/octet-stream";
+
+    /// <summary>
     /// Document status (Pending, Complete, PendingDeletion, Orphaned, MissingFile)
     /// </summary>
+
     [JsonPropertyName("status")]
     public string Status { get; set; } = string.Empty;
 
@@ -62,8 +75,27 @@ public class DocumentResponse
     public string? SignedBy { get; set; }
 
     /// <summary>
+    /// User who created the document
+    /// </summary>
+    [JsonPropertyName("createdBy")]
+    public string CreatedBy { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Display name of the creator
+    /// </summary>
+    [JsonPropertyName("createdByName")]
+    public string? CreatedByName { get; set; }
+
+    /// <summary>
+    /// Email of the creator
+    /// </summary>
+    [JsonPropertyName("createdByEmail")]
+    public string? CreatedByEmail { get; set; }
+
+    /// <summary>
     /// Timestamp when document was signed
     /// </summary>
+
     [JsonPropertyName("signedAt")]
     public DateTime? SignedAt { get; set; }
 

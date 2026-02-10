@@ -90,14 +90,19 @@ public class InternalNoteService : IInternalNoteService
         _logger.LogDebug("Retrieving internal notes for owner {OwnerType}/{OwnerId}", ownerType, ownerId);
 
         var notes = await _context.InternalNotes
-            .Where(n => n.OwnerType == ownerType && n.OwnerId == ownerId)
+            .Where(n => n.OwnerId == ownerId)
             .OrderByDescending(n => n.CreatedAt)
             .ToListAsync();
 
         var responses = new List<InternalNoteResponse>();
 
+        // Filter by ownerType in memory
+        var filteredNotes = notes
+            .Where(n => n.OwnerType.Equals(ownerType, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
         // Collect unique principal IDs
-        var principalIds = notes
+        var principalIds = filteredNotes
             .Where(n => Guid.TryParse(n.CreatedBy, out _))
             .Select(n => Guid.Parse(n.CreatedBy))
             .Distinct()
@@ -163,8 +168,8 @@ public class InternalNoteService : IInternalNoteService
             EntityType = nameof(InternalNote),
             EntityId = note.Id.ToString(),
             Timestamp = DateTime.UtcNow,
-            ChangedFields = JsonSerializer.Serialize(new { note.NoteText }),
-            PreviousValues = JsonSerializer.Serialize(previousValues)
+            ChangedFields = JsonSerializer.Serialize(new { note.NoteText, note.OwnerId, note.OwnerType }),
+            PreviousValues = JsonSerializer.Serialize(new { previousValues.NoteText, note.OwnerId, note.OwnerType })
         };
 
         _context.AuditLogs.Add(auditLog);

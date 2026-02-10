@@ -81,8 +81,29 @@ public class DocumentReference
     public DateTime? SignedAt { get; set; }
 
     /// <summary>
+    /// File size in bytes
+    /// </summary>
+    [Column("file_size")]
+    public long FileSize { get; set; }
+
+    /// <summary>
+    /// MIME type of the file
+    /// </summary>
+    [Column("mime_type")]
+    [MaxLength(100)]
+    public string MimeType { get; set; } = "application/octet-stream";
+
+    /// <summary>
+    /// User who created/uploaded the document
+    /// </summary>
+    [Column("created_by")]
+    [MaxLength(256)]
+    public string CreatedBy { get; set; } = "System";
+
+    /// <summary>
     /// Creation timestamp
     /// </summary>
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

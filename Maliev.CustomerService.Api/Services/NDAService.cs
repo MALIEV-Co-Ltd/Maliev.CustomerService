@@ -48,10 +48,13 @@ public class NDAService : INDAService
             CustomerId = request.CustomerId,
             DocumentReferenceId = request.DocumentReferenceId,
             Status = NDAStatus.Draft,
-            ExpiresAt = request.ExpiresAt,
+            ExpiresAt = request.ExpiresAt?.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(request.ExpiresAt.Value, DateTimeKind.Utc)
+                : request.ExpiresAt?.ToUniversalTime(),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
+
 
         _context.NDARecords.Add(nda);
 
@@ -73,7 +76,17 @@ public class NDAService : INDAService
         };
 
         _context.AuditLogs.Add(auditLog);
-        await _context.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Database update error creating NDA for customer {CustomerId}. Inner: {InnerMessage}",
+                request.CustomerId, ex.InnerException?.Message);
+            throw;
+        }
 
         _logger.LogInformation("NDA {NDAId} created successfully", nda.Id);
         return nda.ToNDAResponse();
@@ -155,13 +168,18 @@ public class NDAService : INDAService
         if (request.Status == NDAStatus.Signed)
         {
             nda.SignedBy = request.SignedBy;
-            nda.SignedAt = request.SignedAt;
+            nda.SignedAt = request.SignedAt?.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(request.SignedAt.Value, DateTimeKind.Utc)
+                : request.SignedAt?.ToUniversalTime();
         }
 
         if (request.Status == NDAStatus.Revoked)
         {
-            nda.RevokedAt = request.RevokedAt;
+            nda.RevokedAt = request.RevokedAt?.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(request.RevokedAt.Value, DateTimeKind.Utc)
+                : request.RevokedAt?.ToUniversalTime();
         }
+
 
         nda.UpdatedAt = DateTime.UtcNow;
 

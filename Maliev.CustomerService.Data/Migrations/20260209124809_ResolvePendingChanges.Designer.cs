@@ -3,6 +3,7 @@ using System;
 using Maliev.CustomerService.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Maliev.CustomerService.Data.Migrations
 {
     [DbContext(typeof(CustomerDbContext))]
-    partial class CustomerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260209124809_ResolvePendingChanges")]
+    partial class ResolvePendingChanges
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -134,8 +137,7 @@ namespace Maliev.CustomerService.Data.Migrations
 
                     b.Property<string>("ActorId")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("text");
 
                     b.Property<string>("ActorType")
                         .IsRequired()
@@ -147,8 +149,7 @@ namespace Maliev.CustomerService.Data.Migrations
 
                     b.Property<string>("EntityId")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("text");
 
                     b.Property<string>("EntityType")
                         .IsRequired()
@@ -325,12 +326,6 @@ namespace Maliev.CustomerService.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<string>("CreatedBy")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("created_by");
-
                     b.Property<string>("DocumentType")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -343,21 +338,11 @@ namespace Maliev.CustomerService.Data.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("file_reference");
 
-                    b.Property<long>("FileSize")
-                        .HasColumnType("bigint")
-                        .HasColumnName("file_size");
-
                     b.Property<string>("Filename")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("filename");
-
-                    b.Property<string>("MimeType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("mime_type");
 
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid")

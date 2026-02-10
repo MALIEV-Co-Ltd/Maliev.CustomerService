@@ -144,6 +144,12 @@ public class CustomerDbContext : DbContext
         modelBuilder.Entity<AuditLog>(entity =>
         {
             entity.HasKey(e => e.Id);
+            entity.Property(e => e.EntityType).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.EntityId).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Action).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.ActorId).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.ActorType).IsRequired().HasMaxLength(50);
+
             entity.HasIndex(e => new { e.EntityType, e.EntityId });
             entity.HasIndex(e => e.Timestamp);
         });

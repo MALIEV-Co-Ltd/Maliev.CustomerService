@@ -72,8 +72,8 @@ try
     builder.AddAuthenticatedServiceClient<Maliev.CustomerService.Api.Services.External.ICountryServiceClient,
         Maliev.CustomerService.Api.Services.External.CountryServiceClient>("CountryService", sourceServiceName: "customer");
 
-    builder.AddServiceClient<Maliev.CustomerService.Api.Services.External.IUploadServiceClient,
-        Maliev.CustomerService.Api.Services.External.UploadServiceClient>("UploadService");
+    builder.AddAuthenticatedServiceClient<Maliev.CustomerService.Api.Services.External.IUploadServiceClient,
+        Maliev.CustomerService.Api.Services.External.UploadServiceClient>("UploadService", sourceServiceName: "customer");
 
     // Controllers
     builder.Services.AddControllers()

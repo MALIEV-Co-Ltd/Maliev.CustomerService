@@ -33,7 +33,7 @@ public class UpdateCustomerRequest
     /// <summary>
     /// Customer's mobile phone number (optional, E.164 format)
     /// </summary>
-    [Phone(ErrorMessage = "Mobile must be a valid phone number")]
+    [RegularExpression(@"^$|^[+]?[0-9\s-]{7,20}$", ErrorMessage = "Invalid phone format")]
     [MaxLength(20, ErrorMessage = "Mobile must not exceed 20 characters")]
     [JsonPropertyName("mobile")]
     public string? Mobile { get; set; }
@@ -48,7 +48,7 @@ public class UpdateCustomerRequest
     /// <summary>
     /// Customer's personal or direct landline phone number (optional, E.164 format)
     /// </summary>
-    [Phone(ErrorMessage = "Landline must be a valid phone number")]
+    [RegularExpression(@"^$|^[+]?[0-9\s-]{7,20}$", ErrorMessage = "Invalid phone format")]
     [MaxLength(20, ErrorMessage = "Landline must not exceed 20 characters")]
     [JsonPropertyName("landline")]
     public string? Landline { get; set; }

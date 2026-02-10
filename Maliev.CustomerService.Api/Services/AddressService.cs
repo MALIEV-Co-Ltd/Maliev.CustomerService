@@ -78,7 +78,6 @@ public class AddressService : IAddressService
             District = request.District,
             City = request.City,
             StateProvince = request.StateProvince,
-
             PostalCode = request.PostalCode,
             CountryId = request.CountryId,
             RecipientName = request.RecipientName,
@@ -111,7 +110,9 @@ public class AddressService : IAddressService
                 address.City,
                 address.StateProvince,
                 address.PostalCode,
-                address.CountryId
+                address.CountryId,
+                address.RecipientName,
+                address.RecipientPhone
             })
         };
 
@@ -136,13 +137,10 @@ public class AddressService : IAddressService
         _logger.LogDebug("Retrieving addresses for {OwnerType} {OwnerId}", ownerType, ownerId);
 
         var addresses = await _context.Addresses
-            .Where(a => a.OwnerType == ownerType && a.OwnerId == ownerId)
+            .Where(a => a.OwnerId == ownerId && a.OwnerType.ToLower() == ownerType.ToLower())
             .OrderBy(a => a.Type)
             .ThenBy(a => a.CreatedAt)
             .ToListAsync(cancellationToken);
-
-        _logger.LogDebug("Found {Count} addresses for {OwnerType} {OwnerId}",
-            addresses.Count, ownerType, ownerId);
 
         return addresses.Select(a => a.ToAddressResponse()).ToList();
     }
@@ -192,9 +190,80 @@ public class AddressService : IAddressService
         // Track changed fields
         var changedFields = new Dictionary<string, object>();
 
-        // ...
+        if (request.Type != null && request.Type != address.Type)
+        {
+            changedFields["Type"] = request.Type;
+            address.Type = request.Type;
+        }
+
+        if (request.IsDefault.HasValue && request.IsDefault != address.IsDefault)
+        {
+            changedFields["IsDefault"] = request.IsDefault.Value;
+            address.IsDefault = request.IsDefault.Value;
+        }
+
+        if (request.AddressLine1 != null && request.AddressLine1 != address.AddressLine1)
+        {
+            changedFields["AddressLine1"] = request.AddressLine1;
+            address.AddressLine1 = request.AddressLine1;
+        }
+
+        if (request.AddressLine2 != null && request.AddressLine2 != address.AddressLine2)
+        {
+            changedFields["AddressLine2"] = request.AddressLine2;
+            address.AddressLine2 = request.AddressLine2;
+        }
+
+        if (request.AddressLine3 != null && request.AddressLine3 != address.AddressLine3)
+        {
+            changedFields["AddressLine3"] = request.AddressLine3;
+            address.AddressLine3 = request.AddressLine3;
+        }
+
+        if (request.District != null && request.District != address.District)
+        {
+            changedFields["District"] = request.District;
+            address.District = request.District;
+        }
+
+        if (request.City != null && request.City != address.City)
+        {
+            changedFields["City"] = request.City;
+            address.City = request.City;
+        }
+
+        if (request.StateProvince != null && request.StateProvince != address.StateProvince)
+        {
+            changedFields["StateProvince"] = request.StateProvince;
+            address.StateProvince = request.StateProvince;
+        }
+
+        if (request.CountryId.HasValue && request.CountryId != address.CountryId)
+        {
+            // Validate country ID via Country Service
+            bool isValidCountry;
+            try
+            {
+                isValidCountry = await _countryServiceClient.ValidateCountryIdAsync(request.CountryId.Value);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogError(ex, "Country Service unavailable during address update");
+                throw;
+            }
+
+            if (!isValidCountry)
+            {
+                _logger.LogWarning("Invalid country ID {CountryId} for address update", request.CountryId.Value);
+                throw new InvalidOperationException($"Country ID '{request.CountryId.Value}' is not valid");
+            }
+
+            changedFields["CountryId"] = request.CountryId.Value;
+            address.CountryId = request.CountryId.Value;
+        }
 
         if (!string.IsNullOrEmpty(request.PostalCode) && request.PostalCode != address.PostalCode)
+
         {
             changedFields["PostalCode"] = request.PostalCode;
             address.PostalCode = request.PostalCode;
@@ -228,8 +297,8 @@ public class AddressService : IAddressService
                 EntityType = nameof(Address),
                 EntityId = address.Id.ToString(),
                 Timestamp = DateTime.UtcNow,
-                ChangedFields = JsonSerializer.Serialize(changedFields),
-                PreviousValues = JsonSerializer.Serialize(previousValues)
+                ChangedFields = JsonSerializer.Serialize(new { Fields = changedFields, address.OwnerId, address.OwnerType }),
+                PreviousValues = JsonSerializer.Serialize(new { Fields = previousValues, address.OwnerId, address.OwnerType })
             };
 
             _context.AuditLogs.Add(auditLog);
@@ -300,7 +369,9 @@ public class AddressService : IAddressService
                 address.City,
                 address.StateProvince,
                 address.PostalCode,
-                address.CountryId
+                address.CountryId,
+                address.RecipientName,
+                address.RecipientPhone
             })
         };
 

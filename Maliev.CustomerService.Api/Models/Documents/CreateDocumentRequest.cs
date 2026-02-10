@@ -42,4 +42,16 @@ public class CreateDocumentRequest
     [Required(ErrorMessage = "Filename is required")]
     [JsonPropertyName("filename")]
     public string Filename { get; set; } = string.Empty;
+
+    /// <summary>
+    /// File size in bytes
+    /// </summary>
+    [JsonPropertyName("fileSize")]
+    public long FileSize { get; set; }
+
+    /// <summary>
+    /// MIME type of the file
+    /// </summary>
+    [JsonPropertyName("mimeType")]
+    public string MimeType { get; set; } = "application/octet-stream";
 }

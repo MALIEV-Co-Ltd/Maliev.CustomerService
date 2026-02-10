@@ -35,7 +35,8 @@ public class UploadServiceClient : IUploadServiceClient
         {
             _logger.LogDebug("Validating file reference {FileReference} with Upload Service", fileReference);
 
-            var response = await _httpClient.GetAsync($"/api/v1/files/{fileReference}/validate");
+            // T159: The correct endpoint is upload/v1/files/{uploadId}
+            var response = await _httpClient.GetAsync($"/upload/v1/files/{Uri.EscapeDataString(fileReference)}");
 
             if (response.IsSuccessStatusCode)
             {

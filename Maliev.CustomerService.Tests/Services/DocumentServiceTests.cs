@@ -20,6 +20,7 @@ public class DocumentServiceTests
 {
     private readonly TestWebApplicationFactory _fixture;
     private readonly Mock<IUploadServiceClient> _mockUploadServiceClient;
+    private readonly Mock<IIAMClient> _mockIamClient;
     private readonly Mock<ILogger<DocumentService>> _mockLogger;
     private readonly Mock<MetricsService> _mockMetricsService;
 
@@ -27,6 +28,7 @@ public class DocumentServiceTests
     {
         _fixture = fixture;
         _mockUploadServiceClient = new Mock<IUploadServiceClient>();
+        _mockIamClient = new Mock<IIAMClient>();
         _mockLogger = new Mock<ILogger<DocumentService>>();
         _mockMetricsService = new Mock<MetricsService>(MockBehavior.Loose, new object[] { Mock.Of<IHostEnvironment>() });
     }
@@ -35,8 +37,9 @@ public class DocumentServiceTests
     private DocumentService CreateService()
     {
         var context = _fixture.CreateDbContext();
-        return new DocumentService(context, _mockUploadServiceClient.Object, _mockLogger.Object, _mockMetricsService.Object);
+        return new DocumentService(context, _mockIamClient.Object, _mockUploadServiceClient.Object, _mockLogger.Object, _mockMetricsService.Object);
     }
+
 
     [Fact]
     public async Task CreateAsync_WithValidData_ReturnsDocumentInPendingStatus()
