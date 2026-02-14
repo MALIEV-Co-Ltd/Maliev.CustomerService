@@ -2,12 +2,12 @@ using Maliev.CustomerService.Api.Models.NDAs;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Data.Models;
 using Maliev.CustomerService.Tests.Infrastructure;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Moq;
-using MassTransit;
 
 namespace Maliev.CustomerService.Tests.Services;
 

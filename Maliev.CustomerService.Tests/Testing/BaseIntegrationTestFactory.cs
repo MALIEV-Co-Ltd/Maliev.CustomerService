@@ -52,6 +52,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Testing");
     }
 
+    [Obsolete]
     public async Task InitializeAsync()
     {
         await _initLock.WaitAsync();
@@ -59,13 +60,13 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         {
             if (!_containersStarted)
             {
-                _postgresContainer = new PostgreSqlBuilder().WithName("postgres:18-alpine")
+                _postgresContainer = new PostgreSqlBuilder().WithImage("postgres:18-alpine")
                     .Build();
 
-                _redisContainer = new RedisBuilder().WithName("redis:8.4-alpine")
+                _redisContainer = new RedisBuilder().WithImage("redis:8.4-alpine")
                     .Build();
 
-                _rabbitmqContainer = new RabbitMqBuilder().WithName("rabbitmq:4.2-alpine")
+                _rabbitmqContainer = new RabbitMqBuilder().WithImage("rabbitmq:4.2-alpine")
                     .Build();
 
                 // Start all containers in parallel
