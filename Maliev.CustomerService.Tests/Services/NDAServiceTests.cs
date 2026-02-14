@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Moq;
+using MassTransit;
 
 namespace Maliev.CustomerService.Tests.Services;
 
@@ -20,19 +21,21 @@ public class NDAServiceTests
     private readonly TestWebApplicationFactory _fixture;
     private readonly Mock<ILogger<NDAService>> _mockLogger;
     private readonly Mock<MetricsService> _mockMetricsService;
+    private readonly Mock<IPublishEndpoint> _mockPublishEndpoint;
 
     public NDAServiceTests(TestWebApplicationFactory fixture)
     {
         _fixture = fixture;
         _mockLogger = new Mock<ILogger<NDAService>>();
         _mockMetricsService = new Mock<MetricsService>(MockBehavior.Loose, new object[] { Mock.Of<IHostEnvironment>() });
+        _mockPublishEndpoint = new Mock<IPublishEndpoint>();
     }
 
 
     private NDAService CreateService()
     {
         var context = _fixture.CreateDbContext();
-        return new NDAService(context, _mockLogger.Object, _mockMetricsService.Object);
+        return new NDAService(context, _mockLogger.Object, _mockMetricsService.Object, _mockPublishEndpoint.Object);
     }
 
     [Fact]
@@ -49,7 +52,7 @@ public class NDAServiceTests
         };
 
         // Act
-        var result = await service.CreateAsync(request, "test-actor", "Employee");
+        var result = await service.CreateAsync(request, "test-actor", "Employee", "Test Actor");
 
         // Assert
         Assert.NotNull(result);
@@ -75,7 +78,7 @@ public class NDAServiceTests
         };
 
         // Act
-        var result = await service.CreateAsync(request, "test-actor", "Employee");
+        var result = await service.CreateAsync(request, "test-actor", "Employee", "Test Actor");
 
         // Assert
         Assert.NotNull(result);
@@ -96,7 +99,7 @@ public class NDAServiceTests
         };
 
         // Act
-        var result = await service.CreateAsync(request, "employee-123", "Employee");
+        var result = await service.CreateAsync(request, "employee-123", "Employee", "Test Actor");
 
         // Assert
         await using var context = _fixture.CreateDbContext();
@@ -121,7 +124,7 @@ public class NDAServiceTests
         {
             CustomerId = Guid.NewGuid(),
             ExpiresAt = DateTime.UtcNow.AddYears(1)
-        }, "test-actor", "Employee");
+        }, "test-actor", "Employee", "Test Actor");
 
         // Act
         var result = await service.GetByIdAsync(created.Id);
@@ -159,7 +162,7 @@ public class NDAServiceTests
             CustomerId = Guid.NewGuid(),
             DocumentReferenceId = Guid.NewGuid(),
             ExpiresAt = DateTime.UtcNow.AddYears(1)
-        }, "test-actor", "Employee");
+        }, "test-actor", "Employee", "Test Actor");
 
         var updateRequest = new UpdateNDAStatusRequest
         {
@@ -170,7 +173,7 @@ public class NDAServiceTests
         };
 
         // Act
-        var result = await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Employee");
+        var result = await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Employee", "Test Actor");
 
         // Assert
         Assert.NotNull(result);
@@ -190,7 +193,7 @@ public class NDAServiceTests
             CustomerId = Guid.NewGuid(),
             DocumentReferenceId = null,
             ExpiresAt = DateTime.UtcNow.AddYears(1)
-        }, "test-actor", "Employee");
+        }, "test-actor", "Employee", "Test Actor");
 
         var updateRequest = new UpdateNDAStatusRequest
         {
@@ -202,7 +205,7 @@ public class NDAServiceTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Employee"));
+            async () => await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Employee", "Test Actor"));
 
         Assert.Contains("without a document reference", exception.Message);
     }
@@ -218,7 +221,7 @@ public class NDAServiceTests
             CustomerId = Guid.NewGuid(),
             DocumentReferenceId = Guid.NewGuid(),
             ExpiresAt = DateTime.UtcNow.AddYears(1)
-        }, "test-actor", "Employee");
+        }, "test-actor", "Employee", "Test Actor");
 
         // First, sign the NDA
         var signRequest = new UpdateNDAStatusRequest
@@ -228,7 +231,7 @@ public class NDAServiceTests
             SignedAt = DateTime.UtcNow,
             Version = created.Version
         };
-        var signed = await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee");
+        var signed = await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee", "Test Actor");
 
         // Now revoke it
         var revokeRequest = new UpdateNDAStatusRequest
@@ -239,7 +242,7 @@ public class NDAServiceTests
         };
 
         // Act
-        var result = await service.UpdateStatusAsync(created.Id, revokeRequest, "admin-user", "Admin");
+        var result = await service.UpdateStatusAsync(created.Id, revokeRequest, "admin-user", "Admin", "Test Actor");
 
         // Assert
         Assert.NotNull(result);
@@ -258,7 +261,7 @@ public class NDAServiceTests
             CustomerId = Guid.NewGuid(),
             DocumentReferenceId = Guid.NewGuid(),
             ExpiresAt = DateTime.UtcNow.AddYears(1)
-        }, "test-actor", "Employee");
+        }, "test-actor", "Employee", "Test Actor");
 
         var updateRequest = new UpdateNDAStatusRequest
         {
@@ -268,7 +271,7 @@ public class NDAServiceTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Employee"));
+            async () => await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Employee", "Test Actor"));
 
         Assert.Contains("Cannot transition from 'Draft' to 'Expired'", exception.Message);
     }
@@ -284,7 +287,7 @@ public class NDAServiceTests
             CustomerId = Guid.NewGuid(),
             DocumentReferenceId = Guid.NewGuid(),
             ExpiresAt = DateTime.UtcNow.AddYears(1)
-        }, "test-actor", "Employee");
+        }, "test-actor", "Employee", "Test Actor");
 
         var updateRequest = new UpdateNDAStatusRequest
         {
@@ -295,7 +298,7 @@ public class NDAServiceTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Employee"));
+            async () => await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Employee", "Test Actor"));
 
         Assert.Contains("Cannot transition from 'Draft' to 'Revoked'", exception.Message);
     }
@@ -311,7 +314,7 @@ public class NDAServiceTests
             CustomerId = Guid.NewGuid(),
             DocumentReferenceId = Guid.NewGuid(),
             ExpiresAt = DateTime.UtcNow.AddYears(1)
-        }, "test-actor", "Employee");
+        }, "test-actor", "Employee", "Test Actor");
 
         // Sign and then revoke
         var signRequest = new UpdateNDAStatusRequest
@@ -321,7 +324,7 @@ public class NDAServiceTests
             SignedAt = DateTime.UtcNow,
             Version = created.Version
         };
-        var signed = await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee");
+        var signed = await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee", "Test Actor");
 
         var revokeRequest = new UpdateNDAStatusRequest
         {
@@ -329,7 +332,7 @@ public class NDAServiceTests
             RevokedAt = DateTime.UtcNow,
             Version = signed.Version
         };
-        var revoked = await service.UpdateStatusAsync(created.Id, revokeRequest, "admin-user", "Admin");
+        var revoked = await service.UpdateStatusAsync(created.Id, revokeRequest, "admin-user", "Admin", "Test Actor");
 
         // Try to transition from Revoked to Signed
         var invalidRequest = new UpdateNDAStatusRequest
@@ -342,7 +345,7 @@ public class NDAServiceTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await service.UpdateStatusAsync(created.Id, invalidRequest, "test-actor", "Employee"));
+            async () => await service.UpdateStatusAsync(created.Id, invalidRequest, "test-actor", "Employee", "Test Actor"));
 
         Assert.Contains("terminal state", exception.Message);
     }
@@ -364,7 +367,7 @@ public class NDAServiceTests
 
         // Act & Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            async () => await service.UpdateStatusAsync(nonExistentId, updateRequest, "test-actor", "Employee"));
+            async () => await service.UpdateStatusAsync(nonExistentId, updateRequest, "test-actor", "Employee", "Test Actor"));
     }
 
     [Fact]
@@ -378,7 +381,7 @@ public class NDAServiceTests
             CustomerId = Guid.NewGuid(),
             DocumentReferenceId = Guid.NewGuid(),
             ExpiresAt = DateTime.UtcNow.AddYears(1)
-        }, "test-actor", "Employee");
+        }, "test-actor", "Employee", "Test Actor");
 
         var updateRequest = new UpdateNDAStatusRequest
         {
@@ -389,7 +392,7 @@ public class NDAServiceTests
         };
 
         // Act
-        await service.UpdateStatusAsync(created.Id, updateRequest, "manager-456", "Manager");
+        await service.UpdateStatusAsync(created.Id, updateRequest, "manager-456", "Manager", "Test Actor");
 
         // Assert
         await using var context = _fixture.CreateDbContext();
@@ -418,7 +421,7 @@ public class NDAServiceTests
             CustomerId = Guid.NewGuid(),
             DocumentReferenceId = Guid.NewGuid(),
             ExpiresAt = DateTime.UtcNow.AddDays(-1) // Already expired
-        }, "test-actor", "Employee");
+        }, "test-actor", "Employee", "Test Actor");
 
         // Sign the NDA
         var signRequest = new UpdateNDAStatusRequest
@@ -428,7 +431,7 @@ public class NDAServiceTests
             SignedAt = DateTime.UtcNow.AddDays(-2),
             Version = created.Version
         };
-        await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee");
+        await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee", "Test Actor");
 
         // Act
         var expiredCount = await service.CheckExpiredNDAsAsync();
@@ -454,7 +457,7 @@ public class NDAServiceTests
             CustomerId = Guid.NewGuid(),
             DocumentReferenceId = Guid.NewGuid(),
             ExpiresAt = DateTime.UtcNow.AddYears(1) // Future expiration
-        }, "test-actor", "Employee");
+        }, "test-actor", "Employee", "Test Actor");
 
         var signRequest = new UpdateNDAStatusRequest
         {
@@ -463,7 +466,7 @@ public class NDAServiceTests
             SignedAt = DateTime.UtcNow,
             Version = created.Version
         };
-        await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee");
+        await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee", "Test Actor");
 
         // Act
         var expiredCount = await service.CheckExpiredNDAsAsync();
@@ -485,7 +488,7 @@ public class NDAServiceTests
             CustomerId = Guid.NewGuid(),
             DocumentReferenceId = Guid.NewGuid(),
             ExpiresAt = DateTime.UtcNow.AddDays(-1) // Already expired
-        }, "test-actor", "Employee");
+        }, "test-actor", "Employee", "Test Actor");
 
         // Act
         var expiredCount = await service.CheckExpiredNDAsAsync();
@@ -506,7 +509,7 @@ public class NDAServiceTests
             CustomerId = Guid.NewGuid(),
             DocumentReferenceId = Guid.NewGuid(),
             ExpiresAt = DateTime.UtcNow.AddDays(-1)
-        }, "test-actor", "Employee");
+        }, "test-actor", "Employee", "Test Actor");
 
         var signRequest = new UpdateNDAStatusRequest
         {
@@ -515,7 +518,7 @@ public class NDAServiceTests
             SignedAt = DateTime.UtcNow.AddDays(-2),
             Version = created.Version
         };
-        await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee");
+        await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee", "Test Actor");
 
         // Act
         await service.CheckExpiredNDAsAsync();
