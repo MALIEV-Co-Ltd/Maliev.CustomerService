@@ -75,7 +75,8 @@ public class NDAController : ControllerBase
 
             var (actorId, actorType) = User.GetActorInfo();
 
-            var nda = await _ndaService.CreateAsync(request, actorId, actorType);
+            var actorName = User.GetActorName();
+            var nda = await _ndaService.CreateAsync(request, actorId, actorType, actorName);
 
             return CreatedAtAction(nameof(GetById), new { id = nda.Id }, nda);
         }
@@ -151,6 +152,30 @@ public class NDAController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves audit history for an NDA
+    /// </summary>
+    /// <param name="id">NDA ID</param>
+    /// <returns>List of audit log entries</returns>
+    /// <response code="200">History retrieved</response>
+    /// <response code="401">Unauthorized</response>
+    [HttpGet("{id:guid}/history")]
+    [ProducesResponseType(typeof(List<NDAAuditLogResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<List<NDAAuditLogResponse>>> GetHistory(Guid id)
+    {
+        try
+        {
+            var history = await _ndaService.GetHistoryAsync(id);
+            return Ok(history);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving history for NDA {NDAId}", id);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Updates NDA status with lifecycle validation
     /// </summary>
     /// <param name="id">NDA ID</param>
@@ -198,7 +223,8 @@ public class NDAController : ControllerBase
 
             var (actorId, actorType) = User.GetActorInfo();
 
-            var nda = await _ndaService.UpdateStatusAsync(id, request, actorId, actorType, cancellationToken);
+            var actorName = User.GetActorName();
+            var nda = await _ndaService.UpdateStatusAsync(id, request, actorId, actorType, actorName, cancellationToken);
 
             return Ok(nda);
         }
@@ -249,6 +275,46 @@ public class NDAController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error updating NDA status {NDAId}", id);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Deletes an NDA record
+    /// </summary>
+    /// <param name="id">NDA ID</param>
+    /// <param name="request">Delete request with version</param>
+    /// <response code="204">NDA deleted successfully</response>
+    /// <response code="401">Unauthorized</response>
+    /// <response code="404">NDA not found</response>
+    /// <response code="409">Version conflict</response>
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(Guid id, [FromBody] DeleteNDARequest request)
+    {
+        try
+        {
+            var (actorId, actorType) = User.GetActorInfo();
+            var actorName = User.GetActorName();
+            var success = await _ndaService.DeleteAsync(id, request.Version, actorId, actorType, actorName);
+
+            if (!success)
+            {
+                return NotFound(new ErrorResponse { Code = "NOT_FOUND", Message = "NDA not found" });
+            }
+
+            return NoContent();
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("modified by another user"))
+        {
+            return Conflict(new ErrorResponse { Code = "VERSION_CONFLICT", Message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting NDA {NDAId}", id);
             throw;
         }
     }

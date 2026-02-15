@@ -31,6 +31,8 @@ public class CustomerDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     /// <summary>Internal notes set</summary>
     public DbSet<InternalNote> InternalNotes => Set<InternalNote>();
+    /// <summary>Internal note comments set</summary>
+    public DbSet<InternalNoteComment> InternalNoteComments => Set<InternalNoteComment>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -161,6 +163,19 @@ public class CustomerDbContext : DbContext
             entity.HasIndex(e => new { e.OwnerType, e.OwnerId });
 
             // Concurrency token (PostgreSQL bytea with default value)
+            entity.Property(e => e.Version)
+                .IsRowVersion()
+                .HasDefaultValueSql("'\\x0000000000000001'::bytea")
+                .ValueGeneratedOnAddOrUpdate();
+        });
+
+        // Configure InternalNoteComment
+        modelBuilder.Entity<InternalNoteComment>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.InternalNoteId);
+
+            // Concurrency token
             entity.Property(e => e.Version)
                 .IsRowVersion()
                 .HasDefaultValueSql("'\\x0000000000000001'::bytea")

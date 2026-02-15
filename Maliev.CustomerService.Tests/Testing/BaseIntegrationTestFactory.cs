@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
-using Maliev.CustomerService.Api.Services.External;
+using System.Text;
 using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Moq;
 using Testcontainers.PostgreSql;
@@ -36,6 +37,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     private static RabbitMqContainer? _rabbitmqContainer;
     private static bool _containersStarted;
     private static readonly SemaphoreSlim _initLock = new(1, 1);
+
     private readonly RSA _testRsa;
 
     /// <summary>
@@ -44,15 +46,24 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     /// </summary>
     protected virtual string DbConnectionStringName => typeof(TDbContext).Name;
 
-    public BaseIntegrationTestFactory()
+    public BaseIntegrationTestFactory(string environment = "Testing")
     {
         _testRsa = RSA.Create(2048);
 
         // Set environment variable EARLY so Program.cs picks it up during WebApplication.CreateBuilder
-        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Testing");
+        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", environment);
+
+        // Also set JWT configuration for validation
+        var publicKeyPem = _testRsa.ExportRSAPublicKeyPem();
+        var publicKeyBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(publicKeyPem));
+        Environment.SetEnvironmentVariable("Jwt__PublicKey", publicKeyBase64);
+        Environment.SetEnvironmentVariable("Jwt__SecurityKey", "test-secret-key-at-least-32-characters-long");
+
+        // Set Rate Limiting environment variables for tests
+        Environment.SetEnvironmentVariable("RateLimiting__PermitLimit", "100");
+        Environment.SetEnvironmentVariable("RateLimiting__public__PermitLimit", "50");
     }
 
-    [Obsolete]
     public async Task InitializeAsync()
     {
         await _initLock.WaitAsync();
@@ -60,13 +71,13 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         {
             if (!_containersStarted)
             {
-                _postgresContainer = new PostgreSqlBuilder().WithImage("postgres:18-alpine")
+                _postgresContainer = new PostgreSqlBuilder("postgres:18-alpine")
                     .Build();
 
-                _redisContainer = new RedisBuilder().WithImage("redis:8.4-alpine")
+                _redisContainer = new RedisBuilder("redis:7.4-alpine")
                     .Build();
 
-                _rabbitmqContainer = new RabbitMqBuilder().WithImage("rabbitmq:4.2-alpine")
+                _rabbitmqContainer = new RabbitMqBuilder("rabbitmq:4.0-alpine")
                     .Build();
 
                 // Start all containers in parallel
@@ -79,19 +90,16 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
                 // Ensure PostgreSQL is fully ready and accepting connections
                 var postgresReady = false;
                 var retryCount = 0;
-                const int maxRetries = 60; // Increased to 60 for CI stability
+                const int maxRetries = 60;
                 while (!postgresReady && retryCount < maxRetries)
                 {
                     try
                     {
                         await using var conn = new Npgsql.NpgsqlConnection(_postgresContainer.GetConnectionString());
                         await conn.OpenAsync();
-
-                        // Perform a simple ping to ensure the database is actually ready to execute queries
                         await using var cmd = conn.CreateCommand();
                         cmd.CommandText = "SELECT 1";
                         await cmd.ExecuteScalarAsync();
-
                         postgresReady = true;
                     }
                     catch
@@ -103,22 +111,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
                 if (!postgresReady)
                 {
-                    throw new Exception("PostgreSQL Testcontainer failed to become ready (Ping failed) after 60 seconds.");
-                }
-
-                // Wait for Redis to be ready
-                using (var connection = await StackExchange.Redis.ConnectionMultiplexer.ConnectAsync(_redisContainer.GetConnectionString()))
-                {
-                    await connection.GetDatabase().PingAsync();
-                }
-
-                // Final Ping check before migrations to ensure connection stability
-                await using (var conn = new Npgsql.NpgsqlConnection(_postgresContainer.GetConnectionString()))
-                {
-                    await conn.OpenAsync();
-                    await using var cmd = conn.CreateCommand();
-                    cmd.CommandText = "SELECT 1";
-                    await cmd.ExecuteScalarAsync();
+                    throw new InvalidOperationException("PostgreSQL Testcontainer failed to become ready after 60 seconds.");
                 }
 
                 // Apply database migrations
@@ -133,18 +126,20 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         }
 
         // Set environment variables immediately after containers start
-        // This ensures they are available when Program.Main runs (which happens when .Server is accessed)
         Environment.SetEnvironmentVariable($"ConnectionStrings__{DbConnectionStringName}", _postgresContainer!.GetConnectionString());
         Environment.SetEnvironmentVariable("ConnectionStrings__redis", _redisContainer!.GetConnectionString());
         Environment.SetEnvironmentVariable("ConnectionStrings__rabbitmq", _rabbitmqContainer!.GetConnectionString());
+        Environment.SetEnvironmentVariable("CORS_ALLOWED_ORIGINS", "http://localhost:3000");
+        Environment.SetEnvironmentVariable("IAM__RegistrationDelaySeconds", "0");
     }
 
     public new async Task DisposeAsync()
     {
-        await base.DisposeAsync(); // Stop the Host (and MassTransit) before deleting containers
-        // Static containers are NOT disposed here to allow reuse across tests
+        await base.DisposeAsync(); // Stop the Host
         _testRsa.Dispose();
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", null); // Cleanup
+        Environment.SetEnvironmentVariable("CORS_ALLOWED_ORIGINS", null);
+        Environment.SetEnvironmentVariable("IAM__RegistrationDelaySeconds", null);
     }
 
 
@@ -156,15 +151,14 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
             InitializeAsync().GetAwaiter().GetResult();
         }
 
-        // Set environment variables BEFORE host builder processes configuration
-        // Note: Connection strings are now injected via ConfigureAppConfiguration in ConfigureWebHost
-        // to ensure they are available during host building causing Program.cs to see them.
-
-
         // Export RSA public key for JWT validation
         var rsaParams = _testRsa.ExportParameters(false);
         Environment.SetEnvironmentVariable("JWT_PUBLIC_KEY_MODULUS", Convert.ToBase64String(rsaParams.Modulus!));
         Environment.SetEnvironmentVariable("JWT_PUBLIC_KEY_EXPONENT", Convert.ToBase64String(rsaParams.Exponent!));
+
+        // Also set the format expected by some Aspire helpers (raw base64 of public key info)
+        var keyBytes = _testRsa.ExportSubjectPublicKeyInfo();
+        Environment.SetEnvironmentVariable("Authentication__Jwt__PublicKey", Convert.ToBase64String(keyBytes));
 
         // Allow derived classes to set additional environment variables
         ConfigureEnvironmentVariables();
@@ -174,24 +168,50 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Testing");
+        builder.ConfigureLogging(logging =>
+        {
+            logging.ClearProviders();
+            logging.AddConsole();
+        });
 
         builder.ConfigureAppConfiguration((context, config) =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
+                ["Jwt:SecurityKey"] = "test-secret-key-at-least-32-characters-long",
                 [$"ConnectionStrings:{DbConnectionStringName}"] = _postgresContainer!.GetConnectionString(),
                 ["ConnectionStrings:redis"] = _redisContainer!.GetConnectionString(),
                 ["ConnectionStrings:rabbitmq"] = _rabbitmqContainer!.GetConnectionString(),
-                ["Jwt:SecurityKey"] = "test-secret-key-at-least-32-characters-long"
+                ["CORS_ALLOWED_ORIGINS"] = "http://localhost:3000",
+                ["IAM:RegistrationDelaySeconds"] = "0"
             });
         });
 
         builder.ConfigureTestServices(services =>
         {
+            // Manual Redis registration
+            var redisConnectionString = _redisContainer!.GetConnectionString();
+            services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp =>
+            {
+                return StackExchange.Redis.ConnectionMultiplexer.Connect(redisConnectionString);
+            });
+
+            // Mock IAM service
+            var iamMock = new Mock<Maliev.Aspire.ServiceDefaults.IAM.IIamServiceClient>();
+            iamMock.Setup(x => x.CheckPermissionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
+            iamMock.Setup(x => x.GetUserPermissionsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Enumerable.Empty<string>());
+            services.AddSingleton(iamMock.Object);
+
+            var statusTracker = new Maliev.Aspire.ServiceDefaults.IAM.IAMRegistrationStatusTracker();
+            statusTracker.MarkRegistered();
+            services.AddSingleton(statusTracker);
+
             // Configure JWT Bearer authentication with test RSA key
             services.PostConfigureAll<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>(options =>
             {
+                options.MapInboundClaims = false;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
@@ -201,12 +221,32 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
                     ValidIssuer = "test-issuer",
                     ValidAudience = "test-audience",
                     IssuerSigningKey = new RsaSecurityKey(_testRsa),
-                    ClockSkew = TimeSpan.Zero // No clock skew for tests
+                    ClockSkew = TimeSpan.Zero,
+                    NameClaimType = "sub",
+                    RoleClaimType = "role"
                 };
+                options.TokenValidationParameters.SignatureValidator = null;
             });
 
-            // Add MassTransit test harness for testing message publishing/consuming
+            // Add MassTransit test harness
             services.AddMassTransitTestHarness();
+
+            // Disable background services
+            var backgroundServicesToDisable = new[]
+            {
+                "NDAExpirationBackgroundService",
+                "DocumentDeletionRetryBackgroundService",
+                "BackgroundIAMRegistrationService"
+            };
+
+            var descriptors = services.Where(d =>
+                d.ServiceType == typeof(IHostedService) &&
+                backgroundServicesToDisable.Contains(d.ImplementationType?.Name)).ToList();
+
+            foreach (var descriptor in descriptors)
+            {
+                services.Remove(descriptor);
+            }
 
             // Allow derived classes to add additional test services
             ConfigureAdditionalServices(services);
@@ -219,7 +259,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     /// </summary>
     protected virtual void ConfigureEnvironmentVariables()
     {
-        // Set dummy URLs for external services to prevent constructor injection failures
+        // Set dummy URLs for external services
         Environment.SetEnvironmentVariable("CountryService__BaseUrl", "http://localhost:5000");
         Environment.SetEnvironmentVariable("UploadService__BaseUrl", "http://localhost:5001");
     }
@@ -229,24 +269,22 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     /// </summary>
     protected virtual void ConfigureAdditionalServices(IServiceCollection services)
     {
-        // Mock CountryService
-        var mockCountryService = new Mock<ICountryServiceClient>();
+        // Default mocks for common external services
+        var mockCountryService = new Mock<Maliev.CustomerService.Api.Services.External.ICountryServiceClient>();
         mockCountryService.Setup(x => x.ValidateCountryIdAsync(It.IsAny<Guid>()))
             .ReturnsAsync(true);
-        services.AddScoped(_ => mockCountryService.Object);
+        services.AddSingleton(mockCountryService.Object);
 
-        // Mock UploadService
-        var mockUploadService = new Mock<IUploadServiceClient>();
+        var mockUploadService = new Mock<Maliev.CustomerService.Api.Services.External.IUploadServiceClient>();
         mockUploadService.Setup(x => x.ValidateFileReferenceAsync(It.IsAny<string>()))
             .ReturnsAsync(true);
         mockUploadService.Setup(x => x.DeleteFileAsync(It.IsAny<string>()))
             .ReturnsAsync(true);
-        services.AddScoped(_ => mockUploadService.Object);
+        services.AddSingleton(mockUploadService.Object);
     }
 
     /// <summary>
     /// Gets the DbContext from the service provider for use in tests.
-    /// Note: Caller must dispose the returned DbContext.
     /// </summary>
     public TDbContext GetDbContext()
     {
@@ -256,24 +294,14 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     /// <summary>
     /// Creates a new DbContext instance for testing (not from DI container).
-    /// Recommended for tests to ensure clean connection management.
     /// </summary>
     public TDbContext CreateDbContext()
     {
         var connectionString = _postgresContainer!.GetConnectionString();
-        // Disable rewriting and limit pool size for tests to avoid exhaustion
-        var builder = new Npgsql.NpgsqlConnectionStringBuilder(connectionString)
-        {
-            Pooling = true,
-            MaxPoolSize = 100, // Reverted to 100
-            IncludeErrorDetail = true
-        };
-
         var optionsBuilder = new DbContextOptionsBuilder<TDbContext>();
-        optionsBuilder.UseNpgsql(builder.ConnectionString, o => o.EnableRetryOnFailure(2)); // Lower retry for tests
+        optionsBuilder.UseNpgsql(connectionString);
         return (TDbContext)Activator.CreateInstance(typeof(TDbContext), optionsBuilder.Options)!;
     }
-
 
     /// <summary>
     /// Applies all pending migrations to the test database.
@@ -286,14 +314,11 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     /// <summary>
     /// Cleans all data from the database while preserving schema.
-    /// Queries the database schema dynamically to get all tables.
     /// </summary>
-    [SuppressMessage("Security", "EF1002:Gaps in SQL queries", Justification = "Table names are retrieved from information_schema and are safe.")]
     public async Task CleanDatabaseAsync()
     {
         await using var context = CreateDbContext();
 
-        // Get all table names from information_schema
         var tableNames = await context.Database
             .SqlQueryRaw<string>(
                 @"SELECT table_name
@@ -304,15 +329,19 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
                   ORDER BY table_name")
             .ToListAsync();
 
-        // Truncate all tables (CASCADE handles foreign keys)
-        if (tableNames.Any())
+        foreach (var tableName in tableNames)
         {
-            var truncateSql = $"TRUNCATE TABLE {string.Join(", ", tableNames.Select(t => $"\"{t}\""))} RESTART IDENTITY CASCADE";
-            await context.Database.ExecuteSqlRawAsync(truncateSql);
+            try
+            {
+#pragma warning disable EF1002
+                await context.Database.ExecuteSqlRawAsync($"TRUNCATE TABLE \"{tableName}\" RESTART IDENTITY CASCADE");
+#pragma warning restore EF1002
+            }
+            catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P01")
+            {
+            }
         }
     }
-
-
 
     /// <summary>
     /// Alias for CleanDatabaseAsync to support different naming conventions.
@@ -329,26 +358,16 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     /// </summary>
     public void ClearCache()
     {
-        // Get IMemoryCache from services and cast to MemoryCache to access Clear()
         var memoryCache = Services.GetService<Microsoft.Extensions.Caching.Memory.IMemoryCache>();
         if (memoryCache is Microsoft.Extensions.Caching.Memory.MemoryCache cache)
         {
-            cache.Compact(1.0); // Compact 100% removes all entries
+            cache.Compact(1.0);
         }
     }
 
     /// <summary>
-    /// Exposes the RSA signing credentials for JWT token creation in tests.
-    /// </summary>
-    public SigningCredentials SigningCredentials => new SigningCredentials(new RsaSecurityKey(_testRsa), SecurityAlgorithms.RsaSha256);
-
-    /// <summary>
     /// Creates a test JWT token for authentication in integration tests.
     /// </summary>
-    /// <param name="userId">User ID to include in token</param>
-    /// <param name="roles">Roles to include in token claims</param>
-    /// <param name="additionalClaims">Additional claims to include</param>
-    /// <returns>JWT token string</returns>
     public string CreateTestJwtToken(
         string userId = "test-user",
         string[]? roles = null,
@@ -361,28 +380,12 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
 
-        if (roles != null)
-        {
-            foreach (var role in roles)
-            {
-                claims.Add(new Claim(ClaimTypes.Role, role));
-            }
-        }
-
-        if (permissions != null)
-        {
-            foreach (var permission in permissions)
-            {
-                claims.Add(new Claim("permissions", permission));
-            }
-        }
+        if (roles != null) foreach (var role in roles) claims.Add(new Claim(ClaimTypes.Role, role));
+        if (permissions != null) foreach (var permission in permissions) claims.Add(new Claim("permissions", permission));
 
         if (additionalClaims != null)
         {
-            foreach (var (key, value) in additionalClaims)
-            {
-                claims.Add(new Claim(key, value));
-            }
+            foreach (var (key, value) in additionalClaims) claims.Add(new Claim(key, value));
         }
 
         var rsaSecurityKey = new RsaSecurityKey(_testRsa);
@@ -401,22 +404,16 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     /// <summary>
     /// Simplified JWT token generator with role parameter.
-    /// Alias for CreateTestJwtToken to support different naming conventions.
     /// </summary>
     public string GenerateTestToken(string userId = "test-user", string role = "admin")
     {
         return CreateTestJwtToken(userId, new[] { role });
     }
 
-
-
     /// <summary>
-    /// Creates an HTTP client with authenticated user, roles, and permissions.
+    /// Creates an HTTP client with authenticated user and specified roles and permissions.
     /// </summary>
-    public HttpClient CreateAuthenticatedClient(
-        string userId = "test-user",
-        string[]? roles = null,
-        string[]? permissions = null)
+    public HttpClient CreateAuthenticatedClient(string userId = "test-user", string[]? roles = null, string[]? permissions = null)
     {
         var token = CreateTestJwtToken(userId, roles, permissions);
         var client = CreateClient();

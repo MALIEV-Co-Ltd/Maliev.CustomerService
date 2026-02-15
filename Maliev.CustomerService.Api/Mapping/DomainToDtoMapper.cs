@@ -157,6 +157,23 @@ public static class DomainToDtoMapper
     }
 
     /// <summary>
+    /// Maps an InternalNoteComment entity to InternalNoteCommentResponse DTO
+    /// </summary>
+    public static InternalNoteCommentResponse ToInternalNoteCommentResponse(this InternalNoteComment comment)
+    {
+        return new InternalNoteCommentResponse
+        {
+            Id = comment.Id,
+            InternalNoteId = comment.InternalNoteId,
+            CommentText = comment.CommentText,
+            CreatedBy = comment.CreatedBy,
+            CreatedByName = comment.CreatedByName,
+            CreatedAt = comment.CreatedAt,
+            Version = comment.Version
+        };
+    }
+
+    /// <summary>
     /// Maps a DocumentReference entity to DocumentResponse DTO
     /// </summary>
     public static DocumentResponse ToDocumentResponse(this DocumentReference document)

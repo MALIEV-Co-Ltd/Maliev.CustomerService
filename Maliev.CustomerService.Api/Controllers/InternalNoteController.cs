@@ -170,4 +170,48 @@ public class InternalNoteController : ControllerBase
             return NotFound(new { error = $"Internal note with ID {id} not found" });
         }
     }
+
+    /// <summary>
+    /// Adds a comment to an internal note
+    /// </summary>
+    [RequirePermission(CustomerPermissions.NotesUpdate)]
+    [HttpPost("{id}/comments")]
+    [ProducesResponseType(typeof(InternalNoteCommentResponse), StatusCodes.Status201Created)]
+    public async Task<IActionResult> AddComment(Guid id, [FromBody] CreateInternalNoteCommentRequest request)
+    {
+        try
+        {
+            var actorId = GetCreatedBy();
+            var comment = await _internalNoteService.AddCommentAsync(id, request, actorId);
+            return CreatedAtAction(nameof(GetComments), new { id }, comment);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new { error = "Internal note not found" });
+        }
+    }
+
+    /// <summary>
+    /// Gets all comments for an internal note
+    /// </summary>
+    [RequirePermission(CustomerPermissions.NotesRead)]
+    [HttpGet("{id}/comments")]
+    [ProducesResponseType(typeof(List<InternalNoteCommentResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetComments(Guid id)
+    {
+        var comments = await _internalNoteService.GetCommentsAsync(id);
+        return Ok(comments);
+    }
+
+    /// <summary>
+    /// Gets combined activity for an internal note
+    /// </summary>
+    [RequirePermission(CustomerPermissions.NotesRead)]
+    [HttpGet("{id}/activity")]
+    [ProducesResponseType(typeof(List<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetActivity(Guid id)
+    {
+        var activity = await _internalNoteService.GetNoteActivityAsync(id);
+        return Ok(activity);
+    }
 }

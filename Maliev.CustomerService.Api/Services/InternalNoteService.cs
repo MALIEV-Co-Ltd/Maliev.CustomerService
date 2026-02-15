@@ -228,4 +228,145 @@ public class InternalNoteService : IInternalNoteService
 
         _logger.LogInformation("Internal note {NoteId} deleted successfully", id);
     }
+
+    /// <inheritdoc />
+    public async Task<InternalNoteCommentResponse> AddCommentAsync(Guid noteId, CreateInternalNoteCommentRequest request, string actorId)
+    {
+        _logger.LogInformation("Adding comment to internal note {NoteId} by {ActorId}", noteId, actorId);
+
+        var note = await _context.InternalNotes.AnyAsync(n => n.Id == noteId);
+        if (!note)
+        {
+            throw new KeyNotFoundException($"Internal note with ID '{noteId}' not found");
+        }
+
+        string? actorName = null;
+        if (Guid.TryParse(actorId, out var principalId))
+        {
+            var principal = await _iamClient.GetPrincipalByIdAsync(principalId);
+            actorName = principal?.DisplayName;
+        }
+
+        var comment = new InternalNoteComment
+        {
+            Id = Guid.NewGuid(),
+            InternalNoteId = noteId,
+            CommentText = request.CommentText,
+            CreatedBy = actorId,
+            CreatedByName = actorName,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.InternalNoteComments.Add(comment);
+
+        // Add audit log for the comment
+        var auditLog = new AuditLog
+        {
+            ActorId = actorId,
+            ActorType = "Employee",
+            Action = "Comment",
+            EntityType = nameof(InternalNote),
+            EntityId = noteId.ToString(),
+            Timestamp = DateTime.UtcNow,
+            ChangedFields = JsonSerializer.Serialize(new { CommentText = request.CommentText })
+        };
+        _context.AuditLogs.Add(auditLog);
+
+        await _context.SaveChangesAsync();
+
+        var response = comment.ToInternalNoteCommentResponse();
+        if (Guid.TryParse(actorId, out var pId))
+        {
+            var p = await _iamClient.GetPrincipalByIdAsync(pId);
+            if (p != null) response.CreatedByEmail = p.Email;
+        }
+
+        return response;
+    }
+
+    /// <inheritdoc />
+    public async Task<List<InternalNoteCommentResponse>> GetCommentsAsync(Guid noteId)
+    {
+        var comments = await _context.InternalNoteComments
+            .Where(c => c.InternalNoteId == noteId)
+            .OrderBy(c => c.CreatedAt)
+            .ToListAsync();
+
+        var responses = new List<InternalNoteCommentResponse>();
+
+        // Collect unique principal IDs
+        var principalIds = comments
+            .Where(c => Guid.TryParse(c.CreatedBy, out _))
+            .Select(c => Guid.Parse(c.CreatedBy))
+            .Distinct()
+            .ToList();
+
+        var principalMap = new Dictionary<Guid, Maliev.CustomerService.Api.Models.IAM.PrincipalResponse>();
+        foreach (var pId in principalIds)
+        {
+            var principal = await _iamClient.GetPrincipalByIdAsync(pId);
+            if (principal != null) principalMap[pId] = principal;
+        }
+
+        foreach (var comment in comments)
+        {
+            var res = comment.ToInternalNoteCommentResponse();
+            if (Guid.TryParse(comment.CreatedBy, out var pId) && principalMap.TryGetValue(pId, out var p))
+            {
+                res.CreatedByName = p.DisplayName;
+                res.CreatedByEmail = p.Email;
+            }
+            responses.Add(res);
+        }
+
+        return responses;
+    }
+
+    /// <inheritdoc />
+    public async Task<List<object>> GetNoteActivityAsync(Guid noteId)
+    {
+        // Get comments
+        var comments = await GetCommentsAsync(noteId);
+
+        // Get audit logs for this specific note
+        var auditLogs = await _context.AuditLogs
+            .Where(a => a.EntityType == nameof(InternalNote) && a.EntityId == noteId.ToString())
+            .OrderByDescending(a => a.Timestamp)
+            .ToListAsync();
+
+        var activity = new List<object>();
+
+        foreach (var comment in comments)
+        {
+            activity.Add(new
+            {
+                Type = "Comment",
+                comment.Id,
+                comment.CommentText,
+                comment.CreatedBy,
+                comment.CreatedByName,
+                comment.CreatedByEmail,
+                Timestamp = comment.CreatedAt
+            });
+        }
+
+        foreach (var log in auditLogs)
+        {
+            if (log.Action == "Comment") continue; // Already added from comments table for richness
+
+            activity.Add(new
+            {
+                Type = "Audit",
+                log.Id,
+                log.Action,
+                log.ActorId,
+                ActorName = (await _iamClient.GetPrincipalByIdAsync(Guid.TryParse(log.ActorId, out var aid) ? aid : Guid.Empty))?.DisplayName ?? log.ActorId,
+                log.ChangedFields,
+                log.PreviousValues,
+                Timestamp = log.Timestamp
+            });
+        }
+
+        return activity.OrderByDescending(a => (DateTime)a.GetType().GetProperty("Timestamp")!.GetValue(a)!).ToList();
+    }
 }

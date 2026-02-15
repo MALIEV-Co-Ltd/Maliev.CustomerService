@@ -205,7 +205,7 @@ public class NDAServiceTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Employee", "Test Actor"));
+            async () => await service.UpdateStatusAsync(created.Id, updateRequest, "test-actor", "Customer", "Test Actor"));
 
         Assert.Contains("without a document reference", exception.Message);
     }
@@ -238,6 +238,7 @@ public class NDAServiceTests
         {
             Status = NDAStatus.Revoked,
             RevokedAt = DateTime.UtcNow,
+            RevokeReason = "Testing revoke",
             Version = signed.Version
         };
 
@@ -293,6 +294,7 @@ public class NDAServiceTests
         {
             Status = NDAStatus.Revoked,
             RevokedAt = DateTime.UtcNow,
+            RevokeReason = "Testing revoke",
             Version = created.Version
         };
 
@@ -330,6 +332,7 @@ public class NDAServiceTests
         {
             Status = NDAStatus.Revoked,
             RevokedAt = DateTime.UtcNow,
+            RevokeReason = "Testing revoke",
             Version = signed.Version
         };
         var revoked = await service.UpdateStatusAsync(created.Id, revokeRequest, "admin-user", "Admin", "Test Actor");

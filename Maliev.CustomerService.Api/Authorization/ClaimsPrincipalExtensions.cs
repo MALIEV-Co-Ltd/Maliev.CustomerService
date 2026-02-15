@@ -31,13 +31,38 @@ public static class ClaimsPrincipalExtensions
         // Updated for GCP-style roles: roles.customer.{role-name}
         var roles = principal.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
         var internalRoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    "Employee", "Manager", "Admin",
-                    "roles.customer.admin", "roles.customer.manager", "roles.customer.representative"
-                };
+        {
+            "Employee", "Manager", "Admin",
+            CustomerPredefinedRoles.Admin,
+            CustomerPredefinedRoles.Manager,
+            CustomerPredefinedRoles.Representative
+        };
         var isInternal = roles.Any(internalRoles.Contains);
 
         var actorType = isInternal ? "Employee" : "Customer";
         return (actorId, actorType);
+    }
+    /// <summary>
+    /// Extracts actor name from the claims principal.
+    /// </summary>
+    /// <param name="principal">The claims principal.</param>
+    /// <returns>The actor name or "Unknown".</returns>
+    public static string GetActorName(this ClaimsPrincipal principal)
+    {
+        var givenName = principal.FindFirst(ClaimTypes.GivenName)?.Value ?? principal.FindFirst("given_name")?.Value;
+        var familyName = principal.FindFirst(ClaimTypes.Surname)?.Value ?? principal.FindFirst("family_name")?.Value;
+
+        if (!string.IsNullOrEmpty(givenName) || !string.IsNullOrEmpty(familyName))
+        {
+            return $"{givenName} {familyName}".Trim();
+        }
+
+        var name = principal.FindFirst(ClaimTypes.Name)?.Value
+            ?? principal.FindFirst("name")?.Value
+            ?? principal.FindFirst("preferred_username")?.Value;
+
+        if (!string.IsNullOrEmpty(name)) return name;
+
+        return principal.FindFirst(ClaimTypes.Email)?.Value ?? principal.FindFirst("email")?.Value ?? "Unknown";
     }
 }

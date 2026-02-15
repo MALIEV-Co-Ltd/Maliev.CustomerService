@@ -483,27 +483,28 @@ public class InternalNoteServiceTests
         // Arrange
         await _fixture.ClearDatabaseAsync();
         var service = CreateService();
-        var sharedId = Guid.NewGuid(); // Same ID for both customer and company
+        var customerId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
 
         // Create note for customer
         var customerNote = await service.CreateAsync(new CreateInternalNoteRequest
         {
             OwnerType = "Customer",
-            OwnerId = sharedId,
+            OwnerId = customerId,
             NoteText = "Customer-specific note"
         }, "employee-1");
 
-        // Create note for company with same ID
+        // Create note for company
         var companyNote = await service.CreateAsync(new CreateInternalNoteRequest
         {
             OwnerType = "Company",
-            OwnerId = sharedId,
+            OwnerId = companyId,
             NoteText = "Company-specific note"
         }, "employee-2");
 
         // Act
-        var customerNotes = await service.GetByOwnerAsync("Customer", sharedId);
-        var companyNotes = await service.GetByOwnerAsync("Company", sharedId);
+        var customerNotes = await service.GetByOwnerAsync("Customer", customerId);
+        var companyNotes = await service.GetByOwnerAsync("Company", companyId);
 
         // Assert
         Assert.Single(customerNotes);

@@ -26,4 +26,10 @@ public class CreateNDARequest
     /// </summary>
     [JsonPropertyName("expiresAt")]
     public DateTime? ExpiresAt { get; set; }
+
+    /// <summary>
+    /// Optional initial status (defaults to Draft)
+    /// </summary>
+    [JsonPropertyName("status")]
+    public string? Status { get; set; }
 }

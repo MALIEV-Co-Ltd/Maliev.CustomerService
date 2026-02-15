@@ -858,24 +858,27 @@ public class CustomerService : ICustomerService
     }
 
     /// <inheritdoc />
-    public async Task<List<CustomerActivityResponse>> GetActivityAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<PaginatedResponse<CustomerActivityResponse>> GetActivityAsync(Guid id, int? skip = null, int? take = null, int page = 1, int pageSize = 50, CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Retrieving activity history for customer {CustomerId}", id);
+        _logger.LogDebug("Retrieving activity history for customer {CustomerId} (Skip {Skip}, Take {Take}, Page {Page}, Size {PageSize})", id, skip, take, page, pageSize);
 
         var customerIdStr = id.ToString();
 
-        // We want to fetch audit logs where:
-        // 1. EntityType = Customer and EntityId = customerId
-        // 2. EntityType = Address/InternalNote/NDARecord/DocumentReference and the ChangedFields contains the ownerId = customerId
-        // Since we can't easily query JSON in a cross-provider way efficiently without specialized functions,
-        // and we only want the last 50, we'll fetch a bit more and filter or use a broader query.
-
-        var auditLogs = await _context.AuditLogs
+        var query = _context.AuditLogs
             .Where(a => (a.EntityType == nameof(Customer) && a.EntityId == customerIdStr) ||
                         (a.EntityType != nameof(Customer) && a.ChangedFields != null && a.ChangedFields.Contains($"\"{customerIdStr}\"")) ||
-                        (a.EntityType != nameof(Customer) && a.PreviousValues != null && a.PreviousValues.Contains($"\"{customerIdStr}\"")))
+                        (a.EntityType != nameof(Customer) && a.PreviousValues != null && a.PreviousValues.Contains($"\"{customerIdStr}\"")));
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        int finalSkip = skip ?? (page - 1) * pageSize;
+        int finalTake = take ?? pageSize;
+        var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+
+        var auditLogs = await query
             .OrderByDescending(a => a.Timestamp)
-            .Take(50)
+            .Skip(finalSkip)
+            .Take(finalTake)
             .ToListAsync(cancellationToken);
 
         var activities = new List<CustomerActivityResponse>();
@@ -926,7 +929,14 @@ public class CustomerService : ICustomerService
             });
         }
 
-        return activities;
+        return new PaginatedResponse<CustomerActivityResponse>
+        {
+            Items = activities,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize,
+            TotalPages = totalPages
+        };
     }
 
     private static string GetEntityDisplayName(string entityType) => entityType switch
@@ -1055,6 +1065,7 @@ public class CustomerService : ICustomerService
                     "District" => "district",
                     "City" => "city",
                     "PostalCode" => "postal code",
+                    "IsDefault" => "default status",
                     _ => field.ToLowerInvariant()
                 };
 
@@ -1062,26 +1073,31 @@ public class CustomerService : ICustomerService
                 var displayOld = oldValue.Length > 30 ? oldValue.Substring(0, 27) + "..." : oldValue;
                 var displayNew = newValue.Length > 30 ? newValue.Substring(0, 27) + "..." : newValue;
 
+                // Humanize boolean values
+                if (field == "IsDefault")
+                {
+                    displayOld = displayOld.ToLower() == "true" ? "default" : "non-default";
+                    displayNew = displayNew.ToLower() == "true" ? "default" : "non-default";
+                }
+
                 if (oldValue == "empty")
                 {
-                    lines.Add($"set {fieldDisplayName} to '{displayNew}'");
+                    lines.Add($"set {fieldDisplayName} to '**{displayNew}**'");
                 }
                 else
                 {
-                    lines.Add($"changed {fieldDisplayName} from '{displayOld}' to '{displayNew}'");
+                    lines.Add($"changed {fieldDisplayName} from '**{displayOld}**' to '**{displayNew}**'");
                 }
             }
 
             if (lines.Count == 0) return $"{prefix} updated";
 
-            if (lines.Count == 1)
+            if (lines.Count > 1)
             {
-                // Capitalize first letter
-                var detail = lines[0];
-                return char.ToUpper(prefix[0]) + prefix.Substring(1) + " update: " + detail;
+                return $"Updated {prefix.ToLowerInvariant()}:\n* {string.Join("\n* ", lines.Select(l => char.ToUpper(l[0]) + l.Substring(1)))}";
             }
 
-            return $"Updated {prefix.ToLowerInvariant()}:\n• {string.Join("\n• ", lines.Select(l => char.ToUpper(l[0]) + l.Substring(1)))}";
+            return char.ToUpper(prefix[0]) + prefix.Substring(1) + " update: " + lines[0];
         }
         catch
         {

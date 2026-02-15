@@ -3,6 +3,8 @@ using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.NDAs;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
+using Maliev.MessagingContracts.Contracts.Customers;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.CustomerService.Api.Services;
@@ -15,6 +17,7 @@ public class NDAService : INDAService
     private readonly CustomerDbContext _context;
     private readonly ILogger<NDAService> _logger;
     private readonly MetricsService _metricsService;
+    private readonly IPublishEndpoint _publishEndpoint;
 
     /// <summary>
     /// Initializes a new instance of the NDAService class
@@ -22,11 +25,13 @@ public class NDAService : INDAService
     /// <param name="context">Database context for Customer Service</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="metricsService">Metrics service for recording NDA operations</param>
-    public NDAService(CustomerDbContext context, ILogger<NDAService> logger, MetricsService metricsService)
+    /// <param name="publishEndpoint">MassTransit publish endpoint</param>
+    public NDAService(CustomerDbContext context, ILogger<NDAService> logger, MetricsService metricsService, IPublishEndpoint publishEndpoint)
     {
         _context = context;
         _logger = logger;
         _metricsService = metricsService;
+        _publishEndpoint = publishEndpoint;
     }
 
     /// <summary>
@@ -35,20 +40,28 @@ public class NDAService : INDAService
     /// <param name="request">NDA creation request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="actorName">Name of the actor performing the action</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Created NDA response</returns>
-    public async Task<NDAResponse> CreateAsync(CreateNDARequest request, string actorId, string actorType, CancellationToken cancellationToken = default)
+    public async Task<NDAResponse> CreateAsync(CreateNDARequest request, string actorId, string actorType, string actorName, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Creating NDA for customer {CustomerId} by actor {ActorId} ({ActorType})",
-            request.CustomerId, actorId, actorType);
+        _logger.LogInformation("Creating NDA for customer {CustomerId} by actor {ActorId} ({ActorName} - {ActorType})",
+            request.CustomerId, actorId, actorName, actorType);
+
+        var status = NDAStatus.Draft;
+        if (!string.IsNullOrEmpty(request.Status) && NDAStatus.All.Contains(request.Status))
+        {
+            status = request.Status;
+        }
 
         var nda = new NDARecord
         {
             Id = Guid.NewGuid(),
             CustomerId = request.CustomerId,
             DocumentReferenceId = request.DocumentReferenceId,
-            Status = NDAStatus.Draft,
+            Status = status,
             ExpiresAt = request.ExpiresAt?.Kind == DateTimeKind.Unspecified
+
                 ? DateTime.SpecifyKind(request.ExpiresAt.Value, DateTimeKind.Utc)
                 : request.ExpiresAt?.ToUniversalTime(),
             CreatedAt = DateTime.UtcNow,
@@ -62,6 +75,7 @@ public class NDAService : INDAService
         {
             ActorId = actorId,
             ActorType = actorType,
+            ActorName = actorName,
             Action = AuditAction.Create,
             EntityType = nameof(NDARecord),
             EntityId = nda.Id.ToString(),
@@ -134,14 +148,15 @@ public class NDAService : INDAService
     /// <param name="request">Status update request</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="actorName">Name of the actor performing the action</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Updated NDA response</returns>
     /// <exception cref="KeyNotFoundException">Thrown when NDA is not found</exception>
     /// <exception cref="InvalidOperationException">Thrown when lifecycle transition is invalid or version conflict occurs</exception>
-    public async Task<NDAResponse> UpdateStatusAsync(Guid id, UpdateNDAStatusRequest request, string actorId, string actorType, CancellationToken cancellationToken = default)
+    public async Task<NDAResponse> UpdateStatusAsync(Guid id, UpdateNDAStatusRequest request, string actorId, string actorType, string actorName, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Updating NDA {NDAId} status to {Status} by actor {ActorId} ({ActorType})",
-            id, request.Status, actorId, actorType);
+        _logger.LogInformation("Updating NDA {NDAId} status to {Status} by actor {ActorId} ({ActorName} - {ActorType})",
+            id, request.Status, actorId, actorName, actorType);
 
         var nda = await _context.NDARecords
             .FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
@@ -157,13 +172,30 @@ public class NDAService : INDAService
             nda.Status,
             nda.SignedBy,
             nda.SignedAt,
-            nda.RevokedAt
+            nda.RevokedAt,
+            nda.ExpiresAt,
+            nda.DocumentReferenceId,
+            nda.RevokeReason
         };
 
         var oldStatus = nda.Status;
-        ValidateLifecycleTransition(nda, request);
+        ValidateLifecycleTransition(nda, request, actorType);
 
         nda.Status = request.Status;
+
+        // Update document if provided
+        if (request.DocumentReferenceId.HasValue)
+        {
+            nda.DocumentReferenceId = request.DocumentReferenceId;
+        }
+
+        // Update expiration date if provided
+        if (request.ExpiresAt.HasValue)
+        {
+            nda.ExpiresAt = request.ExpiresAt.Value.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(request.ExpiresAt.Value, DateTimeKind.Utc)
+                : request.ExpiresAt.Value.ToUniversalTime();
+        }
 
         if (request.Status == NDAStatus.Signed)
         {
@@ -173,8 +205,15 @@ public class NDAService : INDAService
                 : request.SignedAt?.ToUniversalTime();
         }
 
+
         if (request.Status == NDAStatus.Revoked)
         {
+            if (string.IsNullOrWhiteSpace(request.RevokeReason))
+            {
+                throw new InvalidOperationException("Revoke reason is required when revoking an NDA.");
+            }
+
+            nda.RevokeReason = request.RevokeReason;
             nda.RevokedAt = request.RevokedAt?.Kind == DateTimeKind.Unspecified
                 ? DateTime.SpecifyKind(request.RevokedAt.Value, DateTimeKind.Utc)
                 : request.RevokedAt?.ToUniversalTime();
@@ -189,6 +228,7 @@ public class NDAService : INDAService
         {
             ActorId = actorId,
             ActorType = actorType,
+            ActorName = actorName,
             Action = AuditAction.Update,
             EntityType = nameof(NDARecord),
             EntityId = nda.Id.ToString(),
@@ -198,7 +238,10 @@ public class NDAService : INDAService
                 nda.Status,
                 nda.SignedBy,
                 nda.SignedAt,
-                nda.RevokedAt
+                nda.RevokedAt,
+                nda.ExpiresAt,
+                nda.DocumentReferenceId,
+                nda.RevokeReason
             }),
             PreviousValues = JsonSerializer.Serialize(previousValues)
         };
@@ -265,6 +308,14 @@ public class NDAService : INDAService
             };
 
             _context.AuditLogs.Add(auditLog);
+
+            // Publish event
+            await _publishEndpoint.Publish(new NdaExpiredEvent
+            {
+                NdaId = nda.Id,
+                CustomerId = nda.CustomerId,
+                ExpiredAt = DateTime.UtcNow
+            }, cancellationToken);
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -274,7 +325,222 @@ public class NDAService : INDAService
         return expiredNDAs.Count;
     }
 
-    private void ValidateLifecycleTransition(NDARecord nda, UpdateNDAStatusRequest request)
+    /// <inheritdoc />
+    public async Task<int> CheckUpcomingExpirationsAsync(CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Checking for upcoming NDA expirations");
+
+        var now = DateTime.UtcNow.Date;
+        var thresholds = new[] { 30, 7, 1 }; // Days before expiration to warn
+        int eventCount = 0;
+
+        foreach (var days in thresholds)
+        {
+            var targetDate = now.AddDays(days);
+
+            // Find NDAs expiring on the exact target date (ignoring time)
+            var expiringNdas = await _context.NDARecords
+                .Where(n => n.Status == NDAStatus.Signed &&
+                            n.ExpiresAt.HasValue &&
+                            n.ExpiresAt.Value.Date == targetDate)
+                .ToListAsync(cancellationToken);
+
+            foreach (var nda in expiringNdas)
+            {
+                await _publishEndpoint.Publish(new NdaExpiringEvent
+                {
+                    NdaId = nda.Id,
+                    CustomerId = nda.CustomerId,
+                    ExpiresAt = nda.ExpiresAt!.Value,
+                    DaysUntilExpiration = days
+                }, cancellationToken);
+
+                eventCount++;
+            }
+        }
+
+        if (eventCount > 0)
+            _logger.LogInformation("Published {Count} NDA expiration warnings", eventCount);
+
+        return eventCount;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> DeleteAsync(Guid id, byte[] version, string actorId, string actorType, string actorName, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Deleting NDA {NDAId} by actor {ActorId} ({ActorName} - {ActorType})",
+            id, actorId, actorName, actorType);
+
+        var nda = await _context.NDARecords
+            .FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
+
+        if (nda == null)
+        {
+            _logger.LogDebug("NDA {NDAId} not found for deletion", id);
+            return false;
+        }
+
+        _context.Entry(nda).Property(n => n.Version).OriginalValue = version;
+        _context.NDARecords.Remove(nda);
+
+        var auditLog = new AuditLog
+        {
+            ActorId = actorId,
+            ActorType = actorType,
+            ActorName = actorName,
+            Action = AuditAction.Delete,
+            EntityType = nameof(NDARecord),
+            EntityId = nda.Id.ToString(),
+            Timestamp = DateTime.UtcNow,
+            PreviousValues = JsonSerializer.Serialize(new
+            {
+                nda.CustomerId,
+                nda.Status,
+                nda.ExpiresAt
+            })
+        };
+
+        _context.AuditLogs.Add(auditLog);
+
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("NDA {NDAId} deleted successfully", id);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogWarning(ex, "Concurrency conflict deleting NDA {NDAId}", id);
+            throw new InvalidOperationException("The record was modified by another user. Please refresh and try again.");
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<List<NDAAuditLogResponse>> GetHistoryAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Retrieving history for NDA {NDAId}", id);
+
+        var logs = await _context.AuditLogs
+            .Where(l => l.EntityType == nameof(NDARecord) && l.EntityId == id.ToString())
+            .OrderByDescending(l => l.Timestamp)
+            .ToListAsync(cancellationToken);
+
+        // Collect all document IDs to fetch names
+        var documentIds = new HashSet<Guid>();
+        var tempLogs = new List<(AuditLog Log, Guid? DocId, Guid? PrevDocId)>();
+
+        foreach (var log in logs)
+        {
+            Guid? docId = null;
+            Guid? prevDocId = null;
+
+            if (!string.IsNullOrEmpty(log.ChangedFields))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(log.ChangedFields);
+                    if (doc.RootElement.TryGetProperty("DocumentReferenceId", out var dProp) || doc.RootElement.TryGetProperty("documentReferenceId", out dProp))
+                    {
+                        if (dProp.ValueKind != JsonValueKind.Null && dProp.TryGetGuid(out var guid))
+                        {
+                            docId = guid;
+                            documentIds.Add(guid);
+                        }
+                    }
+                }
+                catch { /* Ignore */ }
+            }
+
+            if (!string.IsNullOrEmpty(log.PreviousValues))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(log.PreviousValues);
+                    if (doc.RootElement.TryGetProperty("DocumentReferenceId", out var dProp) || doc.RootElement.TryGetProperty("documentReferenceId", out dProp))
+                    {
+                        if (dProp.ValueKind != JsonValueKind.Null && dProp.TryGetGuid(out var guid))
+                        {
+                            prevDocId = guid;
+                            documentIds.Add(guid);
+                        }
+                    }
+                }
+                catch { /* Ignore */ }
+            }
+
+            tempLogs.Add((log, docId, prevDocId));
+        }
+
+        // Fetch document names
+        var documentNames = new Dictionary<Guid, string>();
+        if (documentIds.Any())
+        {
+            documentNames = await _context.DocumentReferences
+                .Where(d => documentIds.Contains(d.Id))
+                .ToDictionaryAsync(d => d.Id, d => d.Filename, cancellationToken);
+        }
+
+        var history = new List<NDAAuditLogResponse>();
+
+        foreach (var (log, docId, prevDocId) in tempLogs)
+        {
+            string? status = null;
+            string? previousStatus = null;
+            DateTime? expiresAt = null;
+            DateTime? revokedAt = null;
+
+            if (!string.IsNullOrEmpty(log.ChangedFields))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(log.ChangedFields);
+                    if (doc.RootElement.TryGetProperty("Status", out var sProp) || doc.RootElement.TryGetProperty("status", out sProp))
+                        status = sProp.GetString();
+
+                    if (doc.RootElement.TryGetProperty("ExpiresAt", out var eProp) || doc.RootElement.TryGetProperty("expiresAt", out eProp))
+                        expiresAt = eProp.ValueKind != JsonValueKind.Null ? eProp.GetDateTime() : null;
+
+                    if (doc.RootElement.TryGetProperty("RevokedAt", out var rProp) || doc.RootElement.TryGetProperty("revokedAt", out rProp))
+                        revokedAt = rProp.ValueKind != JsonValueKind.Null ? rProp.GetDateTime() : null;
+                }
+                catch { /* Ignore JSON parse errors */ }
+            }
+
+            if (!string.IsNullOrEmpty(log.PreviousValues))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(log.PreviousValues);
+                    if (doc.RootElement.TryGetProperty("Status", out var sProp) || doc.RootElement.TryGetProperty("status", out sProp))
+                        previousStatus = sProp.GetString();
+                }
+                catch { /* Ignore JSON parse errors */ }
+            }
+
+            history.Add(new NDAAuditLogResponse
+            {
+                Id = log.Id,
+                Action = log.Action,
+                ActorId = log.ActorId,
+                ActorType = log.ActorType,
+                ActorName = log.ActorName,
+                Timestamp = log.Timestamp,
+                Status = status,
+                PreviousStatus = previousStatus,
+                ExpiresAt = expiresAt,
+                RevokedAt = revokedAt,
+                DocumentReferenceId = docId,
+                DocumentName = docId.HasValue && documentNames.TryGetValue(docId.Value, out var name) ? name : null,
+                PreviousDocumentReferenceId = prevDocId,
+                PreviousDocumentName = prevDocId.HasValue && documentNames.TryGetValue(prevDocId.Value, out var prevName) ? prevName : null
+            });
+        }
+
+        return history;
+    }
+
+    private void ValidateLifecycleTransition(NDARecord nda, UpdateNDAStatusRequest request, string actorType)
+
     {
         if (NDAStatus.TerminalStates.Contains(nda.Status))
         {
@@ -284,18 +550,24 @@ public class NDAService : INDAService
 
         if (nda.Status == NDAStatus.Draft && request.Status == NDAStatus.Signed)
         {
-            if (!nda.DocumentReferenceId.HasValue)
+            // T159: Allow signing without document if performed by an employee
+            if (!nda.DocumentReferenceId.HasValue && !string.Equals(actorType, "Employee", StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException(
-                    "Cannot transition to Signed status without a document reference. Please link a document first.");
+                    "Cannot transition to Signed status without a document reference. Please upload and link a document first.");
             }
         }
 
-        if (nda.Status == NDAStatus.Draft &&
-            (request.Status == NDAStatus.Expired || request.Status == NDAStatus.Revoked))
+        if (nda.Status == NDAStatus.Draft && request.Status == NDAStatus.Revoked)
         {
             throw new InvalidOperationException(
-                $"Cannot transition from '{nda.Status}' to '{request.Status}'. Valid transitions from Draft: Signed only.");
+                $"Cannot transition from '{nda.Status}' to '{request.Status}'. NDAs must be Signed before they can be Revoked.");
+        }
+
+        if (nda.Status == NDAStatus.Draft && request.Status == NDAStatus.Expired)
+        {
+            throw new InvalidOperationException(
+                $"Cannot transition from '{nda.Status}' to '{request.Status}'. Valid transitions from Draft: Signed, Revoked.");
         }
     }
 }

@@ -283,7 +283,13 @@ public class AddressService : IAddressService
 
         if (changedFields.Count > 0)
         {
+            if (address.IsDefault)
+            {
+                await EnsureSingleDefaultAsync(address.OwnerType, address.OwnerId, address.Type, address.Id, cancellationToken);
+            }
+
             address.UpdatedAt = DateTime.UtcNow;
+
 
             // Set the original row version for optimistic concurrency
             _context.Entry(address).Property(a => a.Version).OriginalValue = request.Version;
@@ -305,7 +311,13 @@ public class AddressService : IAddressService
 
             try
             {
+                if (address.IsDefault)
+                {
+                    await EnsureSingleDefaultAsync(address.OwnerType, address.OwnerId, address.Type, address.Id, cancellationToken);
+                }
+
                 await _context.SaveChangesAsync(cancellationToken);
+
                 _logger.LogInformation("Address {AddressId} updated successfully with {FieldCount} field(s)",
                     id, changedFields.Count);
             }
@@ -382,5 +394,28 @@ public class AddressService : IAddressService
         _logger.LogInformation("Address {AddressId} deleted successfully", id);
 
         return true;
+    }
+
+    private async Task EnsureSingleDefaultAsync(string ownerType, Guid ownerId, string addressType, Guid currentAddressId, CancellationToken ct)
+    {
+        var otherDefaults = await _context.Addresses
+            .Where(a => a.OwnerId == ownerId &&
+                        a.OwnerType.ToLower() == ownerType.ToLower() &&
+                        a.Type == addressType &&
+                        a.IsDefault &&
+                        a.Id != currentAddressId)
+            .ToListAsync(ct);
+
+        if (otherDefaults.Any())
+        {
+            _logger.LogInformation("Resetting {Count} existing default {AddressType} addresses for {OwnerType} {OwnerId}",
+                otherDefaults.Count, addressType, ownerType, ownerId);
+
+            foreach (var other in otherDefaults)
+            {
+                other.IsDefault = false;
+                other.UpdatedAt = DateTime.UtcNow;
+            }
+        }
     }
 }

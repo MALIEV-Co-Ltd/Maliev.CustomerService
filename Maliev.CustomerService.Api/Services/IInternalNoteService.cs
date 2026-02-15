@@ -40,4 +40,19 @@ public interface IInternalNoteService
     /// <param name="id">Internal note ID</param>
     /// <exception cref="KeyNotFoundException">Thrown when internal note is not found</exception>
     Task DeleteAsync(Guid id);
+
+    /// <summary>
+    /// Adds a comment to an existing internal note
+    /// </summary>
+    Task<InternalNoteCommentResponse> AddCommentAsync(Guid noteId, CreateInternalNoteCommentRequest request, string actorId);
+
+    /// <summary>
+    /// Retrieves all comments for a specific internal note
+    /// </summary>
+    Task<List<InternalNoteCommentResponse>> GetCommentsAsync(Guid noteId);
+
+    /// <summary>
+    /// Retrieves detailed activity for a specific internal note (comments + audit logs)
+    /// </summary>
+    Task<List<object>> GetNoteActivityAsync(Guid noteId);
 }

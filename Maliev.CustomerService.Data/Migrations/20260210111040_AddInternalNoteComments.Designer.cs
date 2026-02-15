@@ -3,6 +3,7 @@ using System;
 using Maliev.CustomerService.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Maliev.CustomerService.Data.Migrations
 {
     [DbContext(typeof(CustomerDbContext))]
-    partial class CustomerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260210111040_AddInternalNoteComments")]
+    partial class AddInternalNoteComments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -134,10 +137,6 @@ namespace Maliev.CustomerService.Data.Migrations
 
                     b.Property<string>("ActorId")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("ActorName")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
@@ -527,9 +526,6 @@ namespace Maliev.CustomerService.Data.Migrations
 
                     b.Property<DateTime?>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("RevokeReason")
-                        .HasColumnType("text");
 
                     b.Property<DateTime?>("RevokedAt")
                         .HasColumnType("timestamp with time zone");

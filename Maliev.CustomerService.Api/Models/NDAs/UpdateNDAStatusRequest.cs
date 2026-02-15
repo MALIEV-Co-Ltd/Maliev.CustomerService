@@ -34,6 +34,24 @@ public class UpdateNDAStatusRequest
     public DateTime? RevokedAt { get; set; }
 
     /// <summary>
+    /// Reason for revoking the NDA (required when transitioning to Revoked)
+    /// </summary>
+    [JsonPropertyName("revokeReason")]
+    public string? RevokeReason { get; set; }
+
+    /// <summary>
+    /// Expiration date for the NDA
+    /// </summary>
+    [JsonPropertyName("expiresAt")]
+    public DateTime? ExpiresAt { get; set; }
+
+    /// <summary>
+    /// Optional: New document reference ID (if updating the document)
+    /// </summary>
+    [JsonPropertyName("documentReferenceId")]
+    public Guid? DocumentReferenceId { get; set; }
+
+    /// <summary>
     /// Row version for optimistic concurrency control
     /// </summary>
     [Required(ErrorMessage = "Version is required for updates")]

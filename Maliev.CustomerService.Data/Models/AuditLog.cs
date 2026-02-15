@@ -26,6 +26,12 @@ public class AuditLog
     public string ActorType { get; set; } = "System";
 
     /// <summary>
+    /// Name of the actor who performed the action
+    /// </summary>
+    [MaxLength(100)]
+    public string? ActorName { get; set; }
+
+    /// <summary>
     /// Action performed (Create, Update, Delete, etc.)
     /// </summary>
     [Required]

@@ -90,7 +90,7 @@ public interface ICustomerService
     Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets activity history for a customer
+    /// Gets activity history for a customer with pagination or skip/take
     /// </summary>
-    Task<List<CustomerActivityResponse>> GetActivityAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<PaginatedResponse<CustomerActivityResponse>> GetActivityAsync(Guid id, int? skip = null, int? take = null, int page = 1, int pageSize = 50, CancellationToken cancellationToken = default);
 }

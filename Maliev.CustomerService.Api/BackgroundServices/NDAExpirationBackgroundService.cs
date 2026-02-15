@@ -31,10 +31,13 @@ public class NDAExpirationBackgroundService : BackgroundService
     {
         _logger.LogInformation("NDA Expiration Background Service started");
 
-        // Wait for application to fully start before first check
-        // This prevents blocking startup with database queries
-        _logger.LogInformation("Waiting 30 seconds before first NDA expiration check");
-        await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+        // Calculate time until next midnight UTC
+        var now = DateTime.UtcNow;
+        var nextRun = now.Date.AddDays(1);
+        var initialDelay = nextRun - now;
+
+        _logger.LogInformation("NDA Expiration Service waiting {Delay} until next run at {NextRun} UTC", initialDelay, nextRun);
+        await Task.Delay(initialDelay, stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -47,15 +50,19 @@ public class NDAExpirationBackgroundService : BackgroundService
                 {
                     var ndaService = scope.ServiceProvider.GetRequiredService<INDAService>();
 
+                    // Check for expired NDAs
                     var expiredCount = await ndaService.CheckExpiredNDAsAsync();
-
                     if (expiredCount > 0)
-                    {
                         _logger.LogInformation("NDA expiration check completed. {ExpiredCount} NDAs expired", expiredCount);
-                    }
-                    else
+
+                    // Check for upcoming expirations
+                    var upcomingCount = await ndaService.CheckUpcomingExpirationsAsync();
+                    if (upcomingCount > 0)
+                        _logger.LogInformation("NDA upcoming expiration check completed. {UpcomingCount} warnings sent", upcomingCount);
+
+                    if (expiredCount == 0 && upcomingCount == 0)
                     {
-                        _logger.LogDebug("NDA expiration check completed. No NDAs expired");
+                        _logger.LogDebug("NDA expiration check completed. No actions needed.");
                     }
                 }
             }

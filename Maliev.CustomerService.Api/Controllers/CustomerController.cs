@@ -479,13 +479,19 @@ public class CustomerController : ControllerBase
     }
 
     /// <summary>
-    /// Gets activity history for a customer
+    /// Gets activity history for a customer with pagination or skip/take
     /// </summary>
     [HttpGet("{id:guid}/history")]
-    [ProducesResponseType(typeof(List<CustomerActivityResponse>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<CustomerActivityResponse>>> GetHistory(Guid id, CancellationToken cancellationToken = default)
+    [ProducesResponseType(typeof(PaginatedResponse<CustomerActivityResponse>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PaginatedResponse<CustomerActivityResponse>>> GetHistory(
+        Guid id,
+        [FromQuery] int? skip = null,
+        [FromQuery] int? take = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken cancellationToken = default)
     {
-        var activities = await _customerService.GetActivityAsync(id, cancellationToken);
-        return Ok(activities);
+        var result = await _customerService.GetActivityAsync(id, skip, take, page, pageSize, cancellationToken);
+        return Ok(result);
     }
 }

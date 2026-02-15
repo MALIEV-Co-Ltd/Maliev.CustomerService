@@ -44,6 +44,11 @@ public class NDARecord
     public DateTime? RevokedAt { get; set; }
 
     /// <summary>
+    /// Reason for revoking the NDA
+    /// </summary>
+    public string? RevokeReason { get; set; }
+
+    /// <summary>
     /// Expiration date for the NDA
     /// </summary>
     public DateTime? ExpiresAt { get; set; }
