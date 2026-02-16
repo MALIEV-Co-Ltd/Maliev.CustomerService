@@ -46,6 +46,9 @@ try
 
     builder.Services.AddSingleton<Maliev.CustomerService.Api.Services.MetricsService>();
 
+    // Security Services
+    builder.Services.AddSingleton<Maliev.CustomerService.Data.Interfaces.IEncryptionService, Maliev.CustomerService.Data.Security.EncryptionService>();
+
     // Application Services
     builder.Services.AddScoped<Maliev.CustomerService.Api.Services.ICustomerService, Maliev.CustomerService.Api.Services.CustomerService>();
     builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IAddressService, Maliev.CustomerService.Api.Services.AddressService>();

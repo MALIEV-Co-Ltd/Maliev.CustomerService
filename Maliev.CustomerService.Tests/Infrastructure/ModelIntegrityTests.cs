@@ -1,5 +1,8 @@
 using Maliev.CustomerService.Data;
+using Maliev.CustomerService.Data.Interfaces;
+using Maliev.CustomerService.Data.Security;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace Maliev.CustomerService.Tests.Infrastructure;
@@ -18,7 +21,16 @@ public class ModelIntegrityTests
             .UseNpgsql("Host=localhost;Database=ModelCheck")
             .Options;
 
-        using var context = new CustomerDbContext(options);
+        // Create encryption service for testing
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ASPNETCORE_ENVIRONMENT"] = "Testing"
+            })
+            .Build();
+        IEncryptionService encryptionService = new EncryptionService(configuration);
+
+        using var context = new CustomerDbContext(options, encryptionService);
 
         // This helper (available in EF Core 9.0+) checks if the current code
         // matches the last snapshot in the Migrations folder.

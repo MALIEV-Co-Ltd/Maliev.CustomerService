@@ -128,6 +128,7 @@ public class CustomerService : ICustomerService
             Mobile = request.Mobile,
             Extension = request.Extension,
             Landline = request.Landline,
+            ThaiNationalId = request.ThaiNationalId,
             Segment = request.Segment,
             Tier = request.Tier,
             PreferredLanguage = request.PreferredLanguage,
@@ -161,6 +162,7 @@ public class CustomerService : ICustomerService
                 customer.Mobile,
                 customer.Extension,
                 customer.Landline,
+                ThaiNationalId = customer.ThaiNationalId != null ? "***REDACTED***" : null, // Don't log PII
                 customer.Segment,
                 customer.Tier,
                 customer.PreferredLanguage,
@@ -384,6 +386,8 @@ public class CustomerService : ICustomerService
             customer.Email,
             customer.Mobile,
             customer.Extension,
+            customer.Landline,
+            ThaiNationalId = customer.ThaiNationalId != null ? "***REDACTED***" : null, // Don't log PII
             customer.Segment,
             customer.Tier,
             customer.PreferredLanguage,
@@ -448,6 +452,12 @@ public class CustomerService : ICustomerService
         {
             changedFields["Landline"] = request.Landline;
             customer.Landline = request.Landline;
+        }
+
+        if (request.ThaiNationalId != null && request.ThaiNationalId != customer.ThaiNationalId)
+        {
+            changedFields["ThaiNationalId"] = "***REDACTED***"; // Don't log PII
+            customer.ThaiNationalId = request.ThaiNationalId;
         }
 
         if (!string.IsNullOrEmpty(request.Segment) && request.Segment != customer.Segment)

@@ -1,5 +1,8 @@
+using Maliev.CustomerService.Data.Interfaces;
+using Maliev.CustomerService.Data.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.Extensions.Configuration;
 
 namespace Maliev.CustomerService.Data;
 
@@ -20,6 +23,16 @@ public class CustomerDbContextFactory : IDesignTimeDbContextFactory<CustomerDbCo
 
         optionsBuilder.UseNpgsql(connectionString);
 
-        return new CustomerDbContext(optionsBuilder.Options);
+        // Create a minimal configuration for design-time (migrations)
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ASPNETCORE_ENVIRONMENT"] = "Development"
+            })
+            .Build();
+
+        IEncryptionService encryptionService = new EncryptionService(configuration);
+
+        return new CustomerDbContext(optionsBuilder.Options, encryptionService);
     }
 }

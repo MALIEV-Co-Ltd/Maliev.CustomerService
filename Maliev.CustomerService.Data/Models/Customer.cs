@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Maliev.CustomerService.Data.Attributes;
 
 namespace Maliev.CustomerService.Data.Models;
 
@@ -100,6 +101,14 @@ public class Customer
     /// </summary>
     public bool UsesCompanyBillingAddress { get; set; } = true;
 
+    /// <summary>
+    /// Thai National ID (13 digits) - Encrypted at rest for PDPA compliance
+    /// Used for personal identity on documents (quotations, invoices, receipts)
+    /// MaxLength 500 to accommodate encrypted output (plaintext is 13 chars)
+    /// </summary>
+    [MaxLength(500)]
+    [Encrypted]
+    public string? ThaiNationalId { get; set; }
 
     /// <summary>
     /// Soft delete flag

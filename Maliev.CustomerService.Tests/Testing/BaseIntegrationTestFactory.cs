@@ -3,6 +3,9 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Maliev.CustomerService.Data;
+using Maliev.CustomerService.Data.Interfaces;
+using Maliev.CustomerService.Data.Security;
 using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
@@ -37,6 +40,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     private static RabbitMqContainer? _rabbitmqContainer;
     private static bool _containersStarted;
     private static readonly SemaphoreSlim _initLock = new(1, 1);
+    private static IEncryptionService? _encryptionService;
 
     private readonly RSA _testRsa;
 
@@ -300,6 +304,27 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         var connectionString = _postgresContainer!.GetConnectionString();
         var optionsBuilder = new DbContextOptionsBuilder<TDbContext>();
         optionsBuilder.UseNpgsql(connectionString);
+
+        // Special handling for CustomerDbContext which requires IEncryptionService
+        if (typeof(TDbContext) == typeof(CustomerDbContext))
+        {
+            // Create encryption service once and reuse to avoid EF Core service provider bloat
+            if (_encryptionService == null)
+            {
+                var configuration = new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["ASPNETCORE_ENVIRONMENT"] = "Testing"
+                    })
+                    .Build();
+                _encryptionService = new EncryptionService(configuration);
+            }
+
+            return (TDbContext)(object)new CustomerDbContext(
+                (DbContextOptions<CustomerDbContext>)(object)optionsBuilder.Options,
+                _encryptionService);
+        }
+
         return (TDbContext)Activator.CreateInstance(typeof(TDbContext), optionsBuilder.Options)!;
     }
 

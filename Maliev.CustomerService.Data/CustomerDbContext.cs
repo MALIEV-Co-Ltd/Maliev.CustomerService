@@ -1,3 +1,5 @@
+using Maliev.CustomerService.Data.Interceptors;
+using Maliev.CustomerService.Data.Interfaces;
 using Maliev.CustomerService.Data.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,9 +14,21 @@ public class CustomerDbContext : DbContext
     /// <summary>System principal ID</summary>
     public const string SystemPrincipalId = "00000000-0000-0000-0000-000000000001";
 
+    private readonly IEncryptionService _encryptionService;
+
     /// <summary>Initializes a new instance of the CustomerDbContext class</summary>
-    public CustomerDbContext(DbContextOptions<CustomerDbContext> options) : base(options)
+    public CustomerDbContext(DbContextOptions<CustomerDbContext> options, IEncryptionService encryptionService) : base(options)
     {
+        _encryptionService = encryptionService;
+    }
+
+    /// <inheritdoc />
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        base.OnConfiguring(optionsBuilder);
+
+        // Add encryption interceptor for automatic encrypt/decrypt of sensitive fields
+        optionsBuilder.AddInterceptors(new EncryptionInterceptor(_encryptionService));
     }
 
     /// <summary>Customers set</summary>

@@ -57,6 +57,14 @@ public class CreateCustomerRequest
     public string? Landline { get; set; }
 
     /// <summary>
+    /// Thai National ID (13 digits) - Optional, encrypted at rest for PDPA compliance
+    /// </summary>
+    [MaxLength(13, ErrorMessage = "Thai National ID must be exactly 13 digits")]
+    [RegularExpression(@"^\d{13}$", ErrorMessage = "Thai National ID must be exactly 13 digits")]
+    [JsonPropertyName("thaiNationalId")]
+    public string? ThaiNationalId { get; set; }
+
+    /// <summary>
     /// Customer segmentation: Retail, Wholesale, Enterprise, Government (default: Retail)
     /// </summary>
     [Required(ErrorMessage = "Segment is required")]

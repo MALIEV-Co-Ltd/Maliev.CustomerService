@@ -29,6 +29,7 @@ public static class DomainToDtoMapper
             Mobile = customer.Mobile,
             Extension = customer.Extension,
             Landline = customer.Landline,
+            ThaiNationalId = customer.ThaiNationalId, // Will be masked by CustomerResponse property
             Segment = customer.Segment,
             Tier = customer.Tier,
             PreferredLanguage = customer.PreferredLanguage,

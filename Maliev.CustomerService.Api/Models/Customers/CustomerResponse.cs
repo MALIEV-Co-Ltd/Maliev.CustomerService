@@ -80,6 +80,31 @@ public class CustomerResponse
     public string? CompanyPhone { get; set; }
 
     /// <summary>
+    /// Thai National ID (masked for security - only shows last 2 digits)
+    /// Full ID is never exposed in API responses for PDPA compliance
+    /// </summary>
+    [JsonPropertyName("thaiNationalIdMasked")]
+    public string? ThaiNationalIdMasked
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(ThaiNationalId))
+                return null;
+
+            // Mask all but last 2 digits: ***-****-**XX
+            return ThaiNationalId.Length >= 2
+                ? $"***-****-**{ThaiNationalId.Substring(ThaiNationalId.Length - 2)}"
+                : "***-****-****";
+        }
+    }
+
+    /// <summary>
+    /// Thai National ID (internal use only - never serialized to JSON)
+    /// </summary>
+    [JsonIgnore]
+    public string? ThaiNationalId { get; set; }
+
+    /// <summary>
     /// Status of the Non-Disclosure Agreement
     /// </summary>
     [JsonPropertyName("ndaStatus")]

@@ -1,5 +1,8 @@
 using Maliev.CustomerService.Data;
+using Maliev.CustomerService.Data.Interfaces;
+using Maliev.CustomerService.Data.Security;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Testcontainers.Redis;
@@ -82,7 +85,16 @@ public class TestDatabaseFixture : IAsyncLifetime
             .UseNpgsql(ConnectionString)
             .Options;
 
-        return new CustomerDbContext(options);
+        // Create encryption service for testing
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ASPNETCORE_ENVIRONMENT"] = "Testing"
+            })
+            .Build();
+        IEncryptionService encryptionService = new EncryptionService(configuration);
+
+        return new CustomerDbContext(options, encryptionService);
     }
 
     /// <summary>
