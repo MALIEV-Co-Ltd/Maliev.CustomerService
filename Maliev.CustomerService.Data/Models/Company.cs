@@ -49,6 +49,51 @@ public class Company
     public string Tier { get; set; } = CustomerTier.Bronze;
 
     /// <summary>
+    /// Full company name in Thai (from BDEX registry)
+    /// </summary>
+    public string? FullNameTh { get; set; }
+
+    /// <summary>
+    /// Company registration date (from BDEX registry)
+    /// </summary>
+    public DateTime? RegistrationDate { get; set; }
+
+    /// <summary>
+    /// Company status code from BDEX (1=Active, 5=Liquidated, 8=Vacant)
+    /// </summary>
+    public string? CompanyStatus { get; set; }
+
+    /// <summary>
+    /// Company status description in Thai
+    /// </summary>
+    public string? CompanyStatusNameTh { get; set; }
+
+    /// <summary>
+    /// Type of business entity code (3=Partnership, 5=Limited Company, etc.)
+    /// </summary>
+    public string? CompanyTypeCode { get; set; }
+
+    /// <summary>
+    /// Business objectives (semicolon-separated from BDEX registry)
+    /// </summary>
+    public string? BusinessObjectives { get; set; }
+
+    /// <summary>
+    /// Whether company data was verified from BDEX registry
+    /// </summary>
+    public bool IsVerifiedFromBdex { get; set; }
+
+    /// <summary>
+    /// Date when company was verified from BDEX
+    /// </summary>
+    public DateTime? BdexVerificationDate { get; set; }
+
+    /// <summary>
+    /// Stock symbol for publicly listed companies
+    /// </summary>
+    public string? StockSymbol { get; set; }
+
+    /// <summary>
     /// Creation timestamp
     /// </summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

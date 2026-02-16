@@ -62,6 +62,16 @@ public class CompanyService : ICompanyService
             ContactPhone = request.ContactPhone,
             Segment = request.Segment,
             Tier = request.Tier,
+            // BDEX fields
+            FullNameTh = request.FullNameTh,
+            RegistrationDate = request.RegistrationDate,
+            CompanyStatus = request.CompanyStatus,
+            CompanyStatusNameTh = request.CompanyStatusNameTh,
+            CompanyTypeCode = request.CompanyTypeCode,
+            BusinessObjectives = request.BusinessObjectives,
+            IsVerifiedFromBdex = request.IsVerifiedFromBdex,
+            BdexVerificationDate = request.BdexVerificationDate,
+            StockSymbol = request.StockSymbol,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -85,7 +95,16 @@ public class CompanyService : ICompanyService
                 company.ContactEmail,
                 company.ContactPhone,
                 company.Segment,
-                company.Tier
+                company.Tier,
+                company.FullNameTh,
+                company.RegistrationDate,
+                company.CompanyStatus,
+                company.CompanyStatusNameTh,
+                company.CompanyTypeCode,
+                company.BusinessObjectives,
+                company.IsVerifiedFromBdex,
+                company.BdexVerificationDate,
+                company.StockSymbol
             })
         };
 
@@ -163,7 +182,16 @@ public class CompanyService : ICompanyService
             company.ContactEmail,
             company.ContactPhone,
             company.Segment,
-            company.Tier
+            company.Tier,
+            company.FullNameTh,
+            company.RegistrationDate,
+            company.CompanyStatus,
+            company.CompanyStatusNameTh,
+            company.CompanyTypeCode,
+            company.BusinessObjectives,
+            company.IsVerifiedFromBdex,
+            company.BdexVerificationDate,
+            company.StockSymbol
         };
 
         // Track changed fields
@@ -210,6 +238,61 @@ public class CompanyService : ICompanyService
         {
             changedFields["Tier"] = request.Tier;
             company.Tier = request.Tier;
+        }
+
+        // BDEX fields
+        if (request.FullNameTh != null && request.FullNameTh != company.FullNameTh)
+        {
+            changedFields["FullNameTh"] = request.FullNameTh;
+            company.FullNameTh = request.FullNameTh;
+        }
+
+        if (request.RegistrationDate.HasValue && request.RegistrationDate != company.RegistrationDate)
+        {
+            changedFields["RegistrationDate"] = request.RegistrationDate;
+            company.RegistrationDate = request.RegistrationDate;
+        }
+
+        if (request.CompanyStatus != null && request.CompanyStatus != company.CompanyStatus)
+        {
+            changedFields["CompanyStatus"] = request.CompanyStatus;
+            company.CompanyStatus = request.CompanyStatus;
+        }
+
+        if (request.CompanyStatusNameTh != null && request.CompanyStatusNameTh != company.CompanyStatusNameTh)
+        {
+            changedFields["CompanyStatusNameTh"] = request.CompanyStatusNameTh;
+            company.CompanyStatusNameTh = request.CompanyStatusNameTh;
+        }
+
+        if (request.CompanyTypeCode != null && request.CompanyTypeCode != company.CompanyTypeCode)
+        {
+            changedFields["CompanyTypeCode"] = request.CompanyTypeCode;
+            company.CompanyTypeCode = request.CompanyTypeCode;
+        }
+
+        if (request.BusinessObjectives != null && request.BusinessObjectives != company.BusinessObjectives)
+        {
+            changedFields["BusinessObjectives"] = request.BusinessObjectives;
+            company.BusinessObjectives = request.BusinessObjectives;
+        }
+
+        if (request.IsVerifiedFromBdex.HasValue && request.IsVerifiedFromBdex.Value != company.IsVerifiedFromBdex)
+        {
+            changedFields["IsVerifiedFromBdex"] = request.IsVerifiedFromBdex.Value;
+            company.IsVerifiedFromBdex = request.IsVerifiedFromBdex.Value;
+        }
+
+        if (request.BdexVerificationDate.HasValue && request.BdexVerificationDate != company.BdexVerificationDate)
+        {
+            changedFields["BdexVerificationDate"] = request.BdexVerificationDate;
+            company.BdexVerificationDate = request.BdexVerificationDate;
+        }
+
+        if (request.StockSymbol != null && request.StockSymbol != company.StockSymbol)
+        {
+            changedFields["StockSymbol"] = request.StockSymbol;
+            company.StockSymbol = request.StockSymbol;
         }
 
         if (changedFields.Count > 0)

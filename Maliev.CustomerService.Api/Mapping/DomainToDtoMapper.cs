@@ -64,6 +64,16 @@ public static class DomainToDtoMapper
             ContactPhone = company.ContactPhone,
             Segment = company.Segment,
             Tier = company.Tier,
+            // BDEX fields
+            FullNameTh = company.FullNameTh,
+            RegistrationDate = company.RegistrationDate,
+            CompanyStatus = company.CompanyStatus,
+            CompanyStatusNameTh = company.CompanyStatusNameTh,
+            CompanyTypeCode = company.CompanyTypeCode,
+            BusinessObjectives = company.BusinessObjectives,
+            IsVerifiedFromBdex = company.IsVerifiedFromBdex,
+            BdexVerificationDate = company.BdexVerificationDate,
+            StockSymbol = company.StockSymbol,
             CreatedAt = company.CreatedAt,
             UpdatedAt = company.UpdatedAt,
             Version = company.Version
