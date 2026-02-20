@@ -1,4 +1,5 @@
 using Maliev.CustomerService.Data;
+using Maliev.CustomerService.Data.Interceptors;
 using Maliev.CustomerService.Data.Interfaces;
 using Maliev.CustomerService.Data.Security;
 using Microsoft.EntityFrameworkCore;
@@ -29,8 +30,9 @@ public class ModelIntegrityTests
             })
             .Build();
         IEncryptionService encryptionService = new EncryptionService(configuration);
+        var encryptionInterceptor = new EncryptionInterceptor(encryptionService);
 
-        using var context = new CustomerDbContext(options, encryptionService);
+        using var context = new CustomerDbContext(options, encryptionService, encryptionInterceptor);
 
         // This helper (available in EF Core 9.0+) checks if the current code
         // matches the last snapshot in the Migrations folder.

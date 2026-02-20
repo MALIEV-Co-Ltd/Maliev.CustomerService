@@ -1,4 +1,5 @@
 using Maliev.CustomerService.Data;
+using Maliev.CustomerService.Data.Interceptors;
 using Maliev.CustomerService.Data.Interfaces;
 using Maliev.CustomerService.Data.Security;
 using Microsoft.EntityFrameworkCore;
@@ -93,8 +94,9 @@ public class TestDatabaseFixture : IAsyncLifetime
             })
             .Build();
         IEncryptionService encryptionService = new EncryptionService(configuration);
+        var encryptionInterceptor = new EncryptionInterceptor(encryptionService);
 
-        return new CustomerDbContext(options, encryptionService);
+        return new CustomerDbContext(options, encryptionService, encryptionInterceptor);
     }
 
     /// <summary>

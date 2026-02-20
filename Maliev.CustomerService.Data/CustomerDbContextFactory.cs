@@ -1,3 +1,4 @@
+using Maliev.CustomerService.Data.Interceptors;
 using Maliev.CustomerService.Data.Interfaces;
 using Maliev.CustomerService.Data.Security;
 using Microsoft.EntityFrameworkCore;
@@ -32,7 +33,8 @@ public class CustomerDbContextFactory : IDesignTimeDbContextFactory<CustomerDbCo
             .Build();
 
         IEncryptionService encryptionService = new EncryptionService(configuration);
+        var encryptionInterceptor = new EncryptionInterceptor(encryptionService);
 
-        return new CustomerDbContext(optionsBuilder.Options, encryptionService);
+        return new CustomerDbContext(optionsBuilder.Options, encryptionService, encryptionInterceptor);
     }
 }

@@ -15,11 +15,16 @@ public class CustomerDbContext : DbContext
     public const string SystemPrincipalId = "00000000-0000-0000-0000-000000000001";
 
     private readonly IEncryptionService _encryptionService;
+    private readonly EncryptionInterceptor _encryptionInterceptor;
 
     /// <summary>Initializes a new instance of the CustomerDbContext class</summary>
-    public CustomerDbContext(DbContextOptions<CustomerDbContext> options, IEncryptionService encryptionService) : base(options)
+    public CustomerDbContext(
+        DbContextOptions<CustomerDbContext> options,
+        IEncryptionService encryptionService,
+        EncryptionInterceptor encryptionInterceptor) : base(options)
     {
         _encryptionService = encryptionService;
+        _encryptionInterceptor = encryptionInterceptor;
     }
 
     /// <inheritdoc />
@@ -27,8 +32,8 @@ public class CustomerDbContext : DbContext
     {
         base.OnConfiguring(optionsBuilder);
 
-        // Add encryption interceptor for automatic encrypt/decrypt of sensitive fields
-        optionsBuilder.AddInterceptors(new EncryptionInterceptor(_encryptionService));
+        // Use the injected singleton interceptor to avoid creating multiple service providers
+        optionsBuilder.AddInterceptors(_encryptionInterceptor);
     }
 
     /// <summary>Customers set</summary>

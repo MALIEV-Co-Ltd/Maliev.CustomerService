@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Maliev.CustomerService.Data;
+using Maliev.CustomerService.Data.Interceptors;
 using Maliev.CustomerService.Data.Interfaces;
 using Maliev.CustomerService.Data.Security;
 using MassTransit;
@@ -41,6 +42,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     private static bool _containersStarted;
     private static readonly SemaphoreSlim _initLock = new(1, 1);
     private static IEncryptionService? _encryptionService;
+    private static EncryptionInterceptor? _encryptionInterceptor;
 
     private readonly RSA _testRsa;
 
@@ -308,7 +310,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         // Special handling for CustomerDbContext which requires IEncryptionService
         if (typeof(TDbContext) == typeof(CustomerDbContext))
         {
-            // Create encryption service once and reuse to avoid EF Core service provider bloat
+            // Create encryption service and interceptor once and reuse to avoid EF Core service provider bloat
             if (_encryptionService == null)
             {
                 var configuration = new ConfigurationBuilder()
@@ -318,11 +320,13 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
                     })
                     .Build();
                 _encryptionService = new EncryptionService(configuration);
+                _encryptionInterceptor = new EncryptionInterceptor(_encryptionService);
             }
 
             return (TDbContext)(object)new CustomerDbContext(
                 (DbContextOptions<CustomerDbContext>)(object)optionsBuilder.Options,
-                _encryptionService);
+                _encryptionService,
+                _encryptionInterceptor!);
         }
 
         return (TDbContext)Activator.CreateInstance(typeof(TDbContext), optionsBuilder.Options)!;

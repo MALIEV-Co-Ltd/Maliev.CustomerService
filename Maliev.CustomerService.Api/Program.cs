@@ -1,5 +1,7 @@
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 // Initialize bootstrap logging
 using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
@@ -48,6 +50,7 @@ try
 
     // Security Services
     builder.Services.AddSingleton<Maliev.CustomerService.Data.Interfaces.IEncryptionService, Maliev.CustomerService.Data.Security.EncryptionService>();
+    builder.Services.AddSingleton<Maliev.CustomerService.Data.Interceptors.EncryptionInterceptor>();
 
     // Application Services
     builder.Services.AddScoped<Maliev.CustomerService.Api.Services.ICustomerService, Maliev.CustomerService.Api.Services.CustomerService>();
