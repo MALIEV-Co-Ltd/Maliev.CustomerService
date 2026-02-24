@@ -5,6 +5,7 @@ using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Models.IAM;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
+using Maliev.MessagingContracts.Contracts.Customers;
 using Maliev.MessagingContracts.Generated;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;

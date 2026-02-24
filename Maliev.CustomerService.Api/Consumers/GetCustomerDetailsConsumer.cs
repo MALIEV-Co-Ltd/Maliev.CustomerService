@@ -1,4 +1,5 @@
 using Maliev.CustomerService.Api.Services;
+using Maliev.MessagingContracts.Contracts.Customers;
 using Maliev.MessagingContracts.Generated;
 using MassTransit;
 

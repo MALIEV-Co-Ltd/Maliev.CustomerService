@@ -2,6 +2,8 @@ using Maliev.CustomerService.Api.Consumers;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Data.Models;
 using Maliev.CustomerService.Tests.Infrastructure;
+using Maliev.MessagingContracts.Contracts.Customers;
+using Maliev.MessagingContracts.Contracts.Uploads;
 using Maliev.MessagingContracts.Generated;
 using MassTransit;
 using MassTransit.Testing;

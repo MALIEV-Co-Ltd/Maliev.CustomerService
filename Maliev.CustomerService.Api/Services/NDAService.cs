@@ -3,7 +3,8 @@ using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.NDAs;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
-using Maliev.MessagingContracts.Contracts.Customers;
+using Maliev.MessagingContracts.Contracts.Nda;
+using Maliev.MessagingContracts.Generated;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
@@ -310,12 +311,24 @@ public class NDAService : INDAService
             _context.AuditLogs.Add(auditLog);
 
             // Publish event
-            await _publishEndpoint.Publish(new NdaExpiredEvent
-            {
-                NdaId = nda.Id,
-                CustomerId = nda.CustomerId,
-                ExpiredAt = DateTime.UtcNow
-            }, cancellationToken);
+            await _publishEndpoint.Publish(new NdaExpiredEvent(
+                MessageId: Guid.NewGuid(),
+                MessageName: "NdaExpiredEvent",
+                MessageType: MessageType.Event,
+                MessageVersion: "1.0.0",
+                PublishedBy: "CustomerService",
+                ConsumedBy: ["NotificationService"],
+                CorrelationId: Guid.NewGuid(),
+                CausationId: null,
+                OccurredAtUtc: DateTimeOffset.UtcNow,
+                IsPublic: false,
+                Payload: new NdaExpiredEventPayload(
+                    NdaId: nda.Id,
+                    CustomerId: nda.CustomerId,
+                    ExpiredAt: nda.ExpiresAt ?? DateTimeOffset.UtcNow,
+                    ProcessedAt: DateTimeOffset.UtcNow
+                )
+            ), cancellationToken);
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -347,13 +360,25 @@ public class NDAService : INDAService
 
             foreach (var nda in expiringNdas)
             {
-                await _publishEndpoint.Publish(new NdaExpiringEvent
-                {
-                    NdaId = nda.Id,
-                    CustomerId = nda.CustomerId,
-                    ExpiresAt = nda.ExpiresAt!.Value,
-                    DaysUntilExpiration = days
-                }, cancellationToken);
+                await _publishEndpoint.Publish(new NdaExpiringEvent(
+                    MessageId: Guid.NewGuid(),
+                    MessageName: "NdaExpiringEvent",
+                    MessageType: MessageType.Event,
+                    MessageVersion: "1.0.0",
+                    PublishedBy: "CustomerService",
+                    ConsumedBy: ["NotificationService"],
+                    CorrelationId: Guid.NewGuid(),
+                    CausationId: null,
+                    OccurredAtUtc: DateTimeOffset.UtcNow,
+                    IsPublic: false,
+                    Payload: new NdaExpiringEventPayload(
+                        NdaId: nda.Id,
+                        CustomerId: nda.CustomerId,
+                        ExpiresAt: nda.ExpiresAt!.Value,
+                        DaysUntilExpiration: days,
+                        WarningGeneratedAt: DateTimeOffset.UtcNow
+                    )
+                ), cancellationToken);
 
                 eventCount++;
             }

@@ -1,6 +1,6 @@
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
-using Maliev.MessagingContracts.Generated;
+using Maliev.MessagingContracts.Contracts.Uploads;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
