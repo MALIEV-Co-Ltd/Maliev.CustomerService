@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Companies;
+using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -156,6 +157,7 @@ public class CompanyController : ControllerBase
     /// <param name="pageSize">Page size (default: 20, max: 100)</param>
     /// <param name="segment">Optional customer segment filter</param>
     /// <param name="tier">Optional customer tier filter</param>
+    /// <param name="name">Optional company name filter (partial match)</param>
     /// <returns>Paginated list of companies</returns>
     /// <response code="200">Companies retrieved successfully</response>
     /// <response code="401">Unauthorized</response>
@@ -166,16 +168,24 @@ public class CompanyController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] string? segment = null,
-        [FromQuery] string? tier = null)
+        [FromQuery] string? tier = null,
+        [FromQuery] string? name = null)
     {
         try
         {
             // Enforce maximum page size
             pageSize = Math.Min(pageSize, 100);
 
-            var result = await _companyService.GetAllAsync(page, pageSize, segment, tier);
+            var result = await _companyService.GetAllAsync(page, pageSize, segment, tier, name);
 
-            return Ok(result);
+            return Ok(new
+            {
+                items = result.Companies,
+                totalCount = result.TotalCount,
+                page,
+                pageSize,
+                totalPages = (int)Math.Ceiling((double)result.TotalCount / pageSize)
+            });
         }
         catch (Exception ex)
         {
@@ -363,5 +373,22 @@ public class CompanyController : ControllerBase
             _logger.LogError(ex, "Error retrieving company {CompanyId} with customers", id);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Gets activity history for a company with pagination or skip/take
+    /// </summary>
+    [HttpGet("{id:guid}/history")]
+    [ProducesResponseType(typeof(PaginatedResponse<CustomerActivityResponse>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PaginatedResponse<CustomerActivityResponse>>> GetHistory(
+        Guid id,
+        [FromQuery] int? skip = null,
+        [FromQuery] int? take = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _companyService.GetActivityAsync(id, skip, take, page, pageSize, cancellationToken);
+        return Ok(result);
     }
 }

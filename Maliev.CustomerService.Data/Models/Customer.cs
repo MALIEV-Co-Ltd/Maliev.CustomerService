@@ -111,6 +111,11 @@ public class Customer
     public string? ThaiNationalId { get; set; }
 
     /// <summary>
+    /// Whether this customer is the main contact person for their company
+    /// </summary>
+    public bool IsMainContact { get; set; } = false;
+
+    /// <summary>
     /// Soft delete flag
     /// </summary>
     public bool IsDeleted { get; set; } = false;

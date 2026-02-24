@@ -698,4 +698,45 @@ public class CustomerServiceTests
         Assert.Equal("Asia/Bangkok", pref.Timezone);
         Assert.NotNull(pref.CommunicationPreferences);
     }
+
+    [Fact]
+    public async Task PromoteToMainContactAsync_UpdatesCorrectlyAndResetsOthers()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var companyId = Guid.NewGuid();
+
+        // Create two customers for same company
+        var c1Id = Guid.NewGuid();
+        var c2Id = Guid.NewGuid();
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            context.Customers.AddRange(
+                new Customer { Id = c1Id, PrincipalId = Guid.NewGuid(), FirstName = "C1", LastName = "One", Email = "c1@test.com", CompanyId = companyId, IsMainContact = true, Segment = "Retail", Tier = "Bronze", PreferredLanguage = "en", Timezone = "UTC" },
+                new Customer { Id = c2Id, PrincipalId = Guid.NewGuid(), FirstName = "C2", LastName = "Two", Email = "c2@test.com", CompanyId = companyId, IsMainContact = false, Segment = "Retail", Tier = "Bronze", PreferredLanguage = "en", Timezone = "UTC" }
+            );
+            await context.SaveChangesAsync();
+        }
+
+        // Act - Promote C2
+        var result = await service.PromoteToMainContactAsync(c2Id, "test-actor", "Employee");
+
+        // Assert
+        Assert.True(result);
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var c1 = await context.Customers.FindAsync(c1Id);
+            var c2 = await context.Customers.FindAsync(c2Id);
+
+            Assert.False(c1!.IsMainContact);
+            Assert.True(c2!.IsMainContact);
+
+            // Verify audit log
+            var audit = await context.AuditLogs.FirstOrDefaultAsync(a => a.EntityId == c2Id.ToString() && a.Action == AuditAction.Update);
+            Assert.NotNull(audit);
+            Assert.Contains("IsMainContact", audit!.ChangedFields!);
+        }
+    }
 }

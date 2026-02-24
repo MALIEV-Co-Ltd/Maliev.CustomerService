@@ -26,7 +26,7 @@ public class CompanySearchTests
     private CompanyService CreateService()
     {
         var context = _fixture.CreateDbContext();
-        return new CompanyService(context, _mockLogger.Object);
+        return new CompanyService(context, Mock.Of<IIAMClient>(), _mockLogger.Object);
     }
 
     [Fact]

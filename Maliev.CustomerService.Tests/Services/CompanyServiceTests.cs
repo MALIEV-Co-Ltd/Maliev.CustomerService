@@ -16,11 +16,13 @@ namespace Maliev.CustomerService.Tests.Services;
 public class CompanyServiceTests
 {
     private readonly TestWebApplicationFactory _fixture;
+    private readonly Mock<IIAMClient> _mockIamClient;
     private readonly Mock<ILogger<CompanyService>> _mockLogger;
 
     public CompanyServiceTests(TestWebApplicationFactory fixture)
     {
         _fixture = fixture;
+        _mockIamClient = new Mock<IIAMClient>();
         _mockLogger = new Mock<ILogger<CompanyService>>();
     }
 
@@ -28,7 +30,53 @@ public class CompanyServiceTests
     private CompanyService CreateService()
     {
         var context = _fixture.CreateDbContext();
-        return new CompanyService(context, _mockLogger.Object);
+        return new CompanyService(context, _mockIamClient.Object, _mockLogger.Object);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithNoContactInfo_FallsBackToFirstCustomer()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        // Create company WITHOUT contact details
+        var company = await service.CreateAsync(new CreateCompanyRequest
+        {
+            Name = "No Contact Corp",
+            Segment = "Retail",
+            Tier = "Bronze"
+        }, "test-actor", "Employee");
+
+        // Create a customer for this company
+        await using (var context = _fixture.CreateDbContext())
+        {
+            context.Customers.Add(new Customer
+            {
+                Id = Guid.NewGuid(),
+                PrincipalId = Guid.NewGuid(),
+                FirstName = "Primary",
+                LastName = "Contact",
+                Email = "primary@nocontact.com",
+                Mobile = "081-222-3333",
+                Segment = "Retail",
+                Tier = "Bronze",
+                PreferredLanguage = "en",
+                Timezone = "UTC",
+                CompanyId = company.Id,
+                IsMainContact = true
+            });
+            await context.SaveChangesAsync();
+        }
+
+        // Act
+        var result = await service.GetByIdAsync(company.Id);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("primary@nocontact.com", result!.ContactEmail);
+        Assert.Equal("081-222-3333", result.ContactPhone);
+        Assert.Equal("Primary Contact", result.MainContactName);
     }
 
     [Fact]

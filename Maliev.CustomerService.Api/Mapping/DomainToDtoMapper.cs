@@ -41,6 +41,7 @@ public static class DomainToDtoMapper
             CompanyName = company?.Name,
             CompanyPhone = company?.ContactPhone,
             NDAStatus = nda?.Status,
+            IsMainContact = customer.IsMainContact,
             UsesCompanyBillingAddress = customer.UsesCompanyBillingAddress,
             IsDeleted = customer.IsDeleted,
 

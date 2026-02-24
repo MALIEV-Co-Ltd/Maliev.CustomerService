@@ -59,11 +59,21 @@ public class CustomerDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         // Configure Customer entity (T001, T034, T035)
+        modelBuilder.HasPostgresExtension("pg_trgm"); // Required for gin_trgm_ops (T126)
+
         modelBuilder.Entity<Customer>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.Email).IsUnique();
             entity.HasIndex(e => e.PrincipalId).IsUnique();
+
+            // GIN Trigram indexes for efficient ILike searching (T126)
+            entity.HasIndex(e => e.FirstName)
+                .HasMethod("gin")
+                .HasOperators("gin_trgm_ops");
+            entity.HasIndex(e => e.LastName)
+                .HasMethod("gin")
+                .HasOperators("gin_trgm_ops");
 
             // Soft delete filter (T003)
             entity.HasQueryFilter(e => !e.IsDeleted);

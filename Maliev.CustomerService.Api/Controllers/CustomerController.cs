@@ -479,6 +479,28 @@ public class CustomerController : ControllerBase
     }
 
     /// <summary>
+    /// Promotes a customer to be the main contact for their company
+    /// </summary>
+    [HttpPost("{id:guid}/promote")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Promote(Guid id, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var (actorId, actorType) = User.GetActorInfo();
+            var result = await _customerService.PromoteToMainContactAsync(id, actorId, actorType, cancellationToken);
+            return result ? Ok() : NotFound();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error promoting customer {CustomerId} to main contact", id);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Gets activity history for a customer with pagination or skip/take
     /// </summary>
     [HttpGet("{id:guid}/history")]

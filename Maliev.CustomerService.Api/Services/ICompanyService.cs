@@ -55,9 +55,10 @@ public interface ICompanyService
     /// <param name="pageSize">Number of items per page</param>
     /// <param name="segment">Optional segment filter</param>
     /// <param name="tier">Optional tier filter</param>
+    /// <param name="name">Optional company name filter (partial match)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Tuple containing list of company responses and total count</returns>
-    Task<(List<CompanyResponse> Companies, int TotalCount)> GetAllAsync(int page, int pageSize, string? segment = null, string? tier = null, CancellationToken cancellationToken = default);
+    Task<(List<CompanyResponse> Companies, int TotalCount)> GetAllAsync(int page, int pageSize, string? segment = null, string? tier = null, string? name = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Searches for companies by name or VAT number and includes their default billing address
@@ -67,4 +68,9 @@ public interface ICompanyService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>List of company search results with addresses</returns>
     Task<List<CompanySearchResultDto>> SearchWithAddressAsync(string query, int limit = 10, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets activity history for a company with pagination or skip/take
+    /// </summary>
+    Task<PaginatedResponse<CustomerActivityResponse>> GetActivityAsync(Guid id, int? skip = null, int? take = null, int page = 1, int pageSize = 50, CancellationToken cancellationToken = default);
 }

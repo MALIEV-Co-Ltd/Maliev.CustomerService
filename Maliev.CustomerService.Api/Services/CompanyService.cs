@@ -15,6 +15,7 @@ namespace Maliev.CustomerService.Api.Services;
 public class CompanyService : ICompanyService
 {
     private readonly CustomerDbContext _context;
+    private readonly IIAMClient _iamClient;
     private readonly ILogger<CompanyService> _logger;
 
     // VAT format: Either country code + hyphen + digits (e.g., "TH-0125561001573") or 10-15 digits (e.g., "0125561001573")
@@ -24,10 +25,12 @@ public class CompanyService : ICompanyService
     /// Initializes a new instance of the CompanyService class
     /// </summary>
     /// <param name="context">Database context for Customer Service</param>
+    /// <param name="iamClient">IAM service client</param>
     /// <param name="logger">Logger instance</param>
-    public CompanyService(CustomerDbContext context, ILogger<CompanyService> logger)
+    public CompanyService(CustomerDbContext context, IIAMClient iamClient, ILogger<CompanyService> logger)
     {
         _context = context;
+        _iamClient = iamClient;
         _logger = logger;
     }
 
@@ -137,7 +140,30 @@ public class CompanyService : ICompanyService
             return null;
         }
 
-        return company.ToCompanyResponse();
+        var response = company.ToCompanyResponse();
+
+        // Implement contact person fallback
+        var customers = await _context.Customers
+            .Where(c => c.CompanyId == id && !c.IsDeleted)
+            .ToListAsync(cancellationToken);
+
+        var mainContact = customers.FirstOrDefault(c => c.IsMainContact) ?? customers.FirstOrDefault();
+        if (mainContact != null)
+        {
+            response.MainContactId = mainContact.Id;
+            response.MainContactName = $"{mainContact.FirstName} {mainContact.LastName}".Trim();
+
+            if (string.IsNullOrEmpty(response.ContactEmail))
+            {
+                response.ContactEmail = mainContact.Email;
+            }
+            if (string.IsNullOrEmpty(response.ContactPhone))
+            {
+                response.ContactPhone = mainContact.Mobile ?? mainContact.Landline;
+            }
+        }
+
+        return response;
     }
 
     /// <summary>
@@ -361,11 +387,28 @@ public class CompanyService : ICompanyService
             .Where(c => c.CompanyId == id && !c.IsDeleted)
             .ToListAsync(cancellationToken);
 
+        var companyResponse = company.ToCompanyResponse();
+        var mainContact = customers.FirstOrDefault(c => c.IsMainContact) ?? customers.FirstOrDefault();
+        if (mainContact != null)
+        {
+            companyResponse.MainContactId = mainContact.Id;
+            companyResponse.MainContactName = $"{mainContact.FirstName} {mainContact.LastName}".Trim();
+
+            if (string.IsNullOrEmpty(companyResponse.ContactEmail))
+            {
+                companyResponse.ContactEmail = mainContact.Email;
+            }
+            if (string.IsNullOrEmpty(companyResponse.ContactPhone))
+            {
+                companyResponse.ContactPhone = mainContact.Mobile ?? mainContact.Landline;
+            }
+        }
+
         var customerResponses = customers.Select(c => c.ToCustomerResponse()).ToList();
 
         _logger.LogDebug("Found {CustomerCount} customers for company {CompanyId}", customerResponses.Count, id);
 
-        return (company.ToCompanyResponse(), customerResponses);
+        return (companyResponse, customerResponses);
     }
 
     /// <summary>
@@ -375,12 +418,13 @@ public class CompanyService : ICompanyService
     /// <param name="pageSize">Number of items per page</param>
     /// <param name="segment">Optional segment filter</param>
     /// <param name="tier">Optional tier filter</param>
+    /// <param name="name">Optional company name filter (partial match)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Tuple containing list of company responses and total count</returns>
-    public async Task<(List<CompanyResponse> Companies, int TotalCount)> GetAllAsync(int page, int pageSize, string? segment = null, string? tier = null, CancellationToken cancellationToken = default)
+    public async Task<(List<CompanyResponse> Companies, int TotalCount)> GetAllAsync(int page, int pageSize, string? segment = null, string? tier = null, string? name = null, CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Retrieving companies - Page: {Page}, PageSize: {PageSize}, Segment: {Segment}, Tier: {Tier}",
-            page, pageSize, segment ?? "all", tier ?? "all");
+        _logger.LogDebug("Retrieving companies - Page: {Page}, PageSize: {PageSize}, Segment: {Segment}, Tier: {Tier}, Name: {Name}",
+            page, pageSize, segment ?? "all", tier ?? "all", name ?? "all");
 
         var query = _context.Companies.AsQueryable();
 
@@ -393,6 +437,11 @@ public class CompanyService : ICompanyService
         if (!string.IsNullOrEmpty(tier))
         {
             query = query.Where(c => c.Tier == tier);
+        }
+
+        if (!string.IsNullOrEmpty(name))
+        {
+            query = query.Where(c => EF.Functions.ILike(c.Name, $"%{name}%"));
         }
 
         // Get total count
@@ -445,5 +494,116 @@ public class CompanyService : ICompanyService
         }).ToList();
 
         return results;
+    }
+
+    /// <inheritdoc />
+    public async Task<PaginatedResponse<CustomerActivityResponse>> GetActivityAsync(Guid id, int? skip = null, int? take = null, int page = 1, int pageSize = 50, CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Retrieving activity history for company {CompanyId} (Skip {Skip}, Take {Take}, Page {Page}, Size {PageSize})", id, skip, take, page, pageSize);
+
+        var companyIdStr = id.ToString();
+
+        // Find audit logs directly related to company, or where changed fields mention the company
+        var query = _context.AuditLogs
+            .Where(a => (a.EntityType == nameof(Company) && a.EntityId == companyIdStr) ||
+                        (a.EntityType == nameof(Customer) && a.ChangedFields != null && a.ChangedFields.Contains($"\"CompanyId\":\"{companyIdStr}\"")) ||
+                        (a.EntityType == nameof(Address) && a.ChangedFields != null && a.ChangedFields.Contains($"\"OwnerId\":\"{companyIdStr}\"")));
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        int finalSkip = skip ?? (page - 1) * pageSize;
+        int finalTake = take ?? pageSize;
+        var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+
+        var auditLogs = await query
+            .OrderByDescending(a => a.Timestamp)
+            .Skip(finalSkip)
+            .Take(finalTake)
+            .ToListAsync(cancellationToken);
+
+        var activities = new List<CustomerActivityResponse>();
+
+        // Resolve actor names
+        var actorIds = auditLogs
+            .Where(a => Guid.TryParse(a.ActorId, out _))
+            .Select(a => Guid.Parse(a.ActorId))
+            .Distinct()
+            .ToList();
+
+        var actorMap = new Dictionary<Guid, Maliev.CustomerService.Api.Models.IAM.PrincipalResponse>();
+        foreach (var actorId in actorIds)
+        {
+            var principal = await _iamClient.GetPrincipalByIdAsync(actorId, cancellationToken);
+            if (principal != null) actorMap[actorId] = principal;
+        }
+
+        foreach (var audit in auditLogs)
+        {
+            string description = GetCompanyAuditDescription(audit);
+
+            string? actorName = null;
+            string? actorEmail = null;
+
+            if (Guid.TryParse(audit.ActorId, out var pId) && actorMap.TryGetValue(pId, out var p))
+            {
+                actorName = p.DisplayName;
+                actorEmail = p.Email;
+            }
+
+            activities.Add(new CustomerActivityResponse
+            {
+                Action = audit.Action,
+                Description = description,
+                ActorId = audit.ActorId,
+                ActorName = actorName,
+                ActorEmail = actorEmail,
+                Timestamp = audit.Timestamp,
+                Details = audit.ChangedFields
+            });
+        }
+
+        return new PaginatedResponse<CustomerActivityResponse>
+        {
+            Items = activities,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize,
+            TotalPages = totalPages
+        };
+    }
+
+    private string GetCompanyAuditDescription(AuditLog audit)
+    {
+        if (audit.EntityType == nameof(Company))
+        {
+            return audit.Action switch
+            {
+                AuditAction.Create => "Company profile created",
+                AuditAction.Update => "Company details updated",
+                _ => $"Action: {audit.Action} on Company"
+            };
+        }
+
+        if (audit.EntityType == nameof(Customer))
+        {
+            return audit.Action switch
+            {
+                AuditAction.Create => "New customer added to company",
+                AuditAction.Update => "Customer in company updated",
+                _ => $"Customer action: {audit.Action}"
+            };
+        }
+
+        if (audit.EntityType == nameof(Address))
+        {
+            return audit.Action switch
+            {
+                AuditAction.Create => "Company address added",
+                AuditAction.Update => "Company address updated",
+                _ => "Address updated"
+            };
+        }
+
+        return $"Activity on {audit.EntityType}";
     }
 }

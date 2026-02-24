@@ -685,11 +685,12 @@ public class CustomerService : ICustomerService
         if (!string.IsNullOrEmpty(query))
         {
             var searchTerm = $"%{query}%";
+            // Optimization: Avoid string concatenation (c.FirstName + " " + c.LastName)
+            // as it prevents index usage. Use separate ILike conditions.
             customersQuery = customersQuery.Where(c =>
                 EF.Functions.ILike(c.FirstName, searchTerm) ||
                 EF.Functions.ILike(c.LastName, searchTerm) ||
-                EF.Functions.ILike(c.Email, searchTerm) ||
-                (c.FirstName + " " + c.LastName).Contains(query)); // Fallback for name concat
+                EF.Functions.ILike(c.Email, searchTerm));
         }
 
         // Apply filters (T119, T126)
@@ -865,6 +866,58 @@ public class CustomerService : ICustomerService
         _logger.LogDebug("Email existence check for {Email}: Not found in system", normalizedEmail);
 
         return false;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> PromoteToMainContactAsync(Guid customerId, string actorId, string actorType, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Promoting customer {CustomerId} to main contact by actor {ActorId}", customerId, actorId);
+
+        var customer = await _context.Customers
+            .FirstOrDefaultAsync(c => c.Id == customerId && !c.IsDeleted, cancellationToken);
+
+        if (customer == null || !customer.CompanyId.HasValue)
+        {
+            _logger.LogWarning("Customer {CustomerId} not found or not associated with a company", customerId);
+            return false;
+        }
+
+        var companyId = customer.CompanyId.Value;
+
+        // Reset all other main contacts for this company
+        var otherContacts = await _context.Customers
+            .Where(c => c.CompanyId == companyId && c.IsMainContact && c.Id != customerId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var contact in otherContacts)
+        {
+            contact.IsMainContact = false;
+            contact.UpdatedAt = DateTime.UtcNow;
+        }
+
+        // Set this customer as main contact
+        if (!customer.IsMainContact)
+        {
+            customer.IsMainContact = true;
+            customer.UpdatedAt = DateTime.UtcNow;
+
+            // Create audit log
+            var auditLog = new AuditLog
+            {
+                ActorId = actorId,
+                ActorType = actorType,
+                Action = AuditAction.Update,
+                EntityType = nameof(Customer),
+                EntityId = customerId.ToString(),
+                Timestamp = DateTime.UtcNow,
+                ChangedFields = JsonSerializer.Serialize(new { IsMainContact = true }),
+                PreviousValues = JsonSerializer.Serialize(new { IsMainContact = false })
+            };
+            _context.AuditLogs.Add(auditLog);
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     /// <inheritdoc />

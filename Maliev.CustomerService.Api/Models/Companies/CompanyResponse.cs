@@ -44,6 +44,18 @@ public class CompanyResponse
     public string? ContactPhone { get; set; }
 
     /// <summary>
+    /// ID of the main contact person
+    /// </summary>
+    [JsonPropertyName("mainContactId")]
+    public Guid? MainContactId { get; set; }
+
+    /// <summary>
+    /// Name of the main contact person
+    /// </summary>
+    [JsonPropertyName("mainContactName")]
+    public string? MainContactName { get; set; }
+
+    /// <summary>
     /// Company segment
     /// </summary>
     [JsonPropertyName("segment")]

@@ -154,6 +154,12 @@ public class CustomerResponse
 
 
     /// <summary>
+    /// Whether this customer is the main contact person for their company
+    /// </summary>
+    [JsonPropertyName("isMainContact")]
+    public bool IsMainContact { get; set; }
+
+    /// <summary>
     /// Soft delete flag
     /// </summary>
     [JsonPropertyName("isDeleted")]
