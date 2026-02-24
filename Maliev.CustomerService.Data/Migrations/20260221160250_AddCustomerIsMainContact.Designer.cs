@@ -3,6 +3,7 @@ using System;
 using Maliev.CustomerService.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,16 +12,17 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Maliev.CustomerService.Data.Migrations
 {
     [DbContext(typeof(CustomerDbContext))]
-    partial class CustomerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260221160250_AddCustomerIsMainContact")]
+    partial class AddCustomerIsMainContact
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.3")
+                .HasAnnotation("ProductVersion", "10.0.2")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Maliev.CustomerService.Data.Models.Address", b =>
@@ -346,16 +348,6 @@ namespace Maliev.CustomerService.Data.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique();
-
-                    b.HasIndex("FirstName");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("FirstName"), "gin");
-                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("FirstName"), new[] { "gin_trgm_ops" });
-
-                    b.HasIndex("LastName");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("LastName"), "gin");
-                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("LastName"), new[] { "gin_trgm_ops" });
 
                     b.HasIndex("PrincipalId")
                         .IsUnique();
