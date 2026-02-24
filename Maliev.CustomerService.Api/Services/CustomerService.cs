@@ -5,6 +5,7 @@ using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Models.IAM;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
+using Maliev.MessagingContracts.Contracts.Customers;
 using Maliev.MessagingContracts.Generated;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
@@ -891,8 +892,23 @@ public class CustomerService : ICustomerService
 
         foreach (var contact in otherContacts)
         {
+            var previousIsMain = contact.IsMainContact;
             contact.IsMainContact = false;
             contact.UpdatedAt = DateTime.UtcNow;
+
+            // Audit demotion
+            var demotionAudit = new AuditLog
+            {
+                ActorId = actorId,
+                ActorType = actorType,
+                Action = AuditAction.Update,
+                EntityType = nameof(Customer),
+                EntityId = contact.Id.ToString(),
+                Timestamp = DateTime.UtcNow,
+                ChangedFields = JsonSerializer.Serialize(new { IsMainContact = false }),
+                PreviousValues = JsonSerializer.Serialize(new { IsMainContact = previousIsMain })
+            };
+            _context.AuditLogs.Add(demotionAudit);
         }
 
         // Set this customer as main contact

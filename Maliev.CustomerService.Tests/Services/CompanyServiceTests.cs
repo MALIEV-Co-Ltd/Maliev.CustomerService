@@ -517,6 +517,102 @@ public class CompanyServiceTests
     }
 
     [Fact]
+    public async Task GetAllAsync_WithNoCompanyEmail_FallsBackToMainContactEmail()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        // Create company WITHOUT contact email
+        var company = await service.CreateAsync(new CreateCompanyRequest
+        {
+            Name = "Fallback Test Company",
+            Segment = "Retail",
+            Tier = "Bronze"
+        }, "test-actor", "Employee");
+
+        // Create main contact for this company
+        await using (var context = _fixture.CreateDbContext())
+        {
+            context.Customers.Add(new Customer
+            {
+                Id = Guid.NewGuid(),
+                PrincipalId = Guid.NewGuid(),
+                FirstName = "Main",
+                LastName = "Contact",
+                Email = "main@fallback.com",
+                Mobile = "081-111-2222",
+                Segment = "Retail",
+                Tier = "Bronze",
+                PreferredLanguage = "en",
+                Timezone = "UTC",
+                CompanyId = company.Id,
+                IsMainContact = true
+            });
+            await context.SaveChangesAsync();
+        }
+
+        // Act
+        var (companies, totalCount) = await service.GetAllAsync(page: 1, pageSize: 50);
+
+        // Assert
+        Assert.Single(companies);
+        var result = companies[0];
+        Assert.Equal("Fallback Test Company", result.Name);
+        Assert.Equal("main@fallback.com", result.ContactEmail);
+        Assert.Equal("main@fallback.com", result.MainContactEmail);
+        Assert.Equal("Main Contact", result.MainContactName);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithCompanyEmail_PrioritizesCompanyEmail()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        // Create company WITH contact email
+        var company = await service.CreateAsync(new CreateCompanyRequest
+        {
+            Name = "Direct Email Company",
+            ContactEmail = "direct@company.com",
+            Segment = "Enterprise",
+            Tier = "Gold"
+        }, "test-actor", "Employee");
+
+        // Create main contact with DIFFERENT email
+        await using (var context = _fixture.CreateDbContext())
+        {
+            context.Customers.Add(new Customer
+            {
+                Id = Guid.NewGuid(),
+                PrincipalId = Guid.NewGuid(),
+                FirstName = "Contact",
+                LastName = "Person",
+                Email = "contact@person.com",
+                Mobile = "081-333-4444",
+                Segment = "Enterprise",
+                Tier = "Gold",
+                PreferredLanguage = "en",
+                Timezone = "UTC",
+                CompanyId = company.Id,
+                IsMainContact = true
+            });
+            await context.SaveChangesAsync();
+        }
+
+        // Act
+        var (companies, totalCount) = await service.GetAllAsync(page: 1, pageSize: 50);
+
+        // Assert
+        Assert.Single(companies);
+        var result = companies[0];
+        Assert.Equal("Direct Email Company", result.Name);
+        Assert.Equal("direct@company.com", result.ContactEmail);
+        Assert.Equal("contact@person.com", result.MainContactEmail);
+    }
+
+    [Fact]
     public async Task GetAllAsync_WithSegmentAndTierFilter_ReturnsFilteredCompanies()
     {
         // Arrange

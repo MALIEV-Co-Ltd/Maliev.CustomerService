@@ -454,7 +454,40 @@ public class CompanyService : ICompanyService
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        var companyResponses = companies.Select(c => c.ToCompanyResponse()).ToList();
+        var companyIds = companies.Select(c => c.Id).ToList();
+
+        // Fetch main contacts for companies without their own email
+        var customersWithCompany = await _context.Customers
+            .Where(c => c.CompanyId != null && companyIds.Contains(c.CompanyId.Value) && !c.IsDeleted)
+            .ToListAsync(cancellationToken);
+
+        // Group by CompanyId and find main contact for each
+        var mainContactsByCompanyId = customersWithCompany
+            .GroupBy(c => c.CompanyId)
+            .ToDictionary(
+                g => g.Key!.Value,
+                g => g.FirstOrDefault(c => c.IsMainContact) ?? g.FirstOrDefault()
+            );
+
+        var companyResponses = companies.Select(c =>
+        {
+            var response = c.ToCompanyResponse();
+
+            // Apply main contact fallback
+            if (mainContactsByCompanyId.TryGetValue(c.Id, out var mainContact) && mainContact != null)
+            {
+                response.MainContactId = mainContact.Id;
+                response.MainContactName = $"{mainContact.FirstName} {mainContact.LastName}".Trim();
+                response.MainContactEmail = mainContact.Email;
+
+                if (string.IsNullOrEmpty(response.ContactEmail))
+                {
+                    response.ContactEmail = mainContact.Email;
+                }
+            }
+
+            return response;
+        }).ToList();
 
         _logger.LogDebug("Retrieved {Count} companies out of {TotalCount}", companyResponses.Count, totalCount);
 
@@ -504,10 +537,20 @@ public class CompanyService : ICompanyService
         var companyIdStr = id.ToString();
 
         // Find audit logs directly related to company, or where changed fields mention the company
+        var customerIds = await _context.Customers
+            .Where(c => c.CompanyId == id)
+            .Select(c => c.Id.ToString())
+            .ToListAsync(cancellationToken);
+
+        var addressIds = await _context.Addresses
+            .Where(a => a.OwnerType == OwnerType.Company && a.OwnerId == id)
+            .Select(a => a.Id.ToString())
+            .ToListAsync(cancellationToken);
+
         var query = _context.AuditLogs
             .Where(a => (a.EntityType == nameof(Company) && a.EntityId == companyIdStr) ||
-                        (a.EntityType == nameof(Customer) && a.ChangedFields != null && a.ChangedFields.Contains($"\"CompanyId\":\"{companyIdStr}\"")) ||
-                        (a.EntityType == nameof(Address) && a.ChangedFields != null && a.ChangedFields.Contains($"\"OwnerId\":\"{companyIdStr}\"")));
+                        (a.EntityType == nameof(Customer) && customerIds.Contains(a.EntityId)) ||
+                        (a.EntityType == nameof(Address) && addressIds.Contains(a.EntityId)));
 
         var totalCount = await query.CountAsync(cancellationToken);
 
@@ -523,7 +566,7 @@ public class CompanyService : ICompanyService
 
         var activities = new List<CustomerActivityResponse>();
 
-        // Resolve actor names
+        // Resolve actor names concurrently
         var actorIds = auditLogs
             .Where(a => Guid.TryParse(a.ActorId, out _))
             .Select(a => Guid.Parse(a.ActorId))
@@ -531,10 +574,19 @@ public class CompanyService : ICompanyService
             .ToList();
 
         var actorMap = new Dictionary<Guid, Maliev.CustomerService.Api.Models.IAM.PrincipalResponse>();
-        foreach (var actorId in actorIds)
+        var principalTasks = actorIds.Select(async actorId =>
         {
             var principal = await _iamClient.GetPrincipalByIdAsync(actorId, cancellationToken);
-            if (principal != null) actorMap[actorId] = principal;
+            return new { ActorId = actorId, Principal = principal };
+        });
+
+        var principalResults = await Task.WhenAll(principalTasks);
+        foreach (var result in principalResults)
+        {
+            if (result.Principal != null)
+            {
+                actorMap[result.ActorId] = result.Principal;
+            }
         }
 
         foreach (var audit in auditLogs)

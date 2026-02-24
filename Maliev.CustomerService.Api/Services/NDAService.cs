@@ -4,6 +4,7 @@ using Maliev.CustomerService.Api.Models.NDAs;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
 using Maliev.MessagingContracts.Contracts.Customers;
+using Maliev.MessagingContracts.Contracts.Nda;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
@@ -312,9 +313,12 @@ public class NDAService : INDAService
             // Publish event
             await _publishEndpoint.Publish(new NdaExpiredEvent
             {
-                NdaId = nda.Id,
-                CustomerId = nda.CustomerId,
-                ExpiredAt = DateTime.UtcNow
+                Payload = new NdaExpiredEventPayload
+                {
+                    NdaId = nda.Id,
+                    CustomerId = nda.CustomerId,
+                    ExpiredAt = DateTimeOffset.UtcNow
+                }
             }, cancellationToken);
         }
 
@@ -349,10 +353,13 @@ public class NDAService : INDAService
             {
                 await _publishEndpoint.Publish(new NdaExpiringEvent
                 {
-                    NdaId = nda.Id,
-                    CustomerId = nda.CustomerId,
-                    ExpiresAt = nda.ExpiresAt!.Value,
-                    DaysUntilExpiration = days
+                    Payload = new NdaExpiringEventPayload
+                    {
+                        NdaId = nda.Id,
+                        CustomerId = nda.CustomerId,
+                        ExpiresAt = new DateTimeOffset(nda.ExpiresAt!.Value, TimeSpan.Zero),
+                        DaysUntilExpiration = days
+                    }
                 }, cancellationToken);
 
                 eventCount++;

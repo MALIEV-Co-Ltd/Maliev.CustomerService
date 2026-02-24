@@ -56,6 +56,12 @@ public class CompanyResponse
     public string? MainContactName { get; set; }
 
     /// <summary>
+    /// Email of the main contact person
+    /// </summary>
+    [JsonPropertyName("mainContactEmail")]
+    public string? MainContactEmail { get; set; }
+
+    /// <summary>
     /// Company segment
     /// </summary>
     [JsonPropertyName("segment")]
