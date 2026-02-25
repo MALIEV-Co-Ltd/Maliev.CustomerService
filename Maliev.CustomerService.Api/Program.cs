@@ -65,7 +65,9 @@ try
     builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.ICompanyRepository, Maliev.CustomerService.Data.Repositories.CompanyRepository>();
     builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.ICompanyTierSettingsRepository, Maliev.CustomerService.Data.Repositories.CompanyTierSettingsRepository>();
     builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.ICompanyDocumentRepository, Maliev.CustomerService.Data.Repositories.CompanyDocumentRepository>();
+    builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.IOrderRepository, Maliev.CustomerService.Data.Repositories.OrderRepository>();
     builder.Services.AddScoped<Maliev.CustomerService.Application.Services.ITierCalculationService, Maliev.CustomerService.Application.Services.TierCalculationService>();
+    builder.Services.AddScoped<Maliev.CustomerService.Application.Services.IYearEndTierProcessor, Maliev.CustomerService.Application.Services.YearEndTierProcessor>();
 
     // Scripts
     // builder.Services.AddScoped<Maliev.CustomerService.Api.Scripts.MigrateToPrincipalsScript>();

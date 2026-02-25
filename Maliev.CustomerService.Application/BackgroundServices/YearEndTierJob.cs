@@ -1,4 +1,3 @@
-using Maliev.CustomerService.Application.Interfaces;
 using Maliev.CustomerService.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -7,17 +6,21 @@ using Microsoft.Extensions.Logging;
 namespace Maliev.CustomerService.Application.BackgroundServices;
 
 /// <summary>
-/// Background service for year-end tier demotion processing
-/// Runs at UTC midnight on January 1st
+/// Background service for year-end tier demotion processing.
+/// Runs at UTC midnight on January 1st each year.
+///
+/// Design note: <see cref="BackgroundService"/> is registered as a singleton by the host.
+/// To safely consume scoped services (e.g. EF Core DbContext), we resolve
+/// <see cref="IYearEndTierProcessor"/> from a new DI scope per execution.
+/// This is the recommended Microsoft pattern for singleton background services.
+/// See: https://learn.microsoft.com/aspnet/core/fundamentals/host/hosted-services#consuming-a-scoped-service-in-a-background-task
 /// </summary>
 public class YearEndTierJob : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<YearEndTierJob> _logger;
 
-    public YearEndTierJob(
-        IServiceScopeFactory scopeFactory,
-        ILogger<YearEndTierJob> logger)
+    public YearEndTierJob(IServiceScopeFactory scopeFactory, ILogger<YearEndTierJob> logger)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
@@ -42,7 +45,7 @@ public class YearEndTierJob : BackgroundService
 
                 if (!stoppingToken.IsCancellationRequested)
                 {
-                    await ProcessYearEndDemotions(stoppingToken);
+                    await ProcessYearEndDemotionsAsync(stoppingToken);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -58,17 +61,16 @@ public class YearEndTierJob : BackgroundService
         }
     }
 
-    private async Task ProcessYearEndDemotions(CancellationToken stoppingToken)
+    private async Task ProcessYearEndDemotionsAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Starting year-end tier demotion processing");
-
         try
         {
-            using var scope = _scopeFactory.CreateScope();
-            var tierService = scope.ServiceProvider.GetRequiredService<ITierCalculationService>();
+            // Create a new DI scope per execution — required for singleton BackgroundService
+            // consuming scoped services (EF Core DbContext via IYearEndTierProcessor).
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var processor = scope.ServiceProvider.GetRequiredService<IYearEndTierProcessor>();
 
-            var demotedCount = await tierService.ApplyYearEndDemotionsAsync(stoppingToken);
-            await tierService.ResetYearlyValuesAsync(stoppingToken);
+            var demotedCount = await processor.RunAsync(stoppingToken);
 
             _logger.LogInformation("Year-end tier demotion completed. Demoted {Count} companies", demotedCount);
         }
@@ -81,12 +83,12 @@ public class YearEndTierJob : BackgroundService
 
     private static DateTime GetNextRunTime(DateTime now)
     {
-        var nextYear = now.Year + 1;
-        var nextRun = new DateTime(nextYear, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var nextRun = new DateTime(now.Year + 1, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
+        // Safety check: if we somehow missed this year's run, schedule for next year
         if (now >= nextRun)
         {
-            nextRun = new DateTime(nextYear + 1, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            nextRun = new DateTime(now.Year + 2, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         }
 
         return nextRun;

@@ -98,44 +98,14 @@ public class TierCalculationService : ITierCalculationService
     /// <inheritdoc/>
     public async Task ResetYearlyValuesAsync(CancellationToken cancellationToken = default)
     {
-        var companies = await _companyRepository.GetAllAsync(cancellationToken);
-
-        foreach (var company in companies)
-        {
-            company.CurrentYearPurchaseValue = 0;
-            company.CurrentYearOrderCount = 0;
-        }
-
-        _logger.LogInformation("Reset YTD values for {Count} companies", companies.Count);
+        var count = await _companyRepository.ResetAllYearlyValuesAsync(cancellationToken);
+        _logger.LogInformation("Reset YTD values for {Count} companies", count);
     }
 
     /// <inheritdoc/>
     public async Task<int> ApplyYearEndDemotionsAsync(CancellationToken cancellationToken = default)
     {
-        var companies = await _companyRepository.GetAllAsync(cancellationToken);
-        int demotedCount = 0;
-
-        foreach (var company in companies)
-        {
-            var currentTierIndex = Array.IndexOf(TierOrder, company.Tier);
-
-            if (currentTierIndex > 0)
-            {
-                var newTier = TierOrder[currentTierIndex - 1];
-                _logger.LogInformation(
-                    "Company {CompanyId} demoted from {OldTier} to {NewTier}",
-                    company.Id, company.Tier, newTier);
-
-                company.Tier = newTier;
-                company.TierCalculatedAt = DateTime.UtcNow;
-                demotedCount++;
-            }
-            else
-            {
-                company.TierCalculatedAt = DateTime.UtcNow;
-            }
-        }
-
+        var demotedCount = await _companyRepository.ApplyYearEndDemotionsAsync(cancellationToken);
         _logger.LogInformation("Demoted {Count} companies at year-end", demotedCount);
         return demotedCount;
     }

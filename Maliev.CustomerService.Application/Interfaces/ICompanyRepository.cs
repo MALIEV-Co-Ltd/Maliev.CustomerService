@@ -26,4 +26,14 @@ public interface ICompanyRepository
     /// Gets all companies
     /// </summary>
     Task<List<Company>> GetAllAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Resets YTD values for all companies using batch update
+    /// </summary>
+    Task<int> ResetAllYearlyValuesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Applies year-end demotions and returns count of demoted companies
+    /// </summary>
+    Task<int> ApplyYearEndDemotionsAsync(CancellationToken cancellationToken = default);
 }

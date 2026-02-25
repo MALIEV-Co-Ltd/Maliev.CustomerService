@@ -12,6 +12,7 @@ namespace Maliev.CustomerService.Api.Consumers;
 public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
 {
     private readonly ICompanyRepository _companyRepository;
+    private readonly IOrderRepository _orderRepository;
     private readonly ITierCalculationService _tierCalculationService;
     private readonly IPublishEndpoint _publishEndpoint;
     private readonly ILogger<OrderPaidEventConsumer> _logger;
@@ -21,11 +22,13 @@ public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
     /// </summary>
     public OrderPaidEventConsumer(
         ICompanyRepository companyRepository,
+        IOrderRepository orderRepository,
         ITierCalculationService tierCalculationService,
         IPublishEndpoint publishEndpoint,
         ILogger<OrderPaidEventConsumer> logger)
     {
         _companyRepository = companyRepository;
+        _orderRepository = orderRepository;
         _tierCalculationService = tierCalculationService;
         _publishEndpoint = publishEndpoint;
         _logger = logger;
@@ -44,14 +47,59 @@ public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
 
         try
         {
-            // Note: OrderPaidEvent doesn't contain CompanyId directly
-            // We would need to look up the order to get the CompanyId
-            // For now, this is a placeholder - in production, you'd query an Order service
-            // or include CompanyId in the event
+            var companyId = await _orderRepository.GetCompanyIdByOrderIdAsync(
+                message.Payload.OrderId, context.CancellationToken);
 
-            _logger.LogWarning(
-                "OrderPaidEvent processing requires CompanyId lookup - not implemented yet. OrderId: {OrderId}",
-                message.Payload.OrderId);
+            if (companyId is null)
+            {
+                _logger.LogWarning(
+                    "Could not find company for OrderId {OrderId}. Skipping tier calculation.",
+                    message.Payload.OrderId);
+                return;
+            }
+
+            var company = await _companyRepository.GetByIdAsync(companyId.Value, context.CancellationToken);
+            if (company is null)
+            {
+                _logger.LogWarning(
+                    "Company {CompanyId} not found for OrderId {OrderId}. Skipping tier calculation.",
+                    companyId, message.Payload.OrderId);
+                return;
+            }
+
+            var previousTier = company.Tier;
+
+            company.CurrentYearPurchaseValue += (decimal)message.Payload.PaidAmount;
+            company.CurrentYearOrderCount += 1;
+
+            await _companyRepository.UpdateAsync(company, context.CancellationToken);
+
+            var tierChanged = await _tierCalculationService.ApplyTierAsync(companyId.Value, context.CancellationToken);
+
+            if (tierChanged)
+            {
+                var updatedCompany = await _companyRepository.GetByIdAsync(companyId.Value, context.CancellationToken);
+
+                var tierChangedEvent = new CompanyTierChangedEvent
+                {
+                    CompanyId = companyId.Value,
+                    PreviousTier = previousTier,
+                    NewTier = updatedCompany?.Tier ?? previousTier,
+                    CurrentYearPurchaseValue = updatedCompany?.CurrentYearPurchaseValue ?? company.CurrentYearPurchaseValue,
+                    CurrentYearOrderCount = updatedCompany?.CurrentYearOrderCount ?? company.CurrentYearOrderCount,
+                    Timestamp = DateTime.UtcNow
+                };
+
+                await _publishEndpoint.Publish(tierChangedEvent);
+
+                _logger.LogInformation(
+                    "Company {CompanyId} tier changed from {PreviousTier} to {NewTier}",
+                    companyId, previousTier, tierChangedEvent.NewTier);
+            }
+
+            _logger.LogInformation(
+                "Updated company {CompanyId} YTD: {YtdValue}, {YtdCount} orders",
+                companyId, company.CurrentYearPurchaseValue, company.CurrentYearOrderCount);
         }
         catch (Exception ex)
         {
