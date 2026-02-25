@@ -29,6 +29,7 @@ try
     {
         x.AddConsumer<Maliev.CustomerService.Api.Consumers.GetCustomerDetailsConsumer>();
         x.AddConsumer<Maliev.CustomerService.Api.Consumers.FileDeletedEventConsumer>();
+        x.AddConsumer<Maliev.CustomerService.Api.Consumers.OrderPaidEventConsumer>();
     }); // RabbitMQ message bus (non-blocking startup)
     builder.AddPostgresDbContext<CustomerDbContext>(connectionName: "CustomerDbContext"); // PostgreSQL with retry logic
 
@@ -60,6 +61,12 @@ try
     builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IDocumentService, Maliev.CustomerService.Api.Services.DocumentService>();
     builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IInternalNoteService, Maliev.CustomerService.Api.Services.InternalNoteService>();
 
+    // Tier Calculation Services
+    builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.ICompanyRepository, Maliev.CustomerService.Data.Repositories.CompanyRepository>();
+    builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.ICompanyTierSettingsRepository, Maliev.CustomerService.Data.Repositories.CompanyTierSettingsRepository>();
+    builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.ICompanyDocumentRepository, Maliev.CustomerService.Data.Repositories.CompanyDocumentRepository>();
+    builder.Services.AddScoped<Maliev.CustomerService.Application.Services.ITierCalculationService, Maliev.CustomerService.Application.Services.TierCalculationService>();
+
     // Scripts
     // builder.Services.AddScoped<Maliev.CustomerService.Api.Scripts.MigrateToPrincipalsScript>();
 
@@ -67,6 +74,7 @@ try
 
     builder.Services.AddHostedService<Maliev.CustomerService.Api.BackgroundServices.NDAExpirationBackgroundService>();
     builder.Services.AddHostedService<Maliev.CustomerService.Api.BackgroundServices.DocumentDeletionRetryBackgroundService>();
+    builder.Services.AddHostedService<Maliev.CustomerService.Application.BackgroundServices.YearEndTierJob>();
 
     // IAM Service Client (now with Service Account authentication)
     builder.AddIAMServiceClient("customer");

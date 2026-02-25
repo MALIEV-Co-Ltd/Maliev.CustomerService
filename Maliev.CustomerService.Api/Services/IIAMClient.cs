@@ -45,4 +45,18 @@ public interface IIAMClient
     Task DeletePrincipalAsync(
         Guid principalId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets all resource IDs of a specific type that the principal has the specified permission for.
+    /// </summary>
+    /// <param name="principalId">The principal ID (user or service account).</param>
+    /// <param name="permissionId">The permission to check (e.g., "delivery.customer.read").</param>
+    /// <param name="resourceType">The type of resource (e.g., "customers").</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A collection of resource IDs.</returns>
+    Task<IEnumerable<string>> GetAuthorizedResourcesAsync(
+        string principalId,
+        string permissionId,
+        string resourceType,
+        CancellationToken cancellationToken = default);
 }

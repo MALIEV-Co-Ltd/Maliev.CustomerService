@@ -364,4 +364,44 @@ public class CompanyController : ControllerBase
             throw;
         }
     }
+
+    /// <summary>
+    /// Manually triggers tier recalculation for a company
+    /// </summary>
+    /// <param name="id">Company ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Company with updated tier</returns>
+    /// <response code="200">Tier recalculated successfully</response>
+    /// <response code="401">Unauthorized</response>
+    /// <response code="404">Company not found</response>
+    [HttpPost("{id:guid}/calculate-tier")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<object>> CalculateTier(Guid id, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var tierService = HttpContext.RequestServices.GetRequiredService<Application.Services.ITierCalculationService>();
+            var company = await tierService.GetCompanyWithTierAsync(id, cancellationToken);
+
+            if (company == null)
+            {
+                return NotFound(new ErrorResponse
+                {
+                    Code = "NOT_FOUND",
+                    Message = $"Company with ID '{id}' not found",
+                    TraceId = HttpContext.TraceIdentifier,
+                    Timestamp = DateTime.UtcNow
+                });
+            }
+
+            return Ok(company);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error calculating tier for company {CompanyId}", id);
+            throw;
+        }
+    }
 }
