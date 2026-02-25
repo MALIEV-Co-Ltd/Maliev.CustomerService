@@ -3,6 +3,7 @@ using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Companies;
 using Maliev.CustomerService.Api.Services;
+using Maliev.CustomerService.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -19,18 +20,22 @@ namespace Maliev.CustomerService.Api.Controllers;
 public class CompanyController : ControllerBase
 {
     private readonly ICompanyService _companyService;
+    private readonly ITierCalculationService _tierCalculationService;
     private readonly ILogger<CompanyController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CompanyController"/> class
     /// </summary>
     /// <param name="companyService">Company service</param>
+    /// <param name="tierCalculationService">Tier calculation service</param>
     /// <param name="logger">Logger instance</param>
     public CompanyController(
         ICompanyService companyService,
+        ITierCalculationService tierCalculationService,
         ILogger<CompanyController> logger)
     {
         _companyService = companyService;
+        _tierCalculationService = tierCalculationService;
         _logger = logger;
     }
 
@@ -361,6 +366,50 @@ public class CompanyController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving company {CompanyId} with customers", id);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Manually triggers tier recalculation for a company
+    /// </summary>
+    /// <param name="id">Company ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Company with updated tier</returns>
+    /// <response code="200">Tier recalculated successfully</response>
+    /// <response code="401">Unauthorized</response>
+    /// <response code="404">Company not found</response>
+    [HttpPost("{id:guid}/calculate-tier")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<object>> CalculateTier(Guid id, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var tierChanged = await _tierCalculationService.ApplyTierAsync(id, cancellationToken);
+            var company = await _tierCalculationService.GetCompanyWithTierAsync(id, cancellationToken);
+
+            if (company == null)
+            {
+                return NotFound(new ErrorResponse
+                {
+                    Code = "NOT_FOUND",
+                    Message = $"Company with ID '{id}' not found",
+                    TraceId = HttpContext.TraceIdentifier,
+                    Timestamp = DateTime.UtcNow
+                });
+            }
+
+            _logger.LogInformation(
+                "Tier recalculation for company {CompanyId}: tierChanged={TierChanged}, currentTier={Tier}",
+                id, tierChanged, company.Tier);
+
+            return Ok(company);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error calculating tier for company {CompanyId}", id);
             throw;
         }
     }

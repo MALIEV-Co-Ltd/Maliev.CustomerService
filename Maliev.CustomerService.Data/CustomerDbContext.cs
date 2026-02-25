@@ -1,6 +1,8 @@
+using Maliev.CustomerService.Data.Configurations;
 using Maliev.CustomerService.Data.Interceptors;
 using Maliev.CustomerService.Data.Interfaces;
 using Maliev.CustomerService.Data.Models;
+using Maliev.CustomerService.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.CustomerService.Data;
@@ -32,7 +34,6 @@ public class CustomerDbContext : DbContext
     {
         base.OnConfiguring(optionsBuilder);
 
-        // Use the injected singleton interceptor to avoid creating multiple service providers
         optionsBuilder.AddInterceptors(_encryptionInterceptor);
     }
 
@@ -52,20 +53,28 @@ public class CustomerDbContext : DbContext
     public DbSet<InternalNote> InternalNotes => Set<InternalNote>();
     /// <summary>Internal note comments set</summary>
     public DbSet<InternalNoteComment> InternalNoteComments => Set<InternalNoteComment>();
+    /// <summary>Company tier settings set</summary>
+    public DbSet<CompanyTierSettings> CompanyTierSettings => Set<CompanyTierSettings>();
+    /// <summary>Company documents set</summary>
+    public DbSet<CompanyDocument> CompanyDocuments => Set<CompanyDocument>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // Configure Customer entity (T001, T034, T035)
+        modelBuilder.ApplyConfiguration(new CompanyConfiguration());
+        modelBuilder.ApplyConfiguration(new CompanyTierSettingsConfiguration());
+        modelBuilder.ApplyConfiguration(new CompanyDocumentConfiguration());
+
+        // Configure Customer entity
         modelBuilder.Entity<Customer>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.Email).IsUnique();
             entity.HasIndex(e => e.PrincipalId).IsUnique();
 
-            // Soft delete filter (T003)
+            // Soft delete filter
             entity.HasQueryFilter(e => !e.IsDeleted);
 
             // Concurrency token (PostgreSQL bytea with default value)
@@ -75,7 +84,7 @@ public class CustomerDbContext : DbContext
                 .ValueGeneratedOnAddOrUpdate();
         });
 
-        // Configure Address entity (T037)
+        // Configure Address entity
         modelBuilder.Entity<Address>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -122,20 +131,7 @@ public class CustomerDbContext : DbContext
                 .ValueGeneratedOnAddOrUpdate();
         });
 
-        // Configure Company entity (T066)
-        modelBuilder.Entity<Company>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.VatNumber).IsUnique().HasFilter("\"VatNumber\" IS NOT NULL");
-
-            // Concurrency token (PostgreSQL bytea with default value)
-            entity.Property(e => e.Version)
-                .IsRowVersion()
-                .HasDefaultValueSql("'\\x0000000000000001'::bytea")
-                .ValueGeneratedOnAddOrUpdate();
-        });
-
-        // Configure NDARecord (T069)
+        // Configure NDARecord
         modelBuilder.Entity<NDARecord>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -148,7 +144,7 @@ public class CustomerDbContext : DbContext
                 .ValueGeneratedOnAddOrUpdate();
         });
 
-        // Configure DocumentReference (T071)
+        // Configure DocumentReference
         modelBuilder.Entity<DocumentReference>(entity =>
         {
             entity.HasKey(e => e.Id);

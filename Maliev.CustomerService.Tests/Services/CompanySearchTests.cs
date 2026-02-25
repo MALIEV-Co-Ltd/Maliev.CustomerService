@@ -1,6 +1,7 @@
 using Maliev.CustomerService.Api.Models.Companies;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Data.Models;
+using Maliev.CustomerService.Domain.Entities;
 using Maliev.CustomerService.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;

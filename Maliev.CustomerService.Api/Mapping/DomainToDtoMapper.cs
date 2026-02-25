@@ -6,6 +6,7 @@ using Maliev.CustomerService.Api.Models.Documents;
 using Maliev.CustomerService.Api.Models.InternalNotes;
 using Maliev.CustomerService.Api.Models.NDAs;
 using Maliev.CustomerService.Data.Models;
+using Maliev.CustomerService.Domain.Entities;
 
 namespace Maliev.CustomerService.Api.Mapping;
 
