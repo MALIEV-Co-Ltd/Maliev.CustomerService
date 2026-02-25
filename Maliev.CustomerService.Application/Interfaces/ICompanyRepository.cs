@@ -13,11 +13,6 @@ public interface ICompanyRepository
     Task<Company?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets a company by ID with tier settings
-    /// </summary>
-    Task<Company?> GetByIdWithTierSettingsAsync(Guid id, CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// Updates a company
     /// </summary>
     Task UpdateAsync(Company company, CancellationToken cancellationToken = default);

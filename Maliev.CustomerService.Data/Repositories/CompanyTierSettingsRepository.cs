@@ -56,20 +56,19 @@ public class CompanyTierSettingsRepository : ICompanyTierSettingsRepository
     {
         settings.UpdatedAt = DateTime.UtcNow;
 
-        var updated = await _context.CompanyTierSettings
-            .Where(s => s.Id == settings.Id && s.xmin == settings.xmin)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(s => s.TierName, settings.TierName)
-                .SetProperty(s => s.MinPurchaseValue, settings.MinPurchaseValue)
-                .SetProperty(s => s.MinOrderCount, settings.MinOrderCount)
-                .SetProperty(s => s.DiscountPercentage, settings.DiscountPercentage)
-                .SetProperty(s => s.FreeShippingMinOrder, settings.FreeShippingMinOrder)
-                .SetProperty(s => s.CoinRewardPercentage, settings.CoinRewardPercentage)
-                .SetProperty(s => s.ValidFrom, settings.ValidFrom)
-                .SetProperty(s => s.ValidTo, settings.ValidTo)
-                .SetProperty(s => s.UpdatedAt, settings.UpdatedAt),
-                cancellationToken);
+        // Use the change tracker so EF Core refreshes xmin on the entity after save.
+        // ExecuteUpdateAsync bypasses the change tracker, causing xmin to become stale
+        // and breaking optimistic concurrency on subsequent requests.
+        _context.CompanyTierSettings.Update(settings);
 
-        return updated > 0;
+        try
+        {
+            var updated = await _context.SaveChangesAsync(cancellationToken);
+            return updated > 0;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return false;
+        }
     }
 }

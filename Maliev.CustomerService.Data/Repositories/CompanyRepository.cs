@@ -28,13 +28,6 @@ public class CompanyRepository : ICompanyRepository
     }
 
     /// <inheritdoc/>
-    public async Task<Company?> GetByIdWithTierSettingsAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        return await _context.Companies
-            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
-    }
-
-    /// <inheritdoc/>
     public async Task UpdateAsync(Company company, CancellationToken cancellationToken = default)
     {
         _context.Companies.Update(company);

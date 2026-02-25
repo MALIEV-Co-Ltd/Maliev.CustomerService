@@ -33,7 +33,8 @@ public class CompanyTierSettingsConfiguration : IEntityTypeConfiguration<Company
         entity.Property(e => e.xmin)
             .HasColumnName("xmin")
             .HasColumnType("xid")
-            .ValueGeneratedOnAdd();
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
 
         entity.HasIndex(e => e.TierName);
         entity.HasIndex(e => new { e.TierName, e.ValidFrom });

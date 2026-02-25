@@ -122,5 +122,5 @@ public class Company
     /// Row version for optimistic concurrency control
     /// </summary>
     [Timestamp]
-    public byte[] Version { get; set; } = new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 };
+    public byte[] Version { get; set; } = Array.Empty<byte>();
 }

@@ -38,7 +38,17 @@ public class YearEndTierJob : BackgroundService
                 _logger.LogInformation("YearEndTierJob scheduled to run at {NextRun}", nextRun);
 
                 var delay = nextRun - now;
-                if (delay > TimeSpan.Zero)
+
+                // Task.Delay supports a maximum of ~49 days (uint.MaxValue - 1 ms).
+                // Wait in 30-day chunks to avoid ArgumentOutOfRangeException.
+                while (delay.TotalDays > 30 && !stoppingToken.IsCancellationRequested)
+                {
+                    await Task.Delay(TimeSpan.FromDays(30), stoppingToken);
+                    now = DateTime.UtcNow;
+                    delay = nextRun - now;
+                }
+
+                if (delay > TimeSpan.Zero && !stoppingToken.IsCancellationRequested)
                 {
                     await Task.Delay(delay, stoppingToken);
                 }

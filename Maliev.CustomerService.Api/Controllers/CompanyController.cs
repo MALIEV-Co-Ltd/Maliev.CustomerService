@@ -3,6 +3,7 @@ using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Companies;
 using Maliev.CustomerService.Api.Services;
+using Maliev.CustomerService.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -19,18 +20,22 @@ namespace Maliev.CustomerService.Api.Controllers;
 public class CompanyController : ControllerBase
 {
     private readonly ICompanyService _companyService;
+    private readonly ITierCalculationService _tierCalculationService;
     private readonly ILogger<CompanyController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CompanyController"/> class
     /// </summary>
     /// <param name="companyService">Company service</param>
+    /// <param name="tierCalculationService">Tier calculation service</param>
     /// <param name="logger">Logger instance</param>
     public CompanyController(
         ICompanyService companyService,
+        ITierCalculationService tierCalculationService,
         ILogger<CompanyController> logger)
     {
         _companyService = companyService;
+        _tierCalculationService = tierCalculationService;
         _logger = logger;
     }
 
@@ -382,8 +387,8 @@ public class CompanyController : ControllerBase
     {
         try
         {
-            var tierService = HttpContext.RequestServices.GetRequiredService<Application.Services.ITierCalculationService>();
-            var company = await tierService.GetCompanyWithTierAsync(id, cancellationToken);
+            var tierChanged = await _tierCalculationService.ApplyTierAsync(id, cancellationToken);
+            var company = await _tierCalculationService.GetCompanyWithTierAsync(id, cancellationToken);
 
             if (company == null)
             {
@@ -395,6 +400,10 @@ public class CompanyController : ControllerBase
                     Timestamp = DateTime.UtcNow
                 });
             }
+
+            _logger.LogInformation(
+                "Tier recalculation for company {CompanyId}: tierChanged={TierChanged}, currentTier={Tier}",
+                id, tierChanged, company.Tier);
 
             return Ok(company);
         }

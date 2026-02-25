@@ -29,7 +29,8 @@ public class CompanyDocumentConfiguration : IEntityTypeConfiguration<CompanyDocu
         entity.Property(e => e.xmin)
             .HasColumnName("xmin")
             .HasColumnType("xid")
-            .ValueGeneratedOnAdd();
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
 
         entity.HasOne(e => e.Company)
             .WithMany()

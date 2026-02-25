@@ -113,7 +113,7 @@ public class TierCalculationService : ITierCalculationService
     /// <inheritdoc/>
     public async Task<CompanyWithTierResponse?> GetCompanyWithTierAsync(Guid companyId, CancellationToken cancellationToken = default)
     {
-        var company = await _companyRepository.GetByIdWithTierSettingsAsync(companyId, cancellationToken);
+        var company = await _companyRepository.GetByIdAsync(companyId, cancellationToken);
         if (company == null)
         {
             return null;

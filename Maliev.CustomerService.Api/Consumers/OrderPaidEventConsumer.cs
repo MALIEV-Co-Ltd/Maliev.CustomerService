@@ -1,5 +1,6 @@
 using Maliev.CustomerService.Application.Interfaces;
 using Maliev.CustomerService.Application.Services;
+using Maliev.MessagingContracts.Contracts.Customers;
 using Maliev.MessagingContracts.Contracts.Orders;
 using MassTransit;
 using Microsoft.Extensions.Logging;
@@ -7,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace Maliev.CustomerService.Api.Consumers;
 
 /// <summary>
-/// Consumer for OrderPaidEvent - updates company tier when orders are paid
+/// Consumer for OrderPaidEvent - updates company YTD values and recalculates tier when orders are paid
 /// </summary>
 public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
 {
@@ -18,7 +19,7 @@ public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
     private readonly ILogger<OrderPaidEventConsumer> _logger;
 
     /// <summary>
-    /// Initializes a new instance of OrderPaidEventConsumer
+    /// Initializes a new instance of <see cref="OrderPaidEventConsumer"/>
     /// </summary>
     public OrderPaidEventConsumer(
         ICompanyRepository companyRepository,
@@ -80,21 +81,32 @@ public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
             {
                 var updatedCompany = await _companyRepository.GetByIdAsync(companyId.Value, context.CancellationToken);
 
-                var tierChangedEvent = new CompanyTierChangedEvent
-                {
-                    CompanyId = companyId.Value,
-                    PreviousTier = previousTier,
-                    NewTier = updatedCompany?.Tier ?? previousTier,
-                    CurrentYearPurchaseValue = updatedCompany?.CurrentYearPurchaseValue ?? company.CurrentYearPurchaseValue,
-                    CurrentYearOrderCount = updatedCompany?.CurrentYearOrderCount ?? company.CurrentYearOrderCount,
-                    Timestamp = DateTime.UtcNow
-                };
+                var payload = new CompanyTierChangedEventPayload(
+                    CompanyId: companyId.Value,
+                    PreviousTier: previousTier,
+                    NewTier: updatedCompany?.Tier ?? previousTier,
+                    CurrentYearPurchaseValue: (double)(updatedCompany?.CurrentYearPurchaseValue ?? company.CurrentYearPurchaseValue),
+                    CurrentYearOrderCount: updatedCompany?.CurrentYearOrderCount ?? company.CurrentYearOrderCount,
+                    OccurredAt: DateTimeOffset.UtcNow);
 
-                await _publishEndpoint.Publish(tierChangedEvent);
+                var tierChangedEvent = new CompanyTierChangedEvent(
+                    MessageId: Guid.NewGuid(),
+                    MessageName: nameof(CompanyTierChangedEvent),
+                    MessageType: Maliev.MessagingContracts.Generated.MessageType.Event,
+                    MessageVersion: "1.0",
+                    PublishedBy: "CustomerService",
+                    ConsumedBy: Array.Empty<string>(),
+                    CorrelationId: message.CorrelationId,
+                    CausationId: message.MessageId,
+                    OccurredAtUtc: DateTimeOffset.UtcNow,
+                    IsPublic: true,
+                    Payload: payload);
+
+                await _publishEndpoint.Publish(tierChangedEvent, context.CancellationToken);
 
                 _logger.LogInformation(
                     "Company {CompanyId} tier changed from {PreviousTier} to {NewTier}",
-                    companyId, previousTier, tierChangedEvent.NewTier);
+                    companyId, previousTier, payload.NewTier);
             }
 
             _logger.LogInformation(
@@ -109,23 +121,4 @@ public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
             throw;
         }
     }
-}
-
-/// <summary>
-/// Event published when a company's tier changes
-/// </summary>
-public class CompanyTierChangedEvent
-{
-    /// <summary>Company ID</summary>
-    public Guid CompanyId { get; set; }
-    /// <summary>Previous tier</summary>
-    public string PreviousTier { get; set; } = string.Empty;
-    /// <summary>New tier</summary>
-    public string NewTier { get; set; } = string.Empty;
-    /// <summary>Current YTD purchase value</summary>
-    public decimal CurrentYearPurchaseValue { get; set; }
-    /// <summary>Current YTD order count</summary>
-    public int CurrentYearOrderCount { get; set; }
-    /// <summary>Timestamp when tier changed</summary>
-    public DateTime Timestamp { get; set; }
 }
