@@ -92,7 +92,7 @@ public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
                 var tierChangedEvent = new CompanyTierChangedEvent(
                     MessageId: Guid.NewGuid(),
                     MessageName: nameof(CompanyTierChangedEvent),
-                    MessageType: Maliev.MessagingContracts.Generated.MessageType.Event,
+                    MessageType: Maliev.MessagingContracts.MessageType.Event,
                     MessageVersion: "1.0",
                     PublishedBy: "CustomerService",
                     ConsumedBy: Array.Empty<string>(),

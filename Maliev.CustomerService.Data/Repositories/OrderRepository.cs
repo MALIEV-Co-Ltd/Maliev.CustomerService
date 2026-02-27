@@ -1,4 +1,5 @@
 using Maliev.CustomerService.Application.Interfaces;
+using Maliev.MessagingContracts.Contracts.Orders;
 using Microsoft.Extensions.Logging;
 
 namespace Maliev.CustomerService.Data.Repositories;

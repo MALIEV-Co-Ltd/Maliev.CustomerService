@@ -3,8 +3,8 @@ using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.NDAs;
 using Maliev.CustomerService.Data;
 using Maliev.CustomerService.Data.Models;
+using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Nda;
-using Maliev.MessagingContracts.Generated;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 

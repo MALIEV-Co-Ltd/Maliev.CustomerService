@@ -1,6 +1,6 @@
 using Maliev.CustomerService.Api.Services;
+using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Customers;
-using Maliev.MessagingContracts.Generated;
 using MassTransit;
 
 namespace Maliev.CustomerService.Api.Consumers;
