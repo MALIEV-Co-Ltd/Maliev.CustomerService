@@ -1,6 +1,6 @@
 using Maliev.CustomerService.Api.Consumers;
 using Maliev.CustomerService.Api.Services;
-using Maliev.CustomerService.Data.Models;
+using Maliev.CustomerService.Domain.Entities;
 using Maliev.CustomerService.Tests.Infrastructure;
 using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Customers;
@@ -29,7 +29,7 @@ public class ConsumerAndBackgroundBoostTests
 
         // Seed a customer
         using var scope = _factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<Maliev.CustomerService.Data.CustomerDbContext>();
+        var context = scope.ServiceProvider.GetRequiredService<Maliev.CustomerService.Infrastructure.Persistence.CustomerDbContext>();
         var customerId = Guid.NewGuid();
         context.Customers.Add(new Customer { Id = customerId, FirstName = "Test", LastName = "User", Email = "test@user.com", Segment = "Retail", Tier = "Bronze" });
         await context.SaveChangesAsync();

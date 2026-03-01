@@ -3,6 +3,7 @@ using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models.InternalNotes;
 using Maliev.CustomerService.Api.Services;
+using Maliev.CustomerService.Domain.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;

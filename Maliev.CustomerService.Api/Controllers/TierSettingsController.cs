@@ -3,6 +3,7 @@ using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Application.DTOs;
 using Maliev.CustomerService.Application.Interfaces;
+using Maliev.CustomerService.Domain.Authorization;
 using Maliev.CustomerService.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

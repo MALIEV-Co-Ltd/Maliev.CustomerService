@@ -1,4 +1,4 @@
-using Maliev.CustomerService.Data.Models;
+using Maliev.CustomerService.Domain.Entities;
 using Maliev.CustomerService.Tests.Infrastructure;
 using Xunit;
 

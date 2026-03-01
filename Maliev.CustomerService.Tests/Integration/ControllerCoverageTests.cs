@@ -6,7 +6,7 @@ using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Models.Documents;
 using Maliev.CustomerService.Api.Models.InternalNotes;
 using Maliev.CustomerService.Api.Models.NDAs;
-using Maliev.CustomerService.Data.Models;
+using Maliev.CustomerService.Domain.Entities;
 using Maliev.CustomerService.Tests.Infrastructure;
 using Moq;
 using Xunit;
@@ -22,7 +22,7 @@ public class ControllerCoverageTests
     public ControllerCoverageTests(TestWebApplicationFactory factory)
     {
         _factory = factory;
-        _client = _factory.CreateAuthenticatedClient("test-admin", new[] { "Admin" }, Maliev.CustomerService.Api.Authorization.CustomerPermissions.All);
+        _client = _factory.CreateAuthenticatedClient("test-admin", new[] { "Admin" }, Maliev.CustomerService.Domain.Authorization.CustomerPermissions.All);
     }
 
     [Fact]

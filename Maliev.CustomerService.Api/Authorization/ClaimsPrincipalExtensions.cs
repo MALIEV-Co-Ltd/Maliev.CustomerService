@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Maliev.CustomerService.Domain.Authorization;
 
 namespace Maliev.CustomerService.Api.Authorization;
 

@@ -4,6 +4,7 @@ using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Companies;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Application.Services;
+using Maliev.CustomerService.Domain.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;

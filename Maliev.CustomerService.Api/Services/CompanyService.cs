@@ -3,9 +3,8 @@ using System.Text.RegularExpressions;
 using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.Companies;
 using Maliev.CustomerService.Api.Models.Customers;
-using Maliev.CustomerService.Data;
-using Maliev.CustomerService.Data.Models;
 using Maliev.CustomerService.Domain.Entities;
+using Maliev.CustomerService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.CustomerService.Api.Services;

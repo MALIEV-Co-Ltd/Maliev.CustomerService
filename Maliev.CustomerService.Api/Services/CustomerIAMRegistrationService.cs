@@ -1,5 +1,5 @@
 using Maliev.Aspire.ServiceDefaults.IAM;
-using Maliev.CustomerService.Api.Authorization;
+using Maliev.CustomerService.Domain.Authorization;
 
 namespace Maliev.CustomerService.Api.Services;
 

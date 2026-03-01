@@ -1,7 +1,7 @@
-using Maliev.CustomerService.Data;
-using Maliev.CustomerService.Data.Interceptors;
-using Maliev.CustomerService.Data.Interfaces;
-using Maliev.CustomerService.Data.Security;
+using Maliev.CustomerService.Application.Interfaces;
+using Maliev.CustomerService.Infrastructure.Persistence;
+using Maliev.CustomerService.Infrastructure.Persistence.Interceptors;
+using Maliev.CustomerService.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Testcontainers.PostgreSql;
