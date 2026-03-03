@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Application.DTOs;
@@ -17,7 +18,6 @@ namespace Maliev.CustomerService.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("customer/v{version:apiVersion}/tier-settings")]
-[Authorize]
 public class TierSettingsController : ControllerBase
 {
     private readonly ICompanyTierSettingsRepository _repository;
@@ -43,6 +43,7 @@ public class TierSettingsController : ControllerBase
     /// <response code="200">Tier settings retrieved successfully</response>
     /// <response code="401">Unauthorized</response>
     [HttpGet]
+    [RequirePermission(CustomerPermissions.TiersRead)]
     [ProducesResponseType(typeof(List<TierSettingsResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<List<TierSettingsResponse>>> GetAll(CancellationToken cancellationToken = default)
@@ -76,6 +77,7 @@ public class TierSettingsController : ControllerBase
     /// <response code="400">Invalid request data</response>
     /// <response code="401">Unauthorized</response>
     [HttpPost]
+    [RequirePermission(CustomerPermissions.TiersManage)]
     [ProducesResponseType(typeof(TierSettingsResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -136,6 +138,7 @@ public class TierSettingsController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="404">Tier setting not found</response>
     [HttpGet("{id:guid}")]
+    [RequirePermission(CustomerPermissions.TiersRead)]
     [ProducesResponseType(typeof(TierSettingsResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -184,6 +187,7 @@ public class TierSettingsController : ControllerBase
     /// <response code="404">Tier setting not found</response>
     /// <response code="409">Version conflict</response>
     [HttpPut("{id:guid}")]
+    [RequirePermission(CustomerPermissions.TiersManage)]
     [ProducesResponseType(typeof(TierSettingsResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]

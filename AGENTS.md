@@ -126,21 +126,23 @@ public async Task<CustomerResponse> CreateAsync(CreateCustomerRequest request, C
 
 ## 3. Architecture & Patterns
 
-### Project Structure
-- **Maliev.CustomerService.Api:** Core business logic, Controllers, Services.
-- **Maliev.CustomerService.Data:** Entity Framework DbContext, Entities, Migrations.
-- **Maliev.CustomerService.Tests:** Unit and Integration tests.
+### Project Structure (Clean Architecture)
+- **Maliev.CustomerService.Api:** Controllers, Middleware.
+- **Maliev.CustomerService.Application:** Use cases, handlers, DTOs.
+- **Maliev.CustomerService.Domain:** Entities, interfaces, value objects.
+- **Maliev.CustomerService.Infrastructure:** EF Core, repositories, external services.
+- **Maliev.CustomerService.Tests:** Integration tests (Testcontainers).
 
 ### Key Libraries
 - **Entity Framework Core:** Data access. Use `Async` methods (`ToListAsync`, `FirstOrDefaultAsync`).
 - **MassTransit:** Event bus/messaging (`IPublishEndpoint`).
-- **Moq:** Mocking library for unit tests.
 - **xUnit:** Testing framework.
 
 ### Layering
-- **Controllers:** Minimal logic. Delegate to Services.
-- **Services:** Business logic, validation, transaction management.
-- **Repositories:** (Optional) Use DbContext directly in Services if Repository pattern is not strictly enforced, but follow existing patterns in the specific service file.
+- **Controllers:** Minimal logic. Delegate to Handlers/Services.
+- **Application Layer:** Use cases, CQRS handlers.
+- **Domain Layer:** Business logic, entities, interfaces.
+- **Infrastructure:** Data access, external integrations.
 
 ## 4. Testing Guidelines
 

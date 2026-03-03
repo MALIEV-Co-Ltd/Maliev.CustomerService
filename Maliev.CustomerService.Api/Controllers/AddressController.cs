@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Addresses;
@@ -16,7 +17,6 @@ namespace Maliev.CustomerService.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("customer/v{version:apiVersion}/addresses")]
-[Authorize]
 public class AddressController : ControllerBase
 {
     private readonly IAddressService _addressService;
@@ -45,6 +45,7 @@ public class AddressController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="503">Country Service unavailable</response>
     [HttpPost]
+    [RequirePermission(CustomerPermissions.AddressesManage)]
     [ProducesResponseType(typeof(AddressResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -122,6 +123,7 @@ public class AddressController : ControllerBase
     /// <response code="200">Addresses retrieved successfully</response>
     /// <response code="401">Unauthorized</response>
     [HttpGet]
+    [RequirePermission(CustomerPermissions.AddressesManage)]
     [ProducesResponseType(typeof(List<AddressResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<List<AddressResponse>>> GetByOwner(
@@ -154,6 +156,7 @@ public class AddressController : ControllerBase
     /// <response code="409">Version conflict</response>
     /// <response code="503">Country Service unavailable</response>
     [HttpPatch("{id:guid}")]
+    [RequirePermission(CustomerPermissions.AddressesManage)]
     [ProducesResponseType(typeof(AddressResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -266,6 +269,7 @@ public class AddressController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="404">Address not found</response>
     [HttpDelete("{id:guid}")]
+    [RequirePermission(CustomerPermissions.AddressesManage)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
