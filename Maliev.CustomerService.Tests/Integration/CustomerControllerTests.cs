@@ -34,7 +34,7 @@ public class CustomerControllerTests
 
         // Seed customer with PrincipalId
         using var dbContext = _factory.GetDbContext();
-        var customer = new Maliev.CustomerService.Data.Models.Customer
+        var customer = new Maliev.CustomerService.Domain.Entities.Customer
         {
             FirstName = "Lookup",
             LastName = "User",
@@ -93,7 +93,7 @@ public class CustomerControllerTests
 
         // Seed deleted customer with PrincipalId
         using var dbContext = _factory.GetDbContext();
-        var customer = new Maliev.CustomerService.Data.Models.Customer
+        var customer = new Maliev.CustomerService.Domain.Entities.Customer
         {
             FirstName = "Deleted",
             LastName = "User",

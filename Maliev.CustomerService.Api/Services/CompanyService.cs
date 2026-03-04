@@ -3,9 +3,8 @@ using System.Text.RegularExpressions;
 using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.Companies;
 using Maliev.CustomerService.Api.Models.Customers;
-using Maliev.CustomerService.Data;
-using Maliev.CustomerService.Data.Models;
 using Maliev.CustomerService.Domain.Entities;
+using Maliev.CustomerService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.CustomerService.Api.Services;
@@ -300,8 +299,8 @@ public class CompanyService : ICompanyService
         {
             company.UpdatedAt = DateTime.UtcNow;
 
-            // Set the original row version for optimistic concurrency
-            _context.Entry(company).Property(c => c.Version).OriginalValue = request.Version;
+            // Set the original xmin for optimistic concurrency
+            _context.Entry(company).Property(c => c.xmin).OriginalValue = request.xmin;
 
             // Create audit log
             var auditLog = new AuditLog

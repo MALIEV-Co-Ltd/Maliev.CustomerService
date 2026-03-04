@@ -119,8 +119,7 @@ public class Company
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
-    /// Row version for optimistic concurrency control
+    /// PostgreSQL xmin for optimistic concurrency
     /// </summary>
-    [Timestamp]
-    public byte[] Version { get; set; } = Array.Empty<byte>();
+    public uint xmin { get; set; }
 }

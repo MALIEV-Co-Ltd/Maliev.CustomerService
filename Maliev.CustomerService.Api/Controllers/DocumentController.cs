@@ -1,6 +1,8 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.CustomerService.Api.Models.Documents;
 using Maliev.CustomerService.Api.Services;
+using Maliev.CustomerService.Domain.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +15,6 @@ namespace Maliev.CustomerService.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("customer/v{version:apiVersion}/documents")]
-[Authorize]
 public class DocumentController : ControllerBase
 {
     private readonly IDocumentService _documentService;
@@ -39,6 +40,7 @@ public class DocumentController : ControllerBase
     /// Create a new document reference
     /// </summary>
     [HttpPost]
+    [RequirePermission(CustomerPermissions.DocumentsCreate)]
     [ProducesResponseType(typeof(DocumentResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -80,6 +82,7 @@ public class DocumentController : ControllerBase
     /// Get documents by owner
     /// </summary>
     [HttpGet]
+    [RequirePermission(CustomerPermissions.DocumentsRead)]
     [ProducesResponseType(typeof(List<DocumentResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetDocumentsByOwner([FromQuery] string ownerType, [FromQuery] Guid ownerId)
@@ -102,6 +105,7 @@ public class DocumentController : ControllerBase
     /// Update document (versioning)
     /// </summary>
     [HttpPatch("{id}")]
+    [RequirePermission(CustomerPermissions.DocumentsCreate)]
     [ProducesResponseType(typeof(DocumentResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -155,6 +159,7 @@ public class DocumentController : ControllerBase
     /// Mark document as complete
     /// </summary>
     [HttpPatch("{id}/complete")]
+    [RequirePermission(CustomerPermissions.DocumentsCreate)]
     [ProducesResponseType(typeof(DocumentResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -189,6 +194,7 @@ public class DocumentController : ControllerBase
     /// Delete document
     /// </summary>
     [HttpDelete("{id}")]
+    [RequirePermission(CustomerPermissions.DocumentsDelete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

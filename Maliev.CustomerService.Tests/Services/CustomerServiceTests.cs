@@ -1,7 +1,7 @@
 using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Models.IAM;
 using Maliev.CustomerService.Api.Services;
-using Maliev.CustomerService.Data.Models;
+using Maliev.CustomerService.Domain.Entities;
 using Maliev.CustomerService.Tests.Infrastructure;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
@@ -333,7 +333,7 @@ public class CustomerServiceTests
             FirstName = "Updated",
             Mobile = "+66-2-999-9999",
             Tier = "Silver",
-            Version = created.Version
+            xmin = created.xmin
         };
 
         // Act
@@ -359,7 +359,7 @@ public class CustomerServiceTests
         var updateRequest = new UpdateCustomerRequest
         {
             FirstName = "Updated",
-            Version = new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 }
+            xmin = 1
         };
 
         // Act & Assert
@@ -388,7 +388,7 @@ public class CustomerServiceTests
         var updateRequest = new UpdateCustomerRequest
         {
             FirstName = "Updated",
-            Version = new byte[] { 0, 0, 0, 0, 0, 0, 0, 99 } // Wrong version
+            xmin = 99 // Wrong version
         };
 
         // Act & Assert
@@ -418,7 +418,7 @@ public class CustomerServiceTests
         var updateRequest = new UpdateCustomerRequest
         {
             FirstName = "Updated Audit",
-            Version = created.Version
+            xmin = created.xmin
         };
 
         // Act

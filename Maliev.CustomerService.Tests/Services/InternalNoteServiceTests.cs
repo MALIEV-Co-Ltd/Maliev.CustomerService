@@ -1,6 +1,6 @@
 using Maliev.CustomerService.Api.Models.InternalNotes;
 using Maliev.CustomerService.Api.Services;
-using Maliev.CustomerService.Data.Models;
+using Maliev.CustomerService.Domain.Entities;
 using Maliev.CustomerService.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -60,7 +60,7 @@ public class InternalNoteServiceTests
         Assert.Equal("employee-123", result.CreatedBy);
         Assert.True(result.CreatedAt > DateTime.UtcNow.AddSeconds(-5) && result.CreatedAt <= DateTime.UtcNow.AddSeconds(5));
         Assert.True(result.UpdatedAt > DateTime.UtcNow.AddSeconds(-5) && result.UpdatedAt <= DateTime.UtcNow.AddSeconds(5));
-        Assert.NotEmpty(result.Version);
+        Assert.NotEqual(0u, result.xmin);
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public class InternalNoteServiceTests
         Assert.Equal("employee-456", result.CreatedBy);
         Assert.True(result.CreatedAt > DateTime.UtcNow.AddSeconds(-5) && result.CreatedAt <= DateTime.UtcNow.AddSeconds(5));
         Assert.True(result.UpdatedAt > DateTime.UtcNow.AddSeconds(-5) && result.UpdatedAt <= DateTime.UtcNow.AddSeconds(5));
-        Assert.NotEmpty(result.Version);
+        Assert.NotEqual(0u, result.xmin);
     }
 
     [Fact]
@@ -302,7 +302,7 @@ public class InternalNoteServiceTests
         var updateRequest = new UpdateInternalNoteRequest
         {
             NoteText = "Updated note text",
-            Version = created.Version
+            xmin = created.xmin
         };
 
         // Act
@@ -328,7 +328,7 @@ public class InternalNoteServiceTests
         var updateRequest = new UpdateInternalNoteRequest
         {
             NoteText = "Updated text",
-            Version = new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 }
+            xmin = 1
         };
 
         // Act & Assert
@@ -352,7 +352,7 @@ public class InternalNoteServiceTests
         var updateRequest = new UpdateInternalNoteRequest
         {
             NoteText = "Updated note",
-            Version = new byte[] { 0, 0, 0, 0, 0, 0, 0, 99 } // Wrong version
+            xmin = 99 // Wrong version
         };
 
         // Act & Assert
@@ -378,7 +378,7 @@ public class InternalNoteServiceTests
         var updateRequest = new UpdateInternalNoteRequest
         {
             NoteText = "Updated note for audit",
-            Version = created.Version
+            xmin = created.xmin
         };
 
         // Act

@@ -100,9 +100,9 @@ public class UpdateCustomerRequest
     public Guid? CompanyId { get; set; }
 
     /// <summary>
-    /// Row version for optimistic concurrency control (required)
+    /// PostgreSQL xmin for optimistic concurrency control (required)
     /// </summary>
-    [Required(ErrorMessage = "Version is required for updates")]
-    [JsonPropertyName("version")]
-    public byte[] Version { get; set; } = Array.Empty<byte>();
+    [Required(ErrorMessage = "xmin is required for updates")]
+    [JsonPropertyName("xmin")]
+    public uint xmin { get; set; }
 }

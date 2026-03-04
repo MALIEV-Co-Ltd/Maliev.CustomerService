@@ -1,7 +1,7 @@
 using Maliev.CustomerService.Api.Models.IAM;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Api.Services.External;
-using Maliev.CustomerService.Data;
+using Maliev.CustomerService.Infrastructure.Persistence;
 using Maliev.CustomerService.Tests.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;

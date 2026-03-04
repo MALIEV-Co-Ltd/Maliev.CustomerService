@@ -1,8 +1,10 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.NDAs;
 using Maliev.CustomerService.Api.Services;
+using Maliev.CustomerService.Domain.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,7 +17,6 @@ namespace Maliev.CustomerService.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("customer/v{version:apiVersion}/ndas")]
-[Authorize]
 public class NDAController : ControllerBase
 {
     private readonly INDAService _ndaService;
@@ -44,6 +45,7 @@ public class NDAController : ControllerBase
     /// <response code="400">Invalid request data</response>
     /// <response code="401">Unauthorized</response>
     [HttpPost]
+    [RequirePermission(CustomerPermissions.NdasCreate)]
     [ProducesResponseType(typeof(NDAResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -96,6 +98,7 @@ public class NDAController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="404">NDA not found</response>
     [HttpGet("{id:guid}")]
+    [RequirePermission(CustomerPermissions.NdasRead)]
     [ProducesResponseType(typeof(NDAResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -135,6 +138,7 @@ public class NDAController : ControllerBase
     /// <response code="200">NDAs found</response>
     /// <response code="401">Unauthorized</response>
     [HttpGet("customer/{customerId:guid}")]
+    [RequirePermission(CustomerPermissions.NdasRead)]
     [ProducesResponseType(typeof(List<NDAResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<List<NDAResponse>>> GetByCustomerId(Guid customerId, CancellationToken cancellationToken = default)
@@ -159,6 +163,7 @@ public class NDAController : ControllerBase
     /// <response code="200">History retrieved</response>
     /// <response code="401">Unauthorized</response>
     [HttpGet("{id:guid}/history")]
+    [RequirePermission(CustomerPermissions.NdasRead)]
     [ProducesResponseType(typeof(List<NDAAuditLogResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<List<NDAAuditLogResponse>>> GetHistory(Guid id)
@@ -189,6 +194,7 @@ public class NDAController : ControllerBase
     /// <response code="409">Version conflict</response>
     /// <response code="422">Invalid lifecycle transition</response>
     [HttpPatch("{id:guid}/status")]
+    [RequirePermission(CustomerPermissions.NdasUpdate)]
     [ProducesResponseType(typeof(NDAResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -289,6 +295,7 @@ public class NDAController : ControllerBase
     /// <response code="404">NDA not found</response>
     /// <response code="409">Version conflict</response>
     [HttpDelete("{id:guid}")]
+    [RequirePermission(CustomerPermissions.NdasDelete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -299,7 +306,7 @@ public class NDAController : ControllerBase
         {
             var (actorId, actorType) = User.GetActorInfo();
             var actorName = User.GetActorName();
-            var success = await _ndaService.DeleteAsync(id, request.Version, actorId, actorType, actorName);
+            var success = await _ndaService.DeleteAsync(id, request.xmin, actorId, actorType, actorName);
 
             if (!success)
             {

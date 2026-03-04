@@ -1,8 +1,10 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Application.DTOs;
 using Maliev.CustomerService.Application.Interfaces;
+using Maliev.CustomerService.Domain.Authorization;
 using Maliev.CustomerService.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,7 +17,6 @@ namespace Maliev.CustomerService.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("customer/v{version:apiVersion}/companies/{companyId:guid}/documents")]
-[Authorize]
 public class CompanyDocumentsController : ControllerBase
 {
     private readonly ICompanyDocumentRepository _repository;
@@ -48,6 +49,7 @@ public class CompanyDocumentsController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="404">Company not found</response>
     [HttpGet]
+    [RequirePermission(CustomerPermissions.CompaniesRead)]
     [ProducesResponseType(typeof(List<CompanyDocumentResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -93,6 +95,7 @@ public class CompanyDocumentsController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="404">Company not found</response>
     [HttpPost]
+    [RequirePermission(CustomerPermissions.CompaniesManage)]
     [ProducesResponseType(typeof(CompanyDocumentResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -160,6 +163,7 @@ public class CompanyDocumentsController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="404">Document not found</response>
     [HttpGet("{id:guid}")]
+    [RequirePermission(CustomerPermissions.CompaniesRead)]
     [ProducesResponseType(typeof(CompanyDocumentResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -204,6 +208,7 @@ public class CompanyDocumentsController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="404">Document not found</response>
     [HttpDelete("{id:guid}")]
+    [RequirePermission(CustomerPermissions.CompaniesManage)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]

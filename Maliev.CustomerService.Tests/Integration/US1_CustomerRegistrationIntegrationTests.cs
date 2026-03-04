@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Models.IAM;
+using Maliev.CustomerService.Domain.Authorization;
 using Maliev.CustomerService.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -22,6 +23,21 @@ public class US1_CustomerRegistrationIntegrationTests
 
     private static readonly string[] EmployeeRoles = { "roles.customer.representative" };
     private static readonly string[] CustomerRoles = { "roles.customer.viewer" };
+    private static readonly string[] CustomerPermissionsArr =
+    {
+        CustomerPermissions.CustomersRead,
+        CustomerPermissions.CustomersUpdate,
+        CustomerPermissions.CustomersList
+    };
+    private static readonly string[] EmployeePermissions =
+    {
+        CustomerPermissions.CustomersCreate,
+        CustomerPermissions.CustomersRead,
+        CustomerPermissions.CustomersUpdate,
+        CustomerPermissions.CustomersDelete,
+        CustomerPermissions.CustomersList,
+        CustomerPermissions.CustomersSearch
+    };
 
     public US1_CustomerRegistrationIntegrationTests(TestWebApplicationFactory factory)
     {
@@ -41,7 +57,7 @@ public class US1_CustomerRegistrationIntegrationTests
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles, EmployeePermissions);
         var email = UniqueEmail("john.doe");
         var request = new
         {
@@ -83,7 +99,7 @@ public class US1_CustomerRegistrationIntegrationTests
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles, EmployeePermissions);
         var duplicateEmail = UniqueEmail("jane.smith");
         var request1 = new
         {
@@ -129,7 +145,7 @@ public class US1_CustomerRegistrationIntegrationTests
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles, EmployeePermissions);
         var email = UniqueEmail("alice.johnson");
         var createRequest = new
         {
@@ -181,7 +197,7 @@ public class US1_CustomerRegistrationIntegrationTests
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles, EmployeePermissions);
         var email = UniqueEmail("bob.wilson");
         var createRequest = new
         {
@@ -202,7 +218,7 @@ public class US1_CustomerRegistrationIntegrationTests
         {
             mobile = "+6622222222",
             lastName = "Wilson-Updated",
-            version = createdCustomer!.Version
+            xmin = createdCustomer!.xmin
         };
 
         // Act
@@ -235,7 +251,7 @@ public class US1_CustomerRegistrationIntegrationTests
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var employeeClient = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
+        var employeeClient = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles, EmployeePermissions);
         var email = UniqueEmail("charlie.brown");
         var createRequest = new
         {
@@ -253,11 +269,11 @@ public class US1_CustomerRegistrationIntegrationTests
         var createdCustomer = await createResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Create customer client with the customer's ID
-        var customerClient = _factory.CreateAuthenticatedClient(createdCustomer!.Id.ToString(), CustomerRoles);
+        var customerClient = _factory.CreateAuthenticatedClient(createdCustomer!.Id.ToString(), CustomerRoles, CustomerPermissionsArr);
         var updateRequest = new
         {
             mobile = "+6624444444",
-            version = createdCustomer.Version
+            xmin = createdCustomer.xmin
         };
 
         // Act
@@ -288,7 +304,7 @@ public class US1_CustomerRegistrationIntegrationTests
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles, EmployeePermissions);
         var email = UniqueEmail("diana.prince");
         var createRequest = new
         {
@@ -309,7 +325,7 @@ public class US1_CustomerRegistrationIntegrationTests
         {
             preferredLanguage = "th",
             timezone = "Asia/Singapore",
-            version = createdCustomer!.Version
+            xmin = createdCustomer!.xmin
         };
 
         // Act
@@ -341,7 +357,7 @@ public class US1_CustomerRegistrationIntegrationTests
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles, EmployeePermissions);
         var email = UniqueEmail("edward.norton");
         var createRequest = new
         {
@@ -366,7 +382,7 @@ public class US1_CustomerRegistrationIntegrationTests
                 { "sms_opt_in", false },
                 { "marketing_opt_in", true }
             },
-            version = createdCustomer!.Version
+            xmin = createdCustomer!.xmin
         };
 
         // Act
@@ -399,7 +415,7 @@ public class US1_CustomerRegistrationIntegrationTests
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles, EmployeePermissions);
 
         // Create two customers
         var request1 = new CreateCustomerRequest
@@ -500,7 +516,7 @@ public class US1_CustomerRegistrationIntegrationTests
 
         var client = factoryWithIAM.CreateClient();
         // Manually authenticate since we can't use helper from factoryWithIAM easily if it's not castable
-        var token = _factory.CreateTestJwtToken("test-employee", EmployeeRoles);
+        var token = _factory.CreateTestJwtToken("test-employee", EmployeeRoles, EmployeePermissions);
         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
 
         var email = UniqueEmail("iam.user");

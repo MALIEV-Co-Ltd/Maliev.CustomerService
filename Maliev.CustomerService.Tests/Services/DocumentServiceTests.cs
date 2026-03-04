@@ -1,7 +1,7 @@
 using Maliev.CustomerService.Api.Models.Documents;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Api.Services.External;
-using Maliev.CustomerService.Data.Models;
+using Maliev.CustomerService.Domain.Entities;
 using Maliev.CustomerService.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -225,7 +225,7 @@ public class DocumentServiceTests
         {
             FileReference = "file-ref-2",
             Filename = "nda-v2.pdf",
-            RowVersion = created.RowVersion
+            xmin = created.xmin
         };
 
         // Act
@@ -266,7 +266,7 @@ public class DocumentServiceTests
         {
             FileReference = "invalid-ref",
             Filename = "updated.pdf",
-            RowVersion = created.RowVersion
+            xmin = created.xmin
         };
 
         // Act & Assert
@@ -287,7 +287,7 @@ public class DocumentServiceTests
         {
             FileReference = "file-ref",
             Filename = "updated.pdf",
-            RowVersion = new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 }
+            xmin = 1
         };
 
         // Act & Assert
@@ -317,7 +317,7 @@ public class DocumentServiceTests
         {
             FileReference = "file-ref-2",
             Filename = "nda-v2.pdf",
-            RowVersion = created.RowVersion
+            xmin = created.xmin
         };
 
         // Act

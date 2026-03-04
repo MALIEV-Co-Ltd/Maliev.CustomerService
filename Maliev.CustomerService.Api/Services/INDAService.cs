@@ -63,7 +63,7 @@ public interface INDAService
     /// <summary>
     /// Deletes an NDA record
     /// </summary>
-    Task<bool> DeleteAsync(Guid id, byte[] version, string actorId, string actorType, string actorName, CancellationToken cancellationToken = default);
+    Task<bool> DeleteAsync(Guid id, uint xmin, string actorId, string actorType, string actorName, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves audit history for a specific NDA

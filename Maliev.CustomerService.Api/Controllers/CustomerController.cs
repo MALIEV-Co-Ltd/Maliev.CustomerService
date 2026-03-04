@@ -4,6 +4,7 @@ using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Services;
+using Maliev.CustomerService.Domain.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +17,6 @@ namespace Maliev.CustomerService.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("customer/v{version:apiVersion}/customers")]
-[Authorize]
 public class CustomerController : ControllerBase
 {
     private readonly ICustomerService _customerService;
@@ -47,6 +47,7 @@ public class CustomerController : ControllerBase
     /// <response code="409">Duplicate email</response>
     /// <response code="422">Domain validation failure</response>
     [HttpPost]
+    [RequirePermission(CustomerPermissions.CustomersCreate)]
     [ProducesResponseType(typeof(CustomerResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -140,6 +141,7 @@ public class CustomerController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="404">Customer not found</response>
     [HttpGet("{id:guid}")]
+    [RequirePermission(CustomerPermissions.CustomersRead)]
     [ProducesResponseType(typeof(CustomerResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -227,6 +229,7 @@ public class CustomerController : ControllerBase
     /// <response code="409">Version conflict or duplicate email</response>
     /// <response code="422">Domain validation failure</response>
     [HttpPatch("{id:guid}")]
+    [RequirePermission(CustomerPermissions.CustomersUpdate)]
     [ProducesResponseType(typeof(CustomerResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -331,6 +334,7 @@ public class CustomerController : ControllerBase
     /// Gets all customers with optional filtering and pagination (T120, T127)
     /// </summary>
     [HttpGet]
+    [RequirePermission(CustomerPermissions.CustomersList)]
     [ProducesResponseType(typeof(PaginatedResponse<CustomerResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetAll(
@@ -379,6 +383,7 @@ public class CustomerController : ControllerBase
     /// Gets customer preferences for compliance/audit purposes (T123)
     /// </summary>
     [HttpGet("preferences")]
+    [RequirePermission(CustomerPermissions.CustomersList)]
     [ProducesResponseType(typeof(PaginatedResponse<GetCustomerPreferencesResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetPreferences(
@@ -412,6 +417,7 @@ public class CustomerController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="404">Customer not found</response>
     [HttpDelete("{id:guid}")]
+    [RequirePermission(CustomerPermissions.CustomersDelete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -453,6 +459,7 @@ public class CustomerController : ControllerBase
     /// <response code="200">Check completed successfully</response>
     /// <response code="401">Unauthorized</response>
     [HttpGet("check-email")]
+    [RequirePermission(CustomerPermissions.CustomersRead)]
     [ProducesResponseType(typeof(EmailExistsResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<EmailExistsResponse>> CheckEmail([FromQuery] string email, CancellationToken cancellationToken = default)
@@ -482,6 +489,7 @@ public class CustomerController : ControllerBase
     /// Gets activity history for a customer with pagination or skip/take
     /// </summary>
     [HttpGet("{id:guid}/history")]
+    [RequirePermission(CustomerPermissions.CustomersRead)]
     [ProducesResponseType(typeof(PaginatedResponse<CustomerActivityResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PaginatedResponse<CustomerActivityResponse>>> GetHistory(
         Guid id,

@@ -2,6 +2,6 @@
   <Project Path="Maliev.CustomerService.Api/Maliev.CustomerService.Api.csproj" />
   <Project Path="Maliev.CustomerService.Application/Maliev.CustomerService.Application.csproj" />
   <Project Path="Maliev.CustomerService.Domain/Maliev.CustomerService.Domain.csproj" />
-  <Project Path="Maliev.CustomerService.Data/Maliev.CustomerService.Data.csproj" />
+  <Project Path="Maliev.CustomerService.Infrastructure/Maliev.CustomerService.Infrastructure.csproj" />
   <Project Path="Maliev.CustomerService.Tests/Maliev.CustomerService.Tests.csproj" />
 </Solution>

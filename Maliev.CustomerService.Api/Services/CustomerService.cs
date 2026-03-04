@@ -3,9 +3,8 @@ using System.Text.RegularExpressions;
 using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Models.IAM;
-using Maliev.CustomerService.Data;
-using Maliev.CustomerService.Data.Models;
 using Maliev.CustomerService.Domain.Entities;
+using Maliev.CustomerService.Infrastructure.Persistence;
 using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Customers;
 using MassTransit;
@@ -506,8 +505,8 @@ public class CustomerService : ICustomerService
         {
             customer.UpdatedAt = DateTime.UtcNow;
 
-            // Set the original row version for optimistic concurrency
-            _context.Entry(customer).Property(c => c.Version).OriginalValue = request.Version;
+            // Set the original xmin for optimistic concurrency
+            _context.Entry(customer).Property(c => c.xmin).OriginalValue = request.xmin;
 
             // Create audit log
             var auditLog = new AuditLog

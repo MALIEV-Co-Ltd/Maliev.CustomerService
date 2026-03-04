@@ -122,8 +122,8 @@ public class CompanyResponse
     public DateTime UpdatedAt { get; set; }
 
     /// <summary>
-    /// Row version for optimistic concurrency control
+    /// PostgreSQL xmin for optimistic concurrency control
     /// </summary>
-    [JsonPropertyName("version")]
-    public byte[] Version { get; set; } = Array.Empty<byte>();
+    [JsonPropertyName("xmin")]
+    public uint xmin { get; set; }
 }

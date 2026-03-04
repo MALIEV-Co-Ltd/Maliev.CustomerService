@@ -1,9 +1,11 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Companies;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Application.Services;
+using Maliev.CustomerService.Domain.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +18,6 @@ namespace Maliev.CustomerService.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("customer/v{version:apiVersion}/companies")]
-[Authorize]
 public class CompanyController : ControllerBase
 {
     private readonly ICompanyService _companyService;
@@ -50,6 +51,7 @@ public class CompanyController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="422">Invalid VAT number format</response>
     [HttpPost]
+    [RequirePermission(CustomerPermissions.CompaniesManage)]
     [ProducesResponseType(typeof(CompanyResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -113,6 +115,7 @@ public class CompanyController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="404">Company not found</response>
     [HttpGet("{id:guid}")]
+    [RequirePermission(CustomerPermissions.CompaniesRead)]
     [ProducesResponseType(typeof(CompanyResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -165,6 +168,7 @@ public class CompanyController : ControllerBase
     /// <response code="200">Companies retrieved successfully</response>
     /// <response code="401">Unauthorized</response>
     [HttpGet]
+    [RequirePermission(CustomerPermissions.CompaniesRead)]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<object>> GetAll(
@@ -199,6 +203,7 @@ public class CompanyController : ControllerBase
     /// <response code="200">Search results retrieved successfully</response>
     /// <response code="401">Unauthorized</response>
     [HttpGet("search")]
+    [RequirePermission(CustomerPermissions.CompaniesRead)]
     [ProducesResponseType(typeof(List<CompanySearchResultDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<List<CompanySearchResultDto>>> Search(
@@ -238,6 +243,7 @@ public class CompanyController : ControllerBase
     /// <response code="409">Version conflict</response>
     /// <response code="422">Invalid VAT number format</response>
     [HttpPatch("{id:guid}")]
+    [RequirePermission(CustomerPermissions.CompaniesManage)]
     [ProducesResponseType(typeof(CompanyResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -325,6 +331,7 @@ public class CompanyController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="404">Company not found</response>
     [HttpGet("{id:guid}/customers")]
+    [RequirePermission(CustomerPermissions.CompaniesRead)]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
@@ -380,6 +387,7 @@ public class CompanyController : ControllerBase
     /// <response code="401">Unauthorized</response>
     /// <response code="404">Company not found</response>
     [HttpPost("{id:guid}/calculate-tier")]
+    [RequirePermission(CustomerPermissions.TiersManage)]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]

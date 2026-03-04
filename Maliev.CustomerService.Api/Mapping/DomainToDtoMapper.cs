@@ -5,7 +5,6 @@ using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Models.Documents;
 using Maliev.CustomerService.Api.Models.InternalNotes;
 using Maliev.CustomerService.Api.Models.NDAs;
-using Maliev.CustomerService.Data.Models;
 using Maliev.CustomerService.Domain.Entities;
 
 namespace Maliev.CustomerService.Api.Mapping;
@@ -47,7 +46,7 @@ public static class DomainToDtoMapper
 
             CreatedAt = customer.CreatedAt,
             UpdatedAt = customer.UpdatedAt,
-            Version = customer.Version
+            xmin = customer.xmin
         };
     }
 
@@ -78,7 +77,7 @@ public static class DomainToDtoMapper
             StockSymbol = company.StockSymbol,
             CreatedAt = company.CreatedAt,
             UpdatedAt = company.UpdatedAt,
-            Version = company.Version
+            xmin = company.xmin
         };
     }
 
@@ -106,7 +105,7 @@ public static class DomainToDtoMapper
             RecipientPhone = address.RecipientPhone,
             CreatedAt = address.CreatedAt,
             UpdatedAt = address.UpdatedAt,
-            Version = address.Version
+            xmin = address.xmin
         };
     }
 
@@ -146,7 +145,7 @@ public static class DomainToDtoMapper
             ExpiresAt = nda.ExpiresAt,
             CreatedAt = nda.CreatedAt,
             UpdatedAt = nda.UpdatedAt,
-            Version = nda.Version
+            xmin = nda.xmin
         };
     }
 
@@ -164,7 +163,7 @@ public static class DomainToDtoMapper
             CreatedBy = note.CreatedBy,
             CreatedAt = note.CreatedAt,
             UpdatedAt = note.UpdatedAt,
-            Version = note.Version
+            xmin = note.xmin
         };
     }
 
@@ -181,7 +180,7 @@ public static class DomainToDtoMapper
             CreatedBy = comment.CreatedBy,
             CreatedByName = comment.CreatedByName,
             CreatedAt = comment.CreatedAt,
-            Version = comment.Version
+            xmin = comment.xmin
         };
     }
 
@@ -207,7 +206,7 @@ public static class DomainToDtoMapper
             SignedAt = document.SignedAt,
             CreatedAt = document.CreatedAt,
             UpdatedAt = document.UpdatedAt,
-            RowVersion = document.RowVersion
+            xmin = document.xmin
         };
     }
 }

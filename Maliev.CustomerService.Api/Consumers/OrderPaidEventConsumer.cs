@@ -1,5 +1,6 @@
 using Maliev.CustomerService.Application.Interfaces;
 using Maliev.CustomerService.Application.Services;
+using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Customers;
 using Maliev.MessagingContracts.Contracts.Orders;
 using MassTransit;
@@ -92,7 +93,7 @@ public class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
                 var tierChangedEvent = new CompanyTierChangedEvent(
                     MessageId: Guid.NewGuid(),
                     MessageName: nameof(CompanyTierChangedEvent),
-                    MessageType: Maliev.MessagingContracts.MessageType.Event,
+                    MessageType: MessageType.Event,
                     MessageVersion: "1.0",
                     PublishedBy: "CustomerService",
                     ConsumedBy: Array.Empty<string>(),

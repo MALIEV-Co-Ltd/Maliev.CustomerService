@@ -1,8 +1,8 @@
 using System.Text.Json;
 using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.NDAs;
-using Maliev.CustomerService.Data;
-using Maliev.CustomerService.Data.Models;
+using Maliev.CustomerService.Domain.Entities;
+using Maliev.CustomerService.Infrastructure.Persistence;
 using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Nda;
 using MassTransit;
@@ -223,7 +223,7 @@ public class NDAService : INDAService
 
         nda.UpdatedAt = DateTime.UtcNow;
 
-        _context.Entry(nda).Property(n => n.Version).OriginalValue = request.Version;
+        _context.Entry(nda).Property(n => n.xmin).OriginalValue = request.xmin;
 
         var auditLog = new AuditLog
         {
@@ -391,7 +391,7 @@ public class NDAService : INDAService
     }
 
     /// <inheritdoc />
-    public async Task<bool> DeleteAsync(Guid id, byte[] version, string actorId, string actorType, string actorName, CancellationToken cancellationToken = default)
+    public async Task<bool> DeleteAsync(Guid id, uint xmin, string actorId, string actorType, string actorName, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Deleting NDA {NDAId} by actor {ActorId} ({ActorName} - {ActorType})",
             id, actorId, actorName, actorType);
@@ -405,7 +405,7 @@ public class NDAService : INDAService
             return false;
         }
 
-        _context.Entry(nda).Property(n => n.Version).OriginalValue = version;
+        _context.Entry(nda).Property(n => n.xmin).OriginalValue = xmin;
         _context.NDARecords.Remove(nda);
 
         var auditLog = new AuditLog

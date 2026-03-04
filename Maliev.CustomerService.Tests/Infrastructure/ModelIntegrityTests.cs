@@ -1,7 +1,7 @@
-using Maliev.CustomerService.Data;
-using Maliev.CustomerService.Data.Interceptors;
-using Maliev.CustomerService.Data.Interfaces;
-using Maliev.CustomerService.Data.Security;
+using Maliev.CustomerService.Application.Interfaces;
+using Maliev.CustomerService.Infrastructure.Persistence;
+using Maliev.CustomerService.Infrastructure.Persistence.Interceptors;
+using Maliev.CustomerService.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -40,6 +40,6 @@ public class ModelIntegrityTests
 
         Assert.False(hasChanges,
             "The EF Core model for 'CustomerDbContext' has changed but no migration has been added. " +
-            "Run 'dotnet ef migrations add <Name> --project Maliev.CustomerService.Data --startup-project Maliev.CustomerService.Api' to fix this.");
+            "Run 'dotnet ef migrations add <Name> --project Maliev.CustomerService.Infrastructure --startup-project Maliev.CustomerService.Api' to fix this.");
     }
 }

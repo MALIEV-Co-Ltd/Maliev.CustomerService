@@ -23,9 +23,9 @@ public class UpdateDocumentRequest
     public string Filename { get; set; } = string.Empty;
 
     /// <summary>
-    /// Row version for optimistic concurrency control
+    /// PostgreSQL xmin for optimistic concurrency control
     /// </summary>
-    [Required(ErrorMessage = "Row version is required for updates")]
-    [JsonPropertyName("rowVersion")]
-    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+    [Required(ErrorMessage = "xmin is required for updates")]
+    [JsonPropertyName("xmin")]
+    public uint xmin { get; set; }
 }

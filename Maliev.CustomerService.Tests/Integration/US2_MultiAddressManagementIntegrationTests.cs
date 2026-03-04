@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Addresses;
 using Maliev.CustomerService.Api.Models.Customers;
+using Maliev.CustomerService.Domain.Authorization;
 using Maliev.CustomerService.Tests.Infrastructure;
 using Moq;
 using Xunit;
@@ -20,6 +21,14 @@ public class US2_MultiAddressManagementIntegrationTests
     private readonly string _testId;
 
     private static readonly string[] EmployeeRoles = { "roles.customer.representative" };
+    private static readonly string[] EmployeePermissions =
+    {
+        CustomerPermissions.CustomersCreate,
+        CustomerPermissions.CustomersRead,
+        CustomerPermissions.CustomersUpdate,
+        CustomerPermissions.CustomersList,
+        CustomerPermissions.AddressesManage
+    };
 
     public US2_MultiAddressManagementIntegrationTests(TestWebApplicationFactory factory)
     {
@@ -38,7 +47,7 @@ public class US2_MultiAddressManagementIntegrationTests
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles, EmployeePermissions);
 
         // Mock Country Service to validate country ID
         var mockCountryId = Guid.NewGuid();
@@ -112,7 +121,7 @@ public class US2_MultiAddressManagementIntegrationTests
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles, EmployeePermissions);
 
         var mockCountryId1 = Guid.NewGuid();
         var mockCountryId2 = Guid.NewGuid();
@@ -199,7 +208,7 @@ public class US2_MultiAddressManagementIntegrationTests
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles, EmployeePermissions);
 
         var mockCountryId = Guid.NewGuid();
         _factory.MockCountryService
@@ -241,7 +250,7 @@ public class US2_MultiAddressManagementIntegrationTests
         {
             postalCode = "10330",
             stateProvince = "Nonthaburi",
-            version = createdAddress!.Version
+            xmin = createdAddress!.xmin
         };
 
         // Act
@@ -266,7 +275,7 @@ public class US2_MultiAddressManagementIntegrationTests
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles, EmployeePermissions);
 
         var mockCountryId = Guid.NewGuid();
         _factory.MockCountryService
@@ -358,7 +367,7 @@ public class US2_MultiAddressManagementIntegrationTests
     {
         // Arrange
         await _factory.ClearDatabaseAsync();
-        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles);
+        var client = _factory.CreateAuthenticatedClient("test-employee", EmployeeRoles, EmployeePermissions);
 
         var mockCountryId = Guid.NewGuid();
         _factory.MockCountryService

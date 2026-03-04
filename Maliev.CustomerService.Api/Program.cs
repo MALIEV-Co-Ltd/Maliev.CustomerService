@@ -1,7 +1,9 @@
 using Maliev.CustomerService.Api.Services;
-using Maliev.CustomerService.Data;
+using Maliev.CustomerService.Infrastructure.Persistence;
+using Maliev.CustomerService.Infrastructure.Persistence.Interceptors;
+using Maliev.CustomerService.Infrastructure.Persistence.Repositories;
+using Maliev.CustomerService.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 // Initialize bootstrap logging
 using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
@@ -50,8 +52,8 @@ try
     builder.Services.AddSingleton<Maliev.CustomerService.Api.Services.MetricsService>();
 
     // Security Services
-    builder.Services.AddSingleton<Maliev.CustomerService.Data.Interfaces.IEncryptionService, Maliev.CustomerService.Data.Security.EncryptionService>();
-    builder.Services.AddSingleton<Maliev.CustomerService.Data.Interceptors.EncryptionInterceptor>();
+    builder.Services.AddSingleton<Maliev.CustomerService.Application.Interfaces.IEncryptionService, EncryptionService>();
+    builder.Services.AddSingleton<EncryptionInterceptor>();
 
     // Application Services
     builder.Services.AddScoped<Maliev.CustomerService.Api.Services.ICustomerService, Maliev.CustomerService.Api.Services.CustomerService>();
@@ -62,10 +64,10 @@ try
     builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IInternalNoteService, Maliev.CustomerService.Api.Services.InternalNoteService>();
 
     // Tier Calculation Services
-    builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.ICompanyRepository, Maliev.CustomerService.Data.Repositories.CompanyRepository>();
-    builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.ICompanyTierSettingsRepository, Maliev.CustomerService.Data.Repositories.CompanyTierSettingsRepository>();
-    builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.ICompanyDocumentRepository, Maliev.CustomerService.Data.Repositories.CompanyDocumentRepository>();
-    builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.IOrderRepository, Maliev.CustomerService.Data.Repositories.OrderRepository>();
+    builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.ICompanyRepository, CompanyRepository>();
+    builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.ICompanyTierSettingsRepository, CompanyTierSettingsRepository>();
+    builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.ICompanyDocumentRepository, CompanyDocumentRepository>();
+    builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.IOrderRepository, OrderRepository>();
     builder.Services.AddScoped<Maliev.CustomerService.Application.Services.ITierCalculationService, Maliev.CustomerService.Application.Services.TierCalculationService>();
     builder.Services.AddScoped<Maliev.CustomerService.Application.Services.IYearEndTierProcessor, Maliev.CustomerService.Application.Services.YearEndTierProcessor>();
 

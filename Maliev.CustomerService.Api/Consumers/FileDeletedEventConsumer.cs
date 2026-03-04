@@ -1,5 +1,5 @@
-using Maliev.CustomerService.Data;
-using Maliev.CustomerService.Data.Models;
+using Maliev.CustomerService.Domain.Entities;
+using Maliev.CustomerService.Infrastructure.Persistence;
 using Maliev.MessagingContracts.Contracts.Uploads;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
