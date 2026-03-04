@@ -148,7 +148,7 @@ public class ExtendedControllerTests
         var updateRequest = new Api.Models.Companies.UpdateCompanyRequest
         {
             Name = "Updated Company",
-            Version = company!.Version
+            xmin = company!.xmin
         };
 
         var response = await client.PatchAsJsonAsync($"/customer/v1/companies/{company.Id}", updateRequest);
@@ -247,14 +247,14 @@ public class ExtendedControllerTests
             StateProvince = "BKK",
             PostalCode = "10110",
             CountryId = countryId,
-            Version = new byte[] { 1 }
+            xmin = 1
         });
         await dbContext.SaveChangesAsync();
 
         var request = new Api.Models.Addresses.UpdateAddressRequest
         {
             AddressLine1 = "456 New St",
-            Version = new byte[] { 2 }
+            xmin = 2
         };
 
         var response = await client.PatchAsJsonAsync($"/customer/v1/addresses/{addressId}", request);
@@ -390,14 +390,14 @@ public class ExtendedControllerTests
             OwnerId = Guid.NewGuid(),
             NoteText = "Original text",
             CreatedBy = "test-user",
-            Version = new byte[] { 1 }
+            xmin = 1
         });
         await dbContext.SaveChangesAsync();
 
         var request = new Api.Models.InternalNotes.UpdateInternalNoteRequest
         {
             NoteText = "Updated text",
-            Version = new byte[] { 2 }
+            xmin = 2
         };
 
         var response = await client.PatchAsJsonAsync($"/customer/v1/internal-notes/{noteId}", request);
@@ -561,7 +561,7 @@ public class ExtendedControllerTests
             ExpiresAt = DateTime.UtcNow.AddYears(1),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
-            Version = new byte[] { 1 }
+            xmin = 1
         });
         await dbContext.SaveChangesAsync();
 
@@ -570,7 +570,7 @@ public class ExtendedControllerTests
             Status = NDAStatus.Signed,
             SignedBy = "John Doe",
             SignedAt = DateTime.UtcNow,
-            Version = new byte[] { 2 }
+            xmin = 2
         };
 
         var response = await client.PatchAsJsonAsync($"/customer/v1/ndas/{ndaId}/status", request);

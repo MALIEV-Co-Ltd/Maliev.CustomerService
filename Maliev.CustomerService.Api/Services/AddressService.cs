@@ -291,8 +291,8 @@ public class AddressService : IAddressService
             address.UpdatedAt = DateTime.UtcNow;
 
 
-            // Set the original row version for optimistic concurrency
-            _context.Entry(address).Property(a => a.Version).OriginalValue = request.Version;
+            // Set the original xmin for optimistic concurrency
+            _context.Entry(address).Property(a => a.xmin).OriginalValue = request.xmin;
 
             // Create audit log
             var auditLog = new AuditLog

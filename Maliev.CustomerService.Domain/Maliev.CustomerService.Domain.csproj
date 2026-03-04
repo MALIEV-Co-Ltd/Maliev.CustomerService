@@ -7,7 +7,5 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
-
-  <!-- Domain layer has ZERO external dependencies - no NuGet packages -->
-
+  
 </Project>

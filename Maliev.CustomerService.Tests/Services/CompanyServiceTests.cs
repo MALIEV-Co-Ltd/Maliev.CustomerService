@@ -220,7 +220,7 @@ public class CompanyServiceTests
             Name = "Updated Company Name",
             ContactEmail = "new@test.com",
             Tier = "Silver",
-            Version = created.Version
+            xmin = created.xmin
         };
 
         // Act
@@ -253,7 +253,7 @@ public class CompanyServiceTests
         var updateRequest = new UpdateCompanyRequest
         {
             VatNumber = "INVALID-FORMAT",
-            Version = created.Version
+            xmin = created.xmin
         };
 
         // Act & Assert
@@ -273,7 +273,7 @@ public class CompanyServiceTests
         var updateRequest = new UpdateCompanyRequest
         {
             Name = "Updated Name",
-            Version = new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 }
+            xmin = 1
         };
 
         // Act & Assert
@@ -297,7 +297,7 @@ public class CompanyServiceTests
         var updateRequest = new UpdateCompanyRequest
         {
             Name = "Updated Name",
-            Version = new byte[] { 0, 0, 0, 0, 0, 0, 0, 99 } // Wrong version
+            xmin = 99 // Wrong version
         };
 
         // Act & Assert
@@ -323,7 +323,7 @@ public class CompanyServiceTests
         var updateRequest = new UpdateCompanyRequest
         {
             Name = "Updated Audit Company",
-            Version = created.Version
+            xmin = created.xmin
         };
 
         // Act

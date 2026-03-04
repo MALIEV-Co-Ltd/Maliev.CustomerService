@@ -218,7 +218,7 @@ public class US1_CustomerRegistrationIntegrationTests
         {
             mobile = "+6622222222",
             lastName = "Wilson-Updated",
-            version = createdCustomer!.Version
+            xmin = createdCustomer!.xmin
         };
 
         // Act
@@ -273,7 +273,7 @@ public class US1_CustomerRegistrationIntegrationTests
         var updateRequest = new
         {
             mobile = "+6624444444",
-            version = createdCustomer.Version
+            xmin = createdCustomer.xmin
         };
 
         // Act
@@ -325,7 +325,7 @@ public class US1_CustomerRegistrationIntegrationTests
         {
             preferredLanguage = "th",
             timezone = "Asia/Singapore",
-            version = createdCustomer!.Version
+            xmin = createdCustomer!.xmin
         };
 
         // Act
@@ -382,7 +382,7 @@ public class US1_CustomerRegistrationIntegrationTests
                 { "sms_opt_in", false },
                 { "marketing_opt_in", true }
             },
-            version = createdCustomer!.Version
+            xmin = createdCustomer!.xmin
         };
 
         // Act

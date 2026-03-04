@@ -208,7 +208,7 @@ public class DocumentService : IDocumentService
         document.Version++;
         document.UpdatedAt = DateTime.UtcNow;
 
-        _context.Entry(document).Property(d => d.RowVersion).OriginalValue = request.RowVersion;
+        _context.Entry(document).Property(d => d.xmin).OriginalValue = request.xmin;
 
         var auditLog = new AuditLog
         {

@@ -16,9 +16,9 @@ public class UpdateInternalNoteRequest
     public string NoteText { get; set; } = string.Empty;
 
     /// <summary>
-    /// Row version for optimistic concurrency control
+    /// PostgreSQL xmin for optimistic concurrency control
     /// </summary>
-    [Required(ErrorMessage = "Version is required for updates")]
-    [JsonPropertyName("version")]
-    public byte[] Version { get; set; } = Array.Empty<byte>();
+    [Required(ErrorMessage = "xmin is required for updates")]
+    [JsonPropertyName("xmin")]
+    public uint xmin { get; set; }
 }

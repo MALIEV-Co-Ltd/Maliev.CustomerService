@@ -76,11 +76,12 @@ public class CustomerDbContext : DbContext
             // Soft delete filter
             entity.HasQueryFilter(e => !e.IsDeleted);
 
-            // Concurrency token (PostgreSQL bytea with default value)
-            entity.Property(e => e.Version)
-                .IsRowVersion()
-                .HasDefaultValueSql("'\\x0000000000000001'::bytea")
-                .ValueGeneratedOnAddOrUpdate();
+            // Concurrency token (PostgreSQL xmin)
+            entity.Property(e => e.xmin)
+                .HasColumnName("xmin")
+                .HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate()
+                .IsConcurrencyToken();
         });
 
         // Configure Address entity
@@ -104,7 +105,7 @@ public class CustomerDbContext : DbContext
             entity.Property(e => e.CountryId).HasColumnOrder(12);
             entity.Property(e => e.CreatedAt).HasColumnOrder(13);
             entity.Property(e => e.UpdatedAt).HasColumnOrder(14);
-            entity.Property(e => e.Version).HasColumnOrder(15);
+            entity.Property(e => e.xmin).HasColumnOrder(15);
 
             // Configure table with CHECK constraints for owner_type and type enums
             entity.ToTable(t =>
@@ -123,11 +124,12 @@ public class CustomerDbContext : DbContext
             // Index on country_id for country-based queries
             entity.HasIndex(e => e.CountryId).HasDatabaseName("ix_address_country_id");
 
-            // Concurrency token (PostgreSQL bytea with default value)
-            entity.Property(e => e.Version)
-                .IsRowVersion()
-                .HasDefaultValueSql("'\\x0000000000000001'::bytea")
-                .ValueGeneratedOnAddOrUpdate();
+            // Concurrency token (PostgreSQL xmin)
+            entity.Property(e => e.xmin)
+                .HasColumnName("xmin")
+                .HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate()
+                .IsConcurrencyToken();
         });
 
         // Configure NDARecord
@@ -136,11 +138,12 @@ public class CustomerDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.CustomerId);
 
-            // Concurrency token (PostgreSQL bytea with default value)
-            entity.Property(e => e.Version)
-                .IsRowVersion()
-                .HasDefaultValueSql("'\\x0000000000000001'::bytea")
-                .ValueGeneratedOnAddOrUpdate();
+            // Concurrency token (PostgreSQL xmin)
+            entity.Property(e => e.xmin)
+                .HasColumnName("xmin")
+                .HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate()
+                .IsConcurrencyToken();
         });
 
         // Configure DocumentReference
@@ -149,11 +152,12 @@ public class CustomerDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.OwnerType, e.OwnerId });
 
-            // Concurrency token (PostgreSQL bytea with default value)
-            entity.Property(e => e.RowVersion)
-                .IsRowVersion()
-                .HasDefaultValueSql("'\\x0000000000000001'::bytea")
-                .ValueGeneratedOnAddOrUpdate();
+            // Concurrency token (PostgreSQL xmin)
+            entity.Property(e => e.xmin)
+                .HasColumnName("xmin")
+                .HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate()
+                .IsConcurrencyToken();
         });
 
         // Configure AuditLog
@@ -176,11 +180,12 @@ public class CustomerDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.OwnerType, e.OwnerId });
 
-            // Concurrency token (PostgreSQL bytea with default value)
-            entity.Property(e => e.Version)
-                .IsRowVersion()
-                .HasDefaultValueSql("'\\x0000000000000001'::bytea")
-                .ValueGeneratedOnAddOrUpdate();
+            // Concurrency token (PostgreSQL xmin)
+            entity.Property(e => e.xmin)
+                .HasColumnName("xmin")
+                .HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate()
+                .IsConcurrencyToken();
         });
 
         // Configure InternalNoteComment
@@ -189,11 +194,12 @@ public class CustomerDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.InternalNoteId);
 
-            // Concurrency token
-            entity.Property(e => e.Version)
-                .IsRowVersion()
-                .HasDefaultValueSql("'\\x0000000000000001'::bytea")
-                .ValueGeneratedOnAddOrUpdate();
+            // Concurrency token (PostgreSQL xmin)
+            entity.Property(e => e.xmin)
+                .HasColumnName("xmin")
+                .HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate()
+                .IsConcurrencyToken();
         });
     }
 }

@@ -299,8 +299,8 @@ public class CompanyService : ICompanyService
         {
             company.UpdatedAt = DateTime.UtcNow;
 
-            // Set the original row version for optimistic concurrency
-            _context.Entry(company).Property(c => c.Version).OriginalValue = request.Version;
+            // Set the original xmin for optimistic concurrency
+            _context.Entry(company).Property(c => c.xmin).OriginalValue = request.xmin;
 
             // Create audit log
             var auditLog = new AuditLog

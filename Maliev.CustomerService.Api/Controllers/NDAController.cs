@@ -306,7 +306,7 @@ public class NDAController : ControllerBase
         {
             var (actorId, actorType) = User.GetActorInfo();
             var actorName = User.GetActorName();
-            var success = await _ndaService.DeleteAsync(id, request.Version, actorId, actorType, actorName);
+            var success = await _ndaService.DeleteAsync(id, request.xmin, actorId, actorType, actorName);
 
             if (!success)
             {

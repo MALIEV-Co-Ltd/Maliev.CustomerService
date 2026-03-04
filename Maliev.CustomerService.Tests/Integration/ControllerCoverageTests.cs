@@ -109,7 +109,7 @@ public class ControllerCoverageTests
         var createResponse = await _client.PostAsJsonAsync("/customer/v1/companies", createRequest);
         var company = await createResponse.Content.ReadFromJsonAsync<CompanyResponse>();
 
-        var updateRequest = new UpdateCompanyRequest { Name = "Updated Co", Version = company!.Version };
+        var updateRequest = new UpdateCompanyRequest { Name = "Updated Co", xmin = company!.xmin };
         var updateResponse = await _client.PatchAsJsonAsync($"/customer/v1/companies/{company.Id}", updateRequest);
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
 
@@ -139,7 +139,7 @@ public class ControllerCoverageTests
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
         var address = await createResponse.Content.ReadFromJsonAsync<AddressResponse>();
 
-        var updateRequest = new UpdateAddressRequest { AddressLine1 = "456 St", Version = address!.Version };
+        var updateRequest = new UpdateAddressRequest { AddressLine1 = "456 St", xmin = address!.xmin };
         var updateResponse = await _client.PatchAsJsonAsync($"/customer/v1/addresses/{address.Id}", updateRequest);
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
 
@@ -155,7 +155,7 @@ public class ControllerCoverageTests
         var createResponse = await _client.PostAsJsonAsync("/customer/v1/ndas", createRequest);
         var nda = await createResponse.Content.ReadFromJsonAsync<NDAResponse>();
 
-        var updateRequest = new UpdateNDAStatusRequest { Status = NDAStatus.Signed, SignedBy = "Tester", SignedAt = DateTime.UtcNow, Version = nda!.Version };
+        var updateRequest = new UpdateNDAStatusRequest { Status = NDAStatus.Signed, SignedBy = "Tester", SignedAt = DateTime.UtcNow, xmin = nda!.xmin };
         var updateResponse = await _client.PatchAsJsonAsync($"/customer/v1/ndas/{nda.Id}/status", updateRequest);
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
     }
@@ -168,7 +168,7 @@ public class ControllerCoverageTests
         var createResponse = await _client.PostAsJsonAsync("/customer/v1/documents", createRequest);
         var doc = await createResponse.Content.ReadFromJsonAsync<DocumentResponse>();
 
-        var updateRequest = new UpdateDocumentRequest { FileReference = "f2", Filename = "n2.pdf", RowVersion = doc!.RowVersion };
+        var updateRequest = new UpdateDocumentRequest { FileReference = "f2", Filename = "n2.pdf", xmin = doc!.xmin };
         var updateResponse = await _client.PatchAsJsonAsync($"/customer/v1/documents/{doc.Id}", updateRequest);
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
 
@@ -184,7 +184,7 @@ public class ControllerCoverageTests
         var createResponse = await _client.PostAsJsonAsync("/customer/v1/customers", createRequest);
         var customer = await createResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
-        var updateRequest = new UpdateCustomerRequest { FirstName = "U", Version = customer!.Version };
+        var updateRequest = new UpdateCustomerRequest { FirstName = "U", xmin = customer!.xmin };
         var updateResponse = await _client.PatchAsJsonAsync($"/customer/v1/customers/{customer.Id}", updateRequest);
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
 
@@ -254,7 +254,7 @@ public class ControllerCoverageTests
         var createResponse = await _client.PostAsJsonAsync("/customer/v1/internal-notes", createRequest);
         var note = await createResponse.Content.ReadFromJsonAsync<InternalNoteResponse>();
 
-        var updateRequest = new UpdateInternalNoteRequest { NoteText = "Updated", Version = note!.Version };
+        var updateRequest = new UpdateInternalNoteRequest { NoteText = "Updated", xmin = note!.xmin };
         var updateResponse = await _client.PatchAsJsonAsync($"/customer/v1/internal-notes/{note.Id}", updateRequest);
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
     }
@@ -263,7 +263,7 @@ public class ControllerCoverageTests
     public async Task AddressController_Update_ErrorPaths()
     {
         await _factory.ClearDatabaseAsync();
-        var response = await _client.PatchAsJsonAsync($"/customer/v1/addresses/{Guid.NewGuid()}", new UpdateAddressRequest { AddressLine1 = "X", Version = new byte[8] });
+        var response = await _client.PatchAsJsonAsync($"/customer/v1/addresses/{Guid.NewGuid()}", new UpdateAddressRequest { AddressLine1 = "X", xmin = 0 });
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 }

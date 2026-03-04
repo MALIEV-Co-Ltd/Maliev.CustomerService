@@ -505,8 +505,8 @@ public class CustomerService : ICustomerService
         {
             customer.UpdatedAt = DateTime.UtcNow;
 
-            // Set the original row version for optimistic concurrency
-            _context.Entry(customer).Property(c => c.Version).OriginalValue = request.Version;
+            // Set the original xmin for optimistic concurrency
+            _context.Entry(customer).Property(c => c.xmin).OriginalValue = request.xmin;
 
             // Create audit log
             var auditLog = new AuditLog

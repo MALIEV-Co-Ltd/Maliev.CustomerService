@@ -51,11 +51,10 @@ public class InternalNoteComment
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
-    /// Row version for optimistic concurrency control
+    /// PostgreSQL xmin for optimistic concurrency
     /// </summary>
-    [Column("version")]
-    [Timestamp]
-    public byte[] Version { get; set; } = Array.Empty<byte>();
+    [Column("xmin")]
+    public uint xmin { get; set; }
 
     /// <summary>
     /// Navigation property to parent note

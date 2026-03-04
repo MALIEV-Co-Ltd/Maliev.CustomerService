@@ -319,7 +319,7 @@ public class AddressServiceTests
             AddressLine1 = "999 Updated Street",
             City = "Chiang Mai",
             PostalCode = "50000",
-            Version = created.Version
+            xmin = created.xmin
         };
 
         // Act
@@ -362,7 +362,7 @@ public class AddressServiceTests
         var updateRequest = new UpdateAddressRequest
         {
             CountryId = newCountryId,
-            Version = created.Version
+            xmin = created.xmin
         };
 
         // Act
@@ -401,7 +401,7 @@ public class AddressServiceTests
         var updateRequest = new UpdateAddressRequest
         {
             CountryId = invalidCountryId,
-            Version = created.Version
+            xmin = created.xmin
         };
 
         // Act & Assert
@@ -421,7 +421,7 @@ public class AddressServiceTests
         var updateRequest = new UpdateAddressRequest
         {
             AddressLine1 = "Updated Street",
-            Version = new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 }
+            xmin = 1
         };
 
         // Act & Assert
@@ -454,7 +454,7 @@ public class AddressServiceTests
         var updateRequest = new UpdateAddressRequest
         {
             AddressLine1 = "Updated Street",
-            Version = new byte[] { 0, 0, 0, 0, 0, 0, 0, 99 } // Wrong version
+            xmin = 99 // Wrong version
         };
 
         // Act & Assert
@@ -489,7 +489,7 @@ public class AddressServiceTests
         var updateRequest = new UpdateAddressRequest
         {
             AddressLine1 = "Updated Street",
-            Version = created.Version
+            xmin = created.xmin
         };
 
         // Act

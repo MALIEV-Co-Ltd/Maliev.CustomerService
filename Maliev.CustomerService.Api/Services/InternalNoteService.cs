@@ -158,7 +158,7 @@ public class InternalNoteService : IInternalNoteService
         note.NoteText = request.NoteText;
         note.UpdatedAt = DateTime.UtcNow;
 
-        _context.Entry(note).Property(n => n.Version).OriginalValue = request.Version;
+        _context.Entry(note).Property(n => n.xmin).OriginalValue = request.xmin;
 
         var auditLog = new AuditLog
         {

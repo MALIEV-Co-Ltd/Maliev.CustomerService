@@ -97,7 +97,7 @@ public class AdditionalControllerTests
         var request = new UpdateCustomerRequest
         {
             FirstName = "Updated",
-            Version = new byte[] { 1 }
+            xmin = 1
         };
 
         var response = await client.PatchAsJsonAsync($"/customer/v1/customers/{Guid.NewGuid()}", request);
@@ -123,14 +123,14 @@ public class AdditionalControllerTests
             Email = "test@example.com",
             Segment = "Retail",
             Tier = "Bronze",
-            Version = new byte[] { 1 }
+            xmin = 1
         });
         await dbContext.SaveChangesAsync();
 
         var request = new UpdateCustomerRequest
         {
             FirstName = "Updated",
-            Version = new byte[] { 2 }
+            xmin = 2
         };
 
         var response = await client.PatchAsJsonAsync($"/customer/v1/customers/{customerId}", request);
@@ -357,7 +357,7 @@ public class AdditionalControllerTests
         var request = new Api.Models.Addresses.UpdateAddressRequest
         {
             AddressLine1 = "123 St",
-            Version = new byte[] { 1 }
+            xmin = 1
         };
 
         var response = await client.PatchAsJsonAsync($"/customer/v1/addresses/{Guid.NewGuid()}", request);
@@ -428,7 +428,7 @@ public class AdditionalControllerTests
         {
             FileReference = "new-file",
             Filename = "new.pdf",
-            RowVersion = new byte[] { 1 }
+            xmin = 1
         };
 
         var response = await client.PatchAsJsonAsync($"/customer/v1/documents/{Guid.NewGuid()}", request);
@@ -497,7 +497,7 @@ public class AdditionalControllerTests
         var request = new Api.Models.InternalNotes.UpdateInternalNoteRequest
         {
             NoteText = "Updated text",
-            Version = new byte[] { 1 }
+            xmin = 1
         };
 
         var response = await client.PatchAsJsonAsync($"/customer/v1/internal-notes/{Guid.NewGuid()}", request);
@@ -579,7 +579,7 @@ public class AdditionalControllerTests
             Status = Domain.Entities.NDAStatus.Signed,
             SignedBy = "Tester",
             SignedAt = DateTime.UtcNow,
-            Version = new byte[] { 1 }
+            xmin = 1
         };
 
         var response = await client.PatchAsJsonAsync($"/customer/v1/ndas/{Guid.NewGuid()}/status", request);
@@ -597,7 +597,7 @@ public class AdditionalControllerTests
 
         var request = new Api.Models.NDAs.DeleteNDARequest
         {
-            Version = new byte[] { 1 }
+            xmin = 1
         };
 
         var response = await client.PostAsJsonAsync($"/customer/v1/ndas/{Guid.NewGuid()}/delete", request);

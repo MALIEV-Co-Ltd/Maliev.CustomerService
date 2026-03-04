@@ -45,7 +45,7 @@ public class ApiLayerCoverageTests
         db.Customers.Add(new Customer { Id = customerId, FirstName = "A", LastName = "B", Email = "a@b.com", Segment = "R", Tier = "B" });
         await db.SaveChangesAsync();
 
-        var res = await client.PatchAsJsonAsync($"/customer/v1/customers/{customerId}", new Api.Models.Customers.UpdateCustomerRequest { FirstName = "C", Version = new byte[] { 1 } });
+        var res = await client.PatchAsJsonAsync($"/customer/v1/customers/{customerId}", new Api.Models.Customers.UpdateCustomerRequest { FirstName = "C", xmin = 1 });
         Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
     }
 
@@ -233,7 +233,7 @@ public class ApiLayerCoverageTests
         db.Addresses.Add(new Address { Id = id, OwnerType = OwnerType.Customer, OwnerId = Guid.NewGuid(), Type = AddressType.Billing, AddressLine1 = "123", City = "BKK", StateProvince = "BKK", PostalCode = "10110", CountryId = Guid.NewGuid() });
         await db.SaveChangesAsync();
 
-        var res = await client.PatchAsJsonAsync($"/customer/v1/addresses/{id}", new Api.Models.Addresses.UpdateAddressRequest { AddressLine1 = "456", Version = new byte[] { 1 } });
+        var res = await client.PatchAsJsonAsync($"/customer/v1/addresses/{id}", new Api.Models.Addresses.UpdateAddressRequest { AddressLine1 = "456", xmin = 1 });
         Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
     }
 
@@ -353,7 +353,7 @@ public class ApiLayerCoverageTests
         db.InternalNotes.Add(new InternalNote { Id = id, OwnerType = "Customer", OwnerId = Guid.NewGuid(), NoteText = "Test", CreatedBy = "user" });
         await db.SaveChangesAsync();
 
-        var res = await client.PatchAsJsonAsync($"/customer/v1/internal-notes/{id}", new Api.Models.InternalNotes.UpdateInternalNoteRequest { NoteText = "Updated", Version = new byte[] { 1 } });
+        var res = await client.PatchAsJsonAsync($"/customer/v1/internal-notes/{id}", new Api.Models.InternalNotes.UpdateInternalNoteRequest { NoteText = "Updated", xmin = 1 });
         Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
     }
 
@@ -476,7 +476,7 @@ public class ApiLayerCoverageTests
         db.NDARecords.Add(new NDARecord { Id = id, CustomerId = Guid.NewGuid(), Status = NDAStatus.Draft, ExpiresAt = DateTime.UtcNow.AddYears(1), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
         await db.SaveChangesAsync();
 
-        var res = await client.PatchAsJsonAsync($"/customer/v1/ndas/{id}/status", new Api.Models.NDAs.UpdateNDAStatusRequest { Status = NDAStatus.Signed, Version = new byte[] { 1 } });
+        var res = await client.PatchAsJsonAsync($"/customer/v1/ndas/{id}/status", new Api.Models.NDAs.UpdateNDAStatusRequest { Status = NDAStatus.Signed, xmin = 1 });
         Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
     }
 

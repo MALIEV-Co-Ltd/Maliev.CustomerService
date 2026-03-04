@@ -169,7 +169,7 @@ public class NDAServiceTests
             Status = NDAStatus.Signed,
             SignedBy = "customer-user",
             SignedAt = DateTime.UtcNow,
-            Version = created.Version
+            xmin = created.xmin
         };
 
         // Act
@@ -200,7 +200,7 @@ public class NDAServiceTests
             Status = NDAStatus.Signed,
             SignedBy = "customer-user",
             SignedAt = DateTime.UtcNow,
-            Version = created.Version
+            xmin = created.xmin
         };
 
         // Act & Assert
@@ -229,7 +229,7 @@ public class NDAServiceTests
             Status = NDAStatus.Signed,
             SignedBy = "customer-user",
             SignedAt = DateTime.UtcNow,
-            Version = created.Version
+            xmin = created.xmin
         };
         var signed = await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee", "Test Actor");
 
@@ -239,7 +239,7 @@ public class NDAServiceTests
             Status = NDAStatus.Revoked,
             RevokedAt = DateTime.UtcNow,
             RevokeReason = "Testing revoke",
-            Version = signed.Version
+            xmin = signed.xmin
         };
 
         // Act
@@ -267,7 +267,7 @@ public class NDAServiceTests
         var updateRequest = new UpdateNDAStatusRequest
         {
             Status = NDAStatus.Expired,
-            Version = created.Version
+            xmin = created.xmin
         };
 
         // Act & Assert
@@ -295,7 +295,7 @@ public class NDAServiceTests
             Status = NDAStatus.Revoked,
             RevokedAt = DateTime.UtcNow,
             RevokeReason = "Testing revoke",
-            Version = created.Version
+            xmin = created.xmin
         };
 
         // Act & Assert
@@ -324,7 +324,7 @@ public class NDAServiceTests
             Status = NDAStatus.Signed,
             SignedBy = "customer-user",
             SignedAt = DateTime.UtcNow,
-            Version = created.Version
+            xmin = created.xmin
         };
         var signed = await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee", "Test Actor");
 
@@ -333,7 +333,7 @@ public class NDAServiceTests
             Status = NDAStatus.Revoked,
             RevokedAt = DateTime.UtcNow,
             RevokeReason = "Testing revoke",
-            Version = signed.Version
+            xmin = signed.xmin
         };
         var revoked = await service.UpdateStatusAsync(created.Id, revokeRequest, "admin-user", "Admin", "Test Actor");
 
@@ -343,7 +343,7 @@ public class NDAServiceTests
             Status = NDAStatus.Signed,
             SignedBy = "customer-user",
             SignedAt = DateTime.UtcNow,
-            Version = revoked.Version
+            xmin = revoked.xmin
         };
 
         // Act & Assert
@@ -365,7 +365,7 @@ public class NDAServiceTests
             Status = NDAStatus.Signed,
             SignedBy = "customer-user",
             SignedAt = DateTime.UtcNow,
-            Version = new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 }
+            xmin = 1
         };
 
         // Act & Assert
@@ -391,7 +391,7 @@ public class NDAServiceTests
             Status = NDAStatus.Signed,
             SignedBy = "customer-user",
             SignedAt = DateTime.UtcNow,
-            Version = created.Version
+            xmin = created.xmin
         };
 
         // Act
@@ -432,7 +432,7 @@ public class NDAServiceTests
             Status = NDAStatus.Signed,
             SignedBy = "customer-user",
             SignedAt = DateTime.UtcNow.AddDays(-2),
-            Version = created.Version
+            xmin = created.xmin
         };
         await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee", "Test Actor");
 
@@ -467,7 +467,7 @@ public class NDAServiceTests
             Status = NDAStatus.Signed,
             SignedBy = "customer-user",
             SignedAt = DateTime.UtcNow,
-            Version = created.Version
+            xmin = created.xmin
         };
         await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee", "Test Actor");
 
@@ -519,7 +519,7 @@ public class NDAServiceTests
             Status = NDAStatus.Signed,
             SignedBy = "customer-user",
             SignedAt = DateTime.UtcNow.AddDays(-2),
-            Version = created.Version
+            xmin = created.xmin
         };
         await service.UpdateStatusAsync(created.Id, signRequest, "test-actor", "Employee", "Test Actor");
 

@@ -250,7 +250,7 @@ public class US2_MultiAddressManagementIntegrationTests
         {
             postalCode = "10330",
             stateProvince = "Nonthaburi",
-            version = createdAddress!.Version
+            xmin = createdAddress!.xmin
         };
 
         // Act

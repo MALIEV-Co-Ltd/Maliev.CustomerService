@@ -44,5 +44,11 @@ public class CompanyConfiguration : IEntityTypeConfiguration<Company>
             .HasFilter("\"VatNumber\" IS NOT NULL");
 
         entity.HasIndex(e => e.Tier);
+
+        entity.Property(e => e.xmin)
+            .HasColumnName("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
     }
 }

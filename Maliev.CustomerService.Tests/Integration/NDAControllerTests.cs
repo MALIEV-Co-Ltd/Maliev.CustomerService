@@ -151,7 +151,7 @@ public class NDAControllerTests
             ExpiresAt = DateTime.UtcNow.AddYears(1),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
-            Version = new byte[] { 1 }
+            xmin = 1
         });
         await dbContext.SaveChangesAsync();
 
@@ -159,7 +159,7 @@ public class NDAControllerTests
         var request = new UpdateNDAStatusRequest
         {
             Status = NDAStatus.Expired,
-            Version = new byte[] { 1 }
+            xmin = 1
         };
 
         // Act
