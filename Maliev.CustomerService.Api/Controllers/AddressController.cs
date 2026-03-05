@@ -195,6 +195,7 @@ public class AddressController : ControllerBase
 
             var address = await _addressService.UpdateAsync(id, request, actorId, actorType);
 
+            Response.Headers.Append("ETag", address.xmin.ToString());
             return Ok(address);
         }
         catch (KeyNotFoundException ex)
@@ -264,22 +265,25 @@ public class AddressController : ControllerBase
     /// Deletes an address
     /// </summary>
     /// <param name="id">Address ID</param>
+    /// <param name="request">Delete request containing xmin for concurrency control</param>
     /// <returns>No content on success</returns>
     /// <response code="204">Address deleted successfully</response>
     /// <response code="401">Unauthorized</response>
     /// <response code="404">Address not found</response>
+    /// <response code="409">Version conflict</response>
     [HttpDelete("{id:guid}")]
     [RequirePermission(CustomerPermissions.AddressesManage)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Delete(Guid id)
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(Guid id, [FromBody] DeleteAddressRequest request)
     {
         try
         {
             var (actorId, actorType) = User.GetActorInfo();
 
-            var deleted = await _addressService.DeleteAsync(id, actorId, actorType);
+            var deleted = await _addressService.DeleteAsync(id, request.xmin, actorId, actorType);
 
             if (!deleted)
             {
@@ -294,6 +298,16 @@ public class AddressController : ControllerBase
             }
 
             return NoContent();
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("modified by another user"))
+        {
+            return Conflict(new ErrorResponse
+            {
+                Code = "VERSION_CONFLICT",
+                Message = ex.Message,
+                TraceId = HttpContext.TraceIdentifier,
+                Timestamp = DateTime.UtcNow
+            });
         }
         catch (Exception ex)
         {

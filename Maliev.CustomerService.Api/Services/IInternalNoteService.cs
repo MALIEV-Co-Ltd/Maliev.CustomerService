@@ -35,11 +35,13 @@ public interface IInternalNoteService
     Task<InternalNoteResponse> UpdateAsync(Guid id, UpdateInternalNoteRequest request, string actorId);
 
     /// <summary>
-    /// Deletes an internal note with audit logging
+    /// Deletes an internal note with optimistic concurrency control and audit logging
     /// </summary>
     /// <param name="id">Internal note ID</param>
+    /// <param name="xmin">PostgreSQL xmin for concurrency control</param>
     /// <exception cref="KeyNotFoundException">Thrown when internal note is not found</exception>
-    Task DeleteAsync(Guid id);
+    /// <exception cref="InvalidOperationException">Thrown when version conflict occurs</exception>
+    Task DeleteAsync(Guid id, uint xmin);
 
     /// <summary>
     /// Adds a comment to an existing internal note

@@ -339,11 +339,13 @@ public class AddressService : IAddressService
     /// Deletes an address with audit logging
     /// </summary>
     /// <param name="id">Address ID</param>
+    /// <param name="xmin">PostgreSQL xmin for concurrency control</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if deleted, false if not found</returns>
-    public async Task<bool> DeleteAsync(Guid id, string actorId, string actorType, CancellationToken cancellationToken = default)
+    /// <exception cref="InvalidOperationException">Thrown when version conflict occurs</exception>
+    public async Task<bool> DeleteAsync(Guid id, uint xmin, string actorId, string actorType, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Deleting address {AddressId} by actor {ActorId} ({ActorType})",
             id, actorId, actorType);
@@ -356,6 +358,8 @@ public class AddressService : IAddressService
             _logger.LogDebug("Address {AddressId} not found for deletion", id);
             return false;
         }
+
+        _context.Entry(address).Property(a => a.xmin).OriginalValue = xmin;
 
         _context.Addresses.Remove(address);
 
@@ -389,11 +393,17 @@ public class AddressService : IAddressService
 
         _context.AuditLogs.Add(auditLog);
 
-        await _context.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation("Address {AddressId} deleted successfully", id);
-
-        return true;
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Address {AddressId} deleted successfully", id);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogWarning(ex, "Concurrency conflict deleting address {AddressId}", id);
+            throw new InvalidOperationException("The address was modified by another user. Please refresh and try again.");
+        }
     }
 
     private async Task EnsureSingleDefaultAsync(string ownerType, Guid ownerId, string addressType, Guid currentAddressId, CancellationToken ct)

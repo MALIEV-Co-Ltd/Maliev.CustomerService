@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.CustomerService.Api.Authorization;
+using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.InternalNotes;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Domain.Authorization;
@@ -153,7 +154,8 @@ public class InternalNoteController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteInternalNote(Guid id)
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DeleteInternalNote(Guid id, [FromBody] DeleteInternalNoteRequest request)
     {
         var actorId = GetCreatedBy();
 
@@ -161,7 +163,7 @@ public class InternalNoteController : ControllerBase
 
         try
         {
-            await _internalNoteService.DeleteAsync(id);
+            await _internalNoteService.DeleteAsync(id, request.xmin);
             _logger.LogInformation("Internal note {NoteId} deleted successfully", id);
             return NoContent();
         }
@@ -169,6 +171,10 @@ public class InternalNoteController : ControllerBase
         {
             _logger.LogWarning(ex, "Internal note {NoteId} not found", id);
             return NotFound(new { error = $"Internal note with ID {id} not found" });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("modified by another user"))
+        {
+            return Conflict(new ErrorResponse { Code = "VERSION_CONFLICT", Message = ex.Message });
         }
     }
 

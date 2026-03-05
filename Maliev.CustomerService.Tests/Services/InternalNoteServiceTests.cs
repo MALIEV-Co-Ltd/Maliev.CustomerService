@@ -419,7 +419,7 @@ public class InternalNoteServiceTests
         }, "employee-1");
 
         // Act
-        await service.DeleteAsync(created.Id);
+        await service.DeleteAsync(created.Id, created.xmin);
 
         // Assert
         await using var context = _fixture.CreateDbContext();
@@ -437,7 +437,7 @@ public class InternalNoteServiceTests
 
         // Act & Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            async () => await service.DeleteAsync(nonExistentId));
+            async () => await service.DeleteAsync(nonExistentId, 0));
     }
 
     [Fact]
@@ -454,7 +454,7 @@ public class InternalNoteServiceTests
         }, "employee-1");
 
         // Act
-        await service.DeleteAsync(created.Id);
+        await service.DeleteAsync(created.Id, created.xmin);
 
         // Assert
         await using var context = _fixture.CreateDbContext();

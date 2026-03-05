@@ -310,14 +310,16 @@ public class DocumentService : IDocumentService
     /// Deletes a document reference and associated file from Upload Service
     /// </summary>
     /// <param name="id">Document ID</param>
+    /// <param name="xmin">PostgreSQL xmin for concurrency control</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <exception cref="KeyNotFoundException">Thrown when document is not found</exception>
+    /// <exception cref="InvalidOperationException">Thrown when version conflict occurs</exception>
     /// <remarks>
     /// If deletion from Upload Service fails, the document is marked as PendingDeletion for retry
     /// </remarks>
-    public async Task DeleteAsync(Guid id, string actorId, string actorType, CancellationToken cancellationToken = default)
+    public async Task DeleteAsync(Guid id, uint xmin, string actorId, string actorType, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Deleting document {DocumentId} by actor {ActorId} ({ActorType})",
             id, actorId, actorType);
@@ -328,6 +330,8 @@ public class DocumentService : IDocumentService
             _logger.LogWarning("Document {DocumentId} not found for deletion", id);
             throw new KeyNotFoundException($"Document with ID '{id}' not found");
         }
+
+        _context.Entry(document).Property(d => d.xmin).OriginalValue = xmin;
 
         // Standard Pattern: Mark as PendingDeletion first to ensure atomicity
         var oldStatus = document.Status;
@@ -347,7 +351,16 @@ public class DocumentService : IDocumentService
         };
 
         _context.AuditLogs.Add(auditLog);
-        await _context.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogWarning(ex, "Concurrency conflict deleting document {DocumentId}", id);
+            throw new InvalidOperationException("The document was modified by another user. Please refresh and try again.");
+        }
 
         // Try to delete from Upload Service
         var deleted = await _uploadServiceClient.DeleteFileAsync(document.FileReference);

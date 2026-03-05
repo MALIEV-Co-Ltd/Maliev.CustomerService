@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
+using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Documents;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Domain.Authorization;
@@ -193,13 +194,16 @@ public class DocumentController : ControllerBase
     /// <summary>
     /// Delete document
     /// </summary>
+    /// <param name="id">Document ID</param>
+    /// <param name="request">Delete request containing xmin for concurrency control</param>
     [HttpDelete("{id}")]
     [RequirePermission(CustomerPermissions.DocumentsDelete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
-    public async Task<IActionResult> DeleteDocument(Guid id)
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DeleteDocument(Guid id, [FromBody] DeleteDocumentRequest request)
     {
         var actorId = GetActorId();
         var actorType = GetActorType();
@@ -209,7 +213,7 @@ public class DocumentController : ControllerBase
 
         try
         {
-            await _documentService.DeleteAsync(id, actorId, actorType);
+            await _documentService.DeleteAsync(id, request.xmin, actorId, actorType);
             _logger.LogInformation("Document {DocumentId} deleted successfully", id);
             return NoContent();
         }
@@ -217,6 +221,10 @@ public class DocumentController : ControllerBase
         {
             _logger.LogWarning(ex, "Document {DocumentId} not found", id);
             return NotFound(new { error = $"Document with ID {id} not found" });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("modified by another user"))
+        {
+            return Conflict(new ErrorResponse { Code = "VERSION_CONFLICT", Message = ex.Message });
         }
     }
 }

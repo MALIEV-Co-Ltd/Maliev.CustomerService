@@ -288,7 +288,14 @@ public class ExtendedControllerTests
         });
         await dbContext.SaveChangesAsync();
 
-        var response = await client.DeleteAsync($"/customer/v1/addresses/{addressId}");
+        // Refresh to get the actual xmin value
+        var address = await dbContext.Addresses.FindAsync(addressId);
+        var request = new Api.Models.Addresses.DeleteAddressRequest { xmin = address!.xmin };
+        var httpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/addresses/{addressId}")
+        {
+            Content = JsonContent.Create(request)
+        };
+        var response = await client.SendAsync(httpRequest);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 

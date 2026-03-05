@@ -447,7 +447,12 @@ public class US1_CustomerRegistrationIntegrationTests
         var customer1 = await response1.Content.ReadFromJsonAsync<CustomerResponse>();
 
         // Act - Soft delete the first customer
-        var deleteResponse = await client.DeleteAsync($"/customer/v1/customers/{customer1!.Id}");
+        var deleteRequest = new DeleteCustomerRequest { xmin = customer1!.xmin };
+        var deleteHttpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/customers/{customer1.Id}")
+        {
+            Content = JsonContent.Create(deleteRequest)
+        };
+        var deleteResponse = await client.SendAsync(deleteHttpRequest);
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
         // Now create second customer

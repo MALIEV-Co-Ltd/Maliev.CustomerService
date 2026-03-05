@@ -163,6 +163,7 @@ public class CustomerController : ControllerBase
                 });
             }
 
+            Response.Headers.Append("ETag", customer.xmin.ToString());
             return Ok(customer);
         }
         catch (Exception ex)
@@ -266,6 +267,7 @@ public class CustomerController : ControllerBase
 
             var customer = await _customerService.UpdateAsync(id, request, actorId, actorType, cancellationToken);
 
+            Response.Headers.Append("ETag", customer.xmin.ToString());
             return Ok(customer);
         }
         catch (KeyNotFoundException ex)
@@ -411,23 +413,26 @@ public class CustomerController : ControllerBase
     /// Soft deletes a customer
     /// </summary>
     /// <param name="id">Customer ID</param>
+    /// <param name="request">Delete request containing xmin for concurrency control</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>No content on success</returns>
     /// <response code="204">Customer deleted successfully</response>
     /// <response code="401">Unauthorized</response>
     /// <response code="404">Customer not found</response>
+    /// <response code="409">Version conflict</response>
     [HttpDelete("{id:guid}")]
     [RequirePermission(CustomerPermissions.CustomersDelete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(Guid id, [FromBody] DeleteCustomerRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
             var (actorId, actorType) = User.GetActorInfo();
 
-            var deleted = await _customerService.SoftDeleteAsync(id, actorId, actorType, cancellationToken);
+            var deleted = await _customerService.SoftDeleteAsync(id, request.xmin, actorId, actorType, cancellationToken);
 
             if (!deleted)
             {
@@ -442,6 +447,16 @@ public class CustomerController : ControllerBase
             }
 
             return NoContent();
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("modified by another user"))
+        {
+            return Conflict(new ErrorResponse
+            {
+                Code = "VERSION_CONFLICT",
+                Message = ex.Message,
+                TraceId = HttpContext.TraceIdentifier,
+                Timestamp = DateTime.UtcNow
+            });
         }
         catch (Exception ex)
         {

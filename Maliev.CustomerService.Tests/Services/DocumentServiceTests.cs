@@ -434,7 +434,7 @@ public class DocumentServiceTests
         }, "test-actor", "Employee");
 
         // Act
-        await service.DeleteAsync(created.Id, "admin-user", "Admin");
+        await service.DeleteAsync(created.Id, created.xmin, "admin-user", "Admin");
 
         // Assert
         await using var context = _fixture.CreateDbContext();
@@ -465,7 +465,7 @@ public class DocumentServiceTests
         }, "test-actor", "Employee");
 
         // Act
-        await service.DeleteAsync(created.Id, "admin-user", "Admin");
+        await service.DeleteAsync(created.Id, created.xmin, "admin-user", "Admin");
 
         // Assert
         await using var context = _fixture.CreateDbContext();
@@ -486,7 +486,7 @@ public class DocumentServiceTests
 
         // Act & Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            async () => await service.DeleteAsync(nonExistentId, "test-actor", "Employee"));
+            async () => await service.DeleteAsync(nonExistentId, 0, "test-actor", "Employee"));
     }
 
     [Fact]
@@ -510,7 +510,7 @@ public class DocumentServiceTests
         }, "test-actor", "Employee");
 
         // Act
-        await service.DeleteAsync(created.Id, "admin-999", "Admin");
+        await service.DeleteAsync(created.Id, created.xmin, "admin-999", "Admin");
 
         // Assert
         await using var context = _fixture.CreateDbContext();
@@ -551,7 +551,7 @@ public class DocumentServiceTests
         }, "test-actor", "Employee");
 
         // Act
-        await service.DeleteAsync(created.Id, "admin-999", "Admin");
+        await service.DeleteAsync(created.Id, created.xmin, "admin-999", "Admin");
 
         // Assert
         await using var context = _fixture.CreateDbContext();
@@ -589,7 +589,7 @@ public class DocumentServiceTests
             Filename = "nda.pdf"
         }, "test-actor", "Employee");
 
-        await service.DeleteAsync(created.Id, "admin-user", "Admin");
+        await service.DeleteAsync(created.Id, created.xmin, "admin-user", "Admin");
 
         // Verify it's pending deletion
         await using var context1 = _fixture.CreateDbContext();
@@ -633,7 +633,7 @@ public class DocumentServiceTests
             Filename = "nda.pdf"
         }, "test-actor", "Employee");
 
-        await service.DeleteAsync(created.Id, "admin-user", "Admin");
+        await service.DeleteAsync(created.Id, created.xmin, "admin-user", "Admin");
 
         // Act
         var retryCount = await service.RetryPendingDeletionsAsync();
@@ -685,7 +685,7 @@ public class DocumentServiceTests
             Filename = "nda.pdf"
         }, "test-actor", "Employee");
 
-        await service.DeleteAsync(created.Id, "admin-user", "Admin");
+        await service.DeleteAsync(created.Id, created.xmin, "admin-user", "Admin");
 
         // Setup retry to succeed
         _mockUploadServiceClient.Setup(x => x.DeleteFileAsync("file-ref-1"))
@@ -739,8 +739,8 @@ public class DocumentServiceTests
             Filename = "contract.pdf"
         }, "test-actor", "Employee");
 
-        await service.DeleteAsync(doc1.Id, "admin-user", "Admin");
-        await service.DeleteAsync(doc2.Id, "admin-user", "Admin");
+        await service.DeleteAsync(doc1.Id, doc1.xmin, "admin-user", "Admin");
+        await service.DeleteAsync(doc2.Id, doc2.xmin, "admin-user", "Admin");
 
         // Setup retry - only first succeeds
         _mockUploadServiceClient.Setup(x => x.DeleteFileAsync("file-ref-1"))

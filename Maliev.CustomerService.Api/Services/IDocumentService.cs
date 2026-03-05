@@ -57,14 +57,16 @@ public interface IDocumentService
     /// Deletes a document reference and associated file from Upload Service
     /// </summary>
     /// <param name="id">Document ID</param>
+    /// <param name="xmin">PostgreSQL xmin for concurrency control</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <exception cref="KeyNotFoundException">Thrown when document is not found</exception>
+    /// <exception cref="InvalidOperationException">Thrown when version conflict occurs</exception>
     /// <remarks>
     /// If deletion from Upload Service fails, the document is marked as PendingDeletion for retry
     /// </remarks>
-    Task DeleteAsync(Guid id, string actorId, string actorType, CancellationToken cancellationToken = default);
+    Task DeleteAsync(Guid id, uint xmin, string actorId, string actorType, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retries deletion of documents marked as PendingDeletion (for background job processing)

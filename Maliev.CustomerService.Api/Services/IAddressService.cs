@@ -41,12 +41,14 @@ public interface IAddressService
     Task<AddressResponse> UpdateAsync(Guid id, UpdateAddressRequest request, string actorId, string actorType, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Deletes an address with audit logging
+    /// Deletes an address with optimistic concurrency control and audit logging
     /// </summary>
     /// <param name="id">Address ID</param>
+    /// <param name="xmin">PostgreSQL xmin for concurrency control</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if deleted, false if not found</returns>
-    Task<bool> DeleteAsync(Guid id, string actorId, string actorType, CancellationToken cancellationToken = default);
+    /// <exception cref="InvalidOperationException">Thrown when version conflict occurs</exception>
+    Task<bool> DeleteAsync(Guid id, uint xmin, string actorId, string actorType, CancellationToken cancellationToken = default);
 }

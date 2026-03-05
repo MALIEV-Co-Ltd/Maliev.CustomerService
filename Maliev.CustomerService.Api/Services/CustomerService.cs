@@ -570,14 +570,16 @@ public class CustomerService : ICustomerService
     }
 
     /// <summary>
-    /// Soft deletes a customer with audit logging
+    /// Soft deletes a customer with optimistic concurrency control and audit logging
     /// </summary>
     /// <param name="id">Customer ID</param>
+    /// <param name="xmin">PostgreSQL xmin for concurrency control</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if deleted, false if not found</returns>
-    public async Task<bool> SoftDeleteAsync(Guid id, string actorId, string actorType, CancellationToken cancellationToken = default)
+    /// <exception cref="InvalidOperationException">Thrown when version conflict occurs</exception>
+    public async Task<bool> SoftDeleteAsync(Guid id, uint xmin, string actorId, string actorType, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Soft deleting customer {CustomerId} by actor {ActorId} ({ActorType})",
             id, actorId, actorType);
@@ -591,6 +593,8 @@ public class CustomerService : ICustomerService
             _logger.LogDebug("Customer {CustomerId} not found for deletion", id);
             return false;
         }
+
+        _context.Entry(customer).Property(c => c.xmin).OriginalValue = xmin;
 
         customer.IsDeleted = true;
         customer.UpdatedAt = DateTime.UtcNow;
@@ -608,33 +612,40 @@ public class CustomerService : ICustomerService
 
         _context.AuditLogs.Add(auditLog);
 
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Customer {CustomerId} soft deleted successfully", id);
 
-        _logger.LogInformation("Customer {CustomerId} soft deleted successfully", id);
+            // Publish CustomerDeletedEvent
+            await _publishEndpoint.Publish(new CustomerDeletedEvent(
+                MessageId: Guid.NewGuid(),
+                MessageName: "CustomerDeletedEvent",
+                MessageType: MessageType.Event,
+                MessageVersion: "1.0.0",
+                PublishedBy: "CustomerService",
+                ConsumedBy: ["NotificationService", "AnalyticsService"],
+                CorrelationId: Guid.NewGuid(),
+                CausationId: null,
+                OccurredAtUtc: DateTimeOffset.UtcNow,
+                IsPublic: false,
+                Payload: new CustomerDeletedEventPayload(
+                    CustomerId: customer.Id,
+                    DeletedBy: actorId,
+                    ActorType: actorType,
+                    DeletedAt: new DateTimeOffset(customer.UpdatedAt, TimeSpan.Zero)
+                )
+            ), cancellationToken);
 
-        // Publish CustomerDeletedEvent
-        await _publishEndpoint.Publish(new CustomerDeletedEvent(
-            MessageId: Guid.NewGuid(),
-            MessageName: "CustomerDeletedEvent",
-            MessageType: MessageType.Event,
-            MessageVersion: "1.0.0",
-            PublishedBy: "CustomerService",
-            ConsumedBy: ["NotificationService", "AnalyticsService"],
-            CorrelationId: Guid.NewGuid(),
-            CausationId: null,
-            OccurredAtUtc: DateTimeOffset.UtcNow,
-            IsPublic: false,
-            Payload: new CustomerDeletedEventPayload(
-                CustomerId: customer.Id,
-                DeletedBy: actorId,
-                ActorType: actorType,
-                DeletedAt: new DateTimeOffset(customer.UpdatedAt, TimeSpan.Zero)
-            )
-        ), cancellationToken);
+            _logger.LogInformation("Published CustomerDeletedEvent for customer {CustomerId}", id);
 
-        _logger.LogInformation("Published CustomerDeletedEvent for customer {CustomerId}", id);
-
-        return true;
+            return true;
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogWarning(ex, "Concurrency conflict deleting customer {CustomerId}", id);
+            throw new InvalidOperationException("The customer was modified by another user. Please refresh and try again.");
+        }
     }
 
     /// <summary>

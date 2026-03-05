@@ -146,7 +146,12 @@ public class AdditionalControllerTests
             new[] { "roles.customer.representative" },
             new[] { "customer.customers.delete" });
 
-        var response = await client.DeleteAsync($"/customer/v1/customers/{Guid.NewGuid()}");
+        var request = new Api.Models.Customers.DeleteCustomerRequest { xmin = 0 };
+        var httpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/customers/{Guid.NewGuid()}")
+        {
+            Content = JsonContent.Create(request)
+        };
+        var response = await client.SendAsync(httpRequest);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -373,7 +378,12 @@ public class AdditionalControllerTests
             new[] { "roles.customer.representative" },
             new[] { "customer.addresses.manage" });
 
-        var response = await client.DeleteAsync($"/customer/v1/addresses/{Guid.NewGuid()}");
+        var request = new Api.Models.Addresses.DeleteAddressRequest { xmin = 0 };
+        var httpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/addresses/{Guid.NewGuid()}")
+        {
+            Content = JsonContent.Create(request)
+        };
+        var response = await client.SendAsync(httpRequest);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -457,7 +467,12 @@ public class AdditionalControllerTests
             new[] { "roles.customer.representative" },
             new[] { "customer.documents.delete" });
 
-        var response = await client.DeleteAsync($"/customer/v1/documents/{Guid.NewGuid()}");
+        var request = new Api.Models.Documents.DeleteDocumentRequest { xmin = 0 };
+        var httpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/documents/{Guid.NewGuid()}")
+        {
+            Content = JsonContent.Create(request)
+        };
+        var response = await client.SendAsync(httpRequest);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -513,7 +528,12 @@ public class AdditionalControllerTests
             new[] { "roles.customer.representative" },
             new[] { "customer.notes.delete" });
 
-        var response = await client.DeleteAsync($"/customer/v1/internal-notes/{Guid.NewGuid()}");
+        var request = new Api.Models.InternalNotes.DeleteInternalNoteRequest { xmin = 0 };
+        var httpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/internal-notes/{Guid.NewGuid()}")
+        {
+            Content = JsonContent.Create(request)
+        };
+        var response = await client.SendAsync(httpRequest);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 

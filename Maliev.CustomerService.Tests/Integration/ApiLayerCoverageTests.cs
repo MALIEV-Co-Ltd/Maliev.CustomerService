@@ -60,7 +60,14 @@ public class ApiLayerCoverageTests
         db.Customers.Add(new Customer { Id = customerId, FirstName = "A", LastName = "B", Email = "a@b.com", Segment = "R", Tier = "B" });
         await db.SaveChangesAsync();
 
-        var res = await client.DeleteAsync($"/customer/v1/customers/{customerId}");
+        // Refresh to get the actual xmin value
+        var customer = await db.Customers.FindAsync(customerId);
+        var request = new Api.Models.Customers.DeleteCustomerRequest { xmin = customer!.xmin };
+        var httpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/customers/{customerId}")
+        {
+            Content = JsonContent.Create(request)
+        };
+        var res = await client.SendAsync(httpRequest);
         Assert.Equal(HttpStatusCode.NoContent, res.StatusCode);
     }
 
@@ -248,7 +255,14 @@ public class ApiLayerCoverageTests
         db.Addresses.Add(new Address { Id = id, OwnerType = OwnerType.Customer, OwnerId = Guid.NewGuid(), Type = AddressType.Billing, AddressLine1 = "123", City = "BKK", StateProvince = "BKK", PostalCode = "10110", CountryId = Guid.NewGuid() });
         await db.SaveChangesAsync();
 
-        var res = await client.DeleteAsync($"/customer/v1/addresses/{id}");
+        // Refresh to get the actual xmin value
+        var address = await db.Addresses.FindAsync(id);
+        var request = new Api.Models.Addresses.DeleteAddressRequest { xmin = address!.xmin };
+        var httpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/addresses/{id}")
+        {
+            Content = JsonContent.Create(request)
+        };
+        var res = await client.SendAsync(httpRequest);
         Assert.Equal(HttpStatusCode.NoContent, res.StatusCode);
     }
 
@@ -309,7 +323,12 @@ public class ApiLayerCoverageTests
         await _factory.ClearDatabaseAsync();
         var client = _factory.CreateAuthenticatedClient("test-user", new[] { "Admin" }, new[] { "customer.documents.delete" });
 
-        var res = await client.DeleteAsync($"/customer/v1/documents/{Guid.NewGuid()}");
+        var request = new Api.Models.Documents.DeleteDocumentRequest { xmin = 0 };
+        var httpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/documents/{Guid.NewGuid()}")
+        {
+            Content = JsonContent.Create(request)
+        };
+        var res = await client.SendAsync(httpRequest);
         Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
     }
 
@@ -368,7 +387,14 @@ public class ApiLayerCoverageTests
         db.InternalNotes.Add(new InternalNote { Id = id, OwnerType = "Customer", OwnerId = Guid.NewGuid(), NoteText = "Test", CreatedBy = "user" });
         await db.SaveChangesAsync();
 
-        var res = await client.DeleteAsync($"/customer/v1/internal-notes/{id}");
+        // Refresh to get the actual xmin value
+        var note = await db.InternalNotes.FindAsync(id);
+        var request = new Api.Models.InternalNotes.DeleteInternalNoteRequest { xmin = note!.xmin };
+        var httpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/internal-notes/{id}")
+        {
+            Content = JsonContent.Create(request)
+        };
+        var res = await client.SendAsync(httpRequest);
         Assert.Equal(HttpStatusCode.NoContent, res.StatusCode);
     }
 

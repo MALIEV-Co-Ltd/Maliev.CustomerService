@@ -189,11 +189,13 @@ public class InternalNoteService : IInternalNoteService
     }
 
     /// <summary>
-    /// Deletes an internal note with audit logging
+    /// Deletes an internal note with optimistic concurrency control and audit logging
     /// </summary>
     /// <param name="id">Internal note ID</param>
+    /// <param name="xmin">PostgreSQL xmin for concurrency control</param>
     /// <exception cref="KeyNotFoundException">Thrown when internal note is not found</exception>
-    public async Task DeleteAsync(Guid id)
+    /// <exception cref="InvalidOperationException">Thrown when version conflict occurs</exception>
+    public async Task DeleteAsync(Guid id, uint xmin)
     {
         _logger.LogInformation("Deleting internal note {NoteId}", id);
 
@@ -203,6 +205,8 @@ public class InternalNoteService : IInternalNoteService
             _logger.LogWarning("Internal note {NoteId} not found for deletion", id);
             throw new KeyNotFoundException($"Internal note with ID '{id}' not found");
         }
+
+        _context.Entry(note).Property(n => n.xmin).OriginalValue = xmin;
 
         _context.InternalNotes.Remove(note);
 
@@ -224,9 +228,17 @@ public class InternalNoteService : IInternalNoteService
         };
 
         _context.AuditLogs.Add(auditLog);
-        await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Internal note {NoteId} deleted successfully", id);
+        try
+        {
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Internal note {NoteId} deleted successfully", id);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogWarning(ex, "Concurrency conflict deleting internal note {NoteId}", id);
+            throw new InvalidOperationException("The internal note was modified by another user. Please refresh and try again.");
+        }
     }
 
     /// <inheritdoc />

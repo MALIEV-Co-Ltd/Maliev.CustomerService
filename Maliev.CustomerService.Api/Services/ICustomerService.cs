@@ -47,14 +47,16 @@ public interface ICustomerService
     Task<CustomerResponse> UpdateAsync(Guid id, UpdateCustomerRequest request, string actorId, string actorType, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Soft deletes a customer with audit logging
+    /// Soft deletes a customer with optimistic concurrency control and audit logging
     /// </summary>
     /// <param name="id">Customer ID</param>
+    /// <param name="xmin">PostgreSQL xmin for concurrency control</param>
     /// <param name="actorId">ID of the actor performing the action</param>
     /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if deleted, false if not found</returns>
-    Task<bool> SoftDeleteAsync(Guid id, string actorId, string actorType, CancellationToken cancellationToken = default);
+    /// <exception cref="InvalidOperationException">Thrown when version conflict occurs</exception>
+    Task<bool> SoftDeleteAsync(Guid id, uint xmin, string actorId, string actorType, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets all customers with optional filtering and pagination (T119-T120, T126-T127)

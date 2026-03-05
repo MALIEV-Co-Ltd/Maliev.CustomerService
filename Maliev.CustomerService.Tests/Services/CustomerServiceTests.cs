@@ -301,7 +301,7 @@ public class CustomerServiceTests
         }, "test-actor", "Employee");
 
         // Soft delete the customer
-        await service.SoftDeleteAsync(created.Id, "test-actor", "Employee");
+        await service.SoftDeleteAsync(created.Id, created.xmin, "test-actor", "Employee");
 
         // Act
         var result = await service.GetByIdAsync(created.Id);
@@ -457,7 +457,7 @@ public class CustomerServiceTests
         }, "test-actor", "Employee");
 
         // Act
-        var result = await service.SoftDeleteAsync(created.Id, "admin-789", "Admin");
+        var result = await service.SoftDeleteAsync(created.Id, created.xmin, "admin-789", "Admin");
 
         // Assert
         Assert.True(result);
@@ -480,7 +480,7 @@ public class CustomerServiceTests
         var nonExistentId = Guid.NewGuid();
 
         // Act
-        var result = await service.SoftDeleteAsync(nonExistentId, "test-actor", "Employee");
+        var result = await service.SoftDeleteAsync(nonExistentId, 0, "test-actor", "Employee");
 
         // Assert
         Assert.False(result);
@@ -505,7 +505,7 @@ public class CustomerServiceTests
         }, "test-actor", "Employee");
 
         // Act
-        await service.SoftDeleteAsync(created.Id, "manager-999", "Manager");
+        await service.SoftDeleteAsync(created.Id, created.xmin, "manager-999", "Manager");
 
         // Assert
         await using var context = _fixture.CreateDbContext();
@@ -651,7 +651,7 @@ public class CustomerServiceTests
             Timezone = "Asia/Bangkok"
         }, "test-actor", "Employee");
 
-        await service.SoftDeleteAsync(created.Id, "test-actor", "Employee");
+        await service.SoftDeleteAsync(created.Id, created.xmin, "test-actor", "Employee");
 
         // Act
         var result = await service.GetAllAsync();

@@ -420,7 +420,12 @@ public class US2_MultiAddressManagementIntegrationTests
         var address2 = await response2.Content.ReadFromJsonAsync<AddressResponse>();
 
         // Act - Delete the first address
-        var deleteResponse = await client.DeleteAsync($"/customer/v1/addresses/{address1!.Id}");
+        var deleteRequest = new Api.Models.Addresses.DeleteAddressRequest { xmin = address1!.xmin };
+        var deleteHttpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/addresses/{address1.Id}")
+        {
+            Content = JsonContent.Create(deleteRequest)
+        };
+        var deleteResponse = await client.SendAsync(deleteHttpRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);

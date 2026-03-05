@@ -533,7 +533,7 @@ public class AddressServiceTests
         }, "test-actor", "Employee");
 
         // Act
-        var result = await service.DeleteAsync(created.Id, "admin-789", "Admin");
+        var result = await service.DeleteAsync(created.Id, created.xmin, "admin-789", "Admin");
 
         // Assert
         Assert.True(result);
@@ -553,7 +553,7 @@ public class AddressServiceTests
         var nonExistentId = Guid.NewGuid();
 
         // Act
-        var result = await service.DeleteAsync(nonExistentId, "test-actor", "Employee");
+        var result = await service.DeleteAsync(nonExistentId, 0, "test-actor", "Employee");
 
         // Assert
         Assert.False(result);
@@ -582,7 +582,7 @@ public class AddressServiceTests
         }, "test-actor", "Employee");
 
         // Act
-        await service.DeleteAsync(created.Id, "manager-999", "Manager");
+        await service.DeleteAsync(created.Id, created.xmin, "manager-999", "Manager");
 
         // Assert
         await using var context = _fixture.CreateDbContext();

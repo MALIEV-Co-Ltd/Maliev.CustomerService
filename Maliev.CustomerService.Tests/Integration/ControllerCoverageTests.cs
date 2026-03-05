@@ -97,7 +97,12 @@ public class ControllerCoverageTests
         Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
 
         // Delete
-        var deleteResponse = await _client.DeleteAsync($"/customer/v1/internal-notes/{note!.Id}");
+        var deleteRequest = new DeleteInternalNoteRequest { xmin = note!.xmin };
+        var deleteHttpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/internal-notes/{note.Id}")
+        {
+            Content = JsonContent.Create(deleteRequest)
+        };
+        var deleteResponse = await _client.SendAsync(deleteHttpRequest);
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
     }
 
@@ -142,8 +147,14 @@ public class ControllerCoverageTests
         var updateRequest = new UpdateAddressRequest { AddressLine1 = "456 St", xmin = address!.xmin };
         var updateResponse = await _client.PatchAsJsonAsync($"/customer/v1/addresses/{address.Id}", updateRequest);
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+        var updatedAddress = await updateResponse.Content.ReadFromJsonAsync<AddressResponse>();
 
-        var deleteResponse = await _client.DeleteAsync($"/customer/v1/addresses/{address.Id}");
+        var deleteRequest = new DeleteAddressRequest { xmin = updatedAddress!.xmin };
+        var deleteHttpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/addresses/{address.Id}")
+        {
+            Content = JsonContent.Create(deleteRequest)
+        };
+        var deleteResponse = await _client.SendAsync(deleteHttpRequest);
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
     }
 
@@ -171,8 +182,14 @@ public class ControllerCoverageTests
         var updateRequest = new UpdateDocumentRequest { FileReference = "f2", Filename = "n2.pdf", xmin = doc!.xmin };
         var updateResponse = await _client.PatchAsJsonAsync($"/customer/v1/documents/{doc.Id}", updateRequest);
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+        var updatedDoc = await updateResponse.Content.ReadFromJsonAsync<DocumentResponse>();
 
-        var deleteResponse = await _client.DeleteAsync($"/customer/v1/documents/{doc.Id}");
+        var deleteRequest = new DeleteDocumentRequest { xmin = updatedDoc!.xmin };
+        var deleteHttpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/documents/{doc.Id}")
+        {
+            Content = JsonContent.Create(deleteRequest)
+        };
+        var deleteResponse = await _client.SendAsync(deleteHttpRequest);
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
     }
 
@@ -187,11 +204,17 @@ public class ControllerCoverageTests
         var updateRequest = new UpdateCustomerRequest { FirstName = "U", xmin = customer!.xmin };
         var updateResponse = await _client.PatchAsJsonAsync($"/customer/v1/customers/{customer.Id}", updateRequest);
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+        var updatedCustomer = await updateResponse.Content.ReadFromJsonAsync<CustomerResponse>();
 
         var getByPrincipal = await _client.GetAsync($"/customer/v1/customers/by-principal/{customer.PrincipalId}");
         Assert.Equal(HttpStatusCode.OK, getByPrincipal.StatusCode);
 
-        var deleteResponse = await _client.DeleteAsync($"/customer/v1/customers/{customer.Id}");
+        var deleteRequest = new DeleteCustomerRequest { xmin = updatedCustomer!.xmin };
+        var deleteHttpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/customers/{customer.Id}")
+        {
+            Content = JsonContent.Create(deleteRequest)
+        };
+        var deleteResponse = await _client.SendAsync(deleteHttpRequest);
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
     }
 
