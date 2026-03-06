@@ -133,6 +133,19 @@ public async Task<CustomerResponse> CreateAsync(CreateCustomerRequest request, C
 - **Maliev.CustomerService.Infrastructure:** EF Core, repositories, external services.
 - **Maliev.CustomerService.Tests:** Integration tests (Testcontainers).
 
+### Entity Framework Core Migrations
+
+- **EF Core Design Package:** Only install `Microsoft.EntityFrameworkCore.Design` in the **Infrastructure** project. Do NOT add it to Api or other projects.
+- **Creating Migrations:** Run from the Infrastructure directory with Infrastructure as both the project and startup project:
+  ```bash
+  cd Maliev.CustomerService.Infrastructure
+  dotnet ef migrations add InitialCreate --startup-project .
+  ```
+- **Applying Migrations:** Use the same pattern:
+  ```bash
+  dotnet ef database update --startup-project .
+  ```
+
 ### Key Libraries
 - **Entity Framework Core:** Data access. Use `Async` methods (`ToListAsync`, `FirstOrDefaultAsync`).
 - **MassTransit:** Event bus/messaging (`IPublishEndpoint`).
