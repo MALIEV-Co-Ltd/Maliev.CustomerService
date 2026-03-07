@@ -71,4 +71,10 @@ public class CompanyTierSettingsRepository : ICompanyTierSettingsRepository
             return false;
         }
     }
+
+    /// <inheritdoc/>
+    public uint GetXmin(CompanyTierSettings settings)
+    {
+        return _context.Entry(settings).Property<uint>("xmin").CurrentValue;
+    }
 }

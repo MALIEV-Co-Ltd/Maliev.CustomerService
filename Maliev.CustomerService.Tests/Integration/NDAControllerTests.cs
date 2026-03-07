@@ -150,8 +150,7 @@ public class NDAControllerTests
             Status = NDAStatus.Draft,
             ExpiresAt = DateTime.UtcNow.AddYears(1),
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            xmin = 1
+            UpdatedAt = DateTime.UtcNow
         });
         await dbContext.SaveChangesAsync();
 

@@ -50,11 +50,6 @@ public class CompanyDocument
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
-    /// PostgreSQL xmin for optimistic concurrency
-    /// </summary>
-    public uint xmin { get; set; }
-
-    /// <summary>
     /// Navigation property to Company
     /// </summary>
     public virtual Company? Company { get; set; }

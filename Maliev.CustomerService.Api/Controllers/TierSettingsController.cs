@@ -61,7 +61,7 @@ public class TierSettingsController : ControllerBase
             CoinRewardPercentage = s.CoinRewardPercentage,
             ValidFrom = s.ValidFrom,
             ValidTo = s.ValidTo,
-            xmin = s.xmin
+            xmin = _repository.GetXmin(s)
         }).ToList();
 
         return Ok(response);
@@ -122,7 +122,7 @@ public class TierSettingsController : ControllerBase
             CoinRewardPercentage = created.CoinRewardPercentage,
             ValidFrom = created.ValidFrom,
             ValidTo = created.ValidTo,
-            xmin = created.xmin
+            xmin = _repository.GetXmin(created)
         };
 
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, response);
@@ -168,7 +168,7 @@ public class TierSettingsController : ControllerBase
             CoinRewardPercentage = settings.CoinRewardPercentage,
             ValidFrom = settings.ValidFrom,
             ValidTo = settings.ValidTo,
-            xmin = settings.xmin
+            xmin = _repository.GetXmin(settings)
         };
 
         return Ok(response);
@@ -252,7 +252,7 @@ public class TierSettingsController : ControllerBase
             CoinRewardPercentage = existing.CoinRewardPercentage,
             ValidFrom = existing.ValidFrom,
             ValidTo = existing.ValidTo,
-            xmin = existing.xmin
+            xmin = _repository.GetXmin(existing)
         };
 
         return Ok(response);

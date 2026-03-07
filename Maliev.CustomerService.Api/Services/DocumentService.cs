@@ -112,7 +112,8 @@ public class DocumentService : IDocumentService
         // Record metrics
         _metricsService.RecordDocumentOperation("create");
 
-        return document.ToDocumentResponse();
+        var xminValue = _context.Entry(document).Property<uint>("xmin").CurrentValue;
+        return document.ToDocumentResponse(xminValue);
     }
 
     /// <summary>
@@ -152,7 +153,7 @@ public class DocumentService : IDocumentService
         var responses = new List<DocumentResponse>();
         foreach (var doc in filteredDocs)
         {
-            var res = doc.ToDocumentResponse();
+            var res = doc.ToDocumentResponse(_context.Entry(doc).Property<uint>("xmin").CurrentValue);
             if (Guid.TryParse(doc.CreatedBy, out var pId) && creatorMap.TryGetValue(pId, out var p))
             {
                 res.CreatedByName = p.DisplayName;
@@ -208,7 +209,7 @@ public class DocumentService : IDocumentService
         document.Version++;
         document.UpdatedAt = DateTime.UtcNow;
 
-        _context.Entry(document).Property(d => d.xmin).OriginalValue = request.xmin;
+        _context.Entry(document).Property("xmin").OriginalValue = request.xmin;
 
         var auditLog = new AuditLog
         {
@@ -240,7 +241,8 @@ public class DocumentService : IDocumentService
             throw new InvalidOperationException("The record was modified by another user. Please refresh and try again.");
         }
 
-        return document.ToDocumentResponse();
+        var xminValue = _context.Entry(document).Property<uint>("xmin").CurrentValue;
+        return document.ToDocumentResponse(xminValue);
     }
 
     /// <summary>
@@ -303,7 +305,8 @@ public class DocumentService : IDocumentService
         // Record metrics
         _metricsService.RecordDocumentOperation("complete");
 
-        return document.ToDocumentResponse();
+        var xminValue = _context.Entry(document).Property<uint>("xmin").CurrentValue;
+        return document.ToDocumentResponse(xminValue);
     }
 
     /// <summary>
@@ -331,7 +334,7 @@ public class DocumentService : IDocumentService
             throw new KeyNotFoundException($"Document with ID '{id}' not found");
         }
 
-        _context.Entry(document).Property(d => d.xmin).OriginalValue = xmin;
+        _context.Entry(document).Property("xmin").OriginalValue = xmin;
 
         // Standard Pattern: Mark as PendingDeletion first to ensure atomicity
         var oldStatus = document.Status;

@@ -30,11 +30,9 @@ public class CompanyTierSettingsConfiguration : IEntityTypeConfiguration<Company
         entity.Property(e => e.CoinRewardPercentage)
             .HasColumnType("decimal(5,2)");
 
-        entity.Property(e => e.xmin)
-            .HasColumnName("xmin")
+        entity.Property<uint>("xmin")
             .HasColumnType("xid")
-            .ValueGeneratedOnAddOrUpdate()
-            .IsConcurrencyToken();
+            .IsRowVersion();
 
         entity.HasIndex(e => e.TierName);
         entity.HasIndex(e => new { e.TierName, e.ValidFrom });

@@ -122,8 +122,7 @@ public class AdditionalControllerTests
             LastName = "User",
             Email = "test@example.com",
             Segment = "Retail",
-            Tier = "Bronze",
-            xmin = 1
+            Tier = "Bronze"
         });
         await dbContext.SaveChangesAsync();
 

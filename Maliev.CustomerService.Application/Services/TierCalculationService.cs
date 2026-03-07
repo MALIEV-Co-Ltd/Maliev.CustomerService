@@ -42,7 +42,7 @@ public class TierCalculationService : ITierCalculationService
             CoinRewardPercentage = s.CoinRewardPercentage,
             ValidFrom = s.ValidFrom,
             ValidTo = s.ValidTo,
-            xmin = s.xmin
+            xmin = _tierSettingsRepository.GetXmin(s)
         }).ToList();
     }
 

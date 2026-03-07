@@ -114,7 +114,8 @@ public class CompanyService : ICompanyService
 
         _logger.LogInformation("Company {CompanyId} created successfully", company.Id);
 
-        return company.ToCompanyResponse();
+        var xminValue = _context.Entry(company).Property<uint>("xmin").CurrentValue;
+        return company.ToCompanyResponse(xminValue);
     }
 
     /// <summary>
@@ -137,7 +138,8 @@ public class CompanyService : ICompanyService
             return null;
         }
 
-        return company.ToCompanyResponse();
+        var xminValue = _context.Entry(company).Property<uint>("xmin").CurrentValue;
+        return company.ToCompanyResponse(xminValue);
     }
 
     /// <summary>
@@ -300,7 +302,7 @@ public class CompanyService : ICompanyService
             company.UpdatedAt = DateTime.UtcNow;
 
             // Set the original xmin for optimistic concurrency
-            _context.Entry(company).Property(c => c.xmin).OriginalValue = request.xmin;
+            _context.Entry(company).Property("xmin").OriginalValue = request.xmin;
 
             // Create audit log
             var auditLog = new AuditLog
@@ -334,7 +336,8 @@ public class CompanyService : ICompanyService
             _logger.LogInformation("No changes detected for company {CompanyId}", id);
         }
 
-        return company.ToCompanyResponse();
+        var xminValue = _context.Entry(company).Property<uint>("xmin").CurrentValue;
+        return company.ToCompanyResponse(xminValue);
     }
 
     /// <summary>
@@ -361,11 +364,12 @@ public class CompanyService : ICompanyService
             .Where(c => c.CompanyId == id && !c.IsDeleted)
             .ToListAsync(cancellationToken);
 
-        var customerResponses = customers.Select(c => c.ToCustomerResponse()).ToList();
+        var customerResponses = customers.Select(c => c.ToCustomerResponse(xmin: _context.Entry(c).Property<uint>("xmin").CurrentValue)).ToList();
 
         _logger.LogDebug("Found {CustomerCount} customers for company {CompanyId}", customerResponses.Count, id);
 
-        return (company.ToCompanyResponse(), customerResponses);
+        var companyXmin = _context.Entry(company).Property<uint>("xmin").CurrentValue;
+        return (company.ToCompanyResponse(companyXmin), customerResponses);
     }
 
     /// <summary>
@@ -405,7 +409,7 @@ public class CompanyService : ICompanyService
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        var companyResponses = companies.Select(c => c.ToCompanyResponse()).ToList();
+        var companyResponses = companies.Select(c => c.ToCompanyResponse(_context.Entry(c).Property<uint>("xmin").CurrentValue)).ToList();
 
         _logger.LogDebug("Retrieved {Count} companies out of {TotalCount}", companyResponses.Count, totalCount);
 

@@ -112,9 +112,4 @@ public class DocumentReference
     [Column("updated_at")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-    /// <summary>
-    /// PostgreSQL xmin for optimistic concurrency
-    /// </summary>
-    [Column("xmin")]
-    public uint xmin { get; set; }
 }

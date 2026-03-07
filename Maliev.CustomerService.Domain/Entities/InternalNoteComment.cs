@@ -51,12 +51,6 @@ public class InternalNoteComment
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
-    /// PostgreSQL xmin for optimistic concurrency
-    /// </summary>
-    [Column("xmin")]
-    public uint xmin { get; set; }
-
-    /// <summary>
     /// Navigation property to parent note
     /// </summary>
     [ForeignKey(nameof(InternalNoteId))]

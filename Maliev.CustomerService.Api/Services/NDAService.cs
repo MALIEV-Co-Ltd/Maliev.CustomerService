@@ -104,7 +104,8 @@ public class NDAService : INDAService
         }
 
         _logger.LogInformation("NDA {NDAId} created successfully", nda.Id);
-        return nda.ToNDAResponse();
+        var xminValue = _context.Entry(nda).Property<uint>("xmin").CurrentValue;
+        return nda.ToNDAResponse(xminValue);
     }
 
     /// <summary>
@@ -126,7 +127,8 @@ public class NDAService : INDAService
             return null;
         }
 
-        return nda.ToNDAResponse();
+        var xminValue = _context.Entry(nda).Property<uint>("xmin").CurrentValue;
+        return nda.ToNDAResponse(xminValue);
     }
 
     /// <inheritdoc />
@@ -139,7 +141,7 @@ public class NDAService : INDAService
             .OrderByDescending(n => n.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return ndas.Select(n => n.ToNDAResponse()).ToList();
+        return ndas.Select(n => n.ToNDAResponse(_context.Entry(n).Property<uint>("xmin").CurrentValue)).ToList();
     }
 
     /// <summary>
@@ -223,7 +225,7 @@ public class NDAService : INDAService
 
         nda.UpdatedAt = DateTime.UtcNow;
 
-        _context.Entry(nda).Property(n => n.xmin).OriginalValue = request.xmin;
+        _context.Entry(nda).Property("xmin").OriginalValue = request.xmin;
 
         var auditLog = new AuditLog
         {
@@ -263,7 +265,8 @@ public class NDAService : INDAService
             throw new InvalidOperationException("The record was modified by another user. Please refresh and try again.");
         }
 
-        return nda.ToNDAResponse();
+        var xminValue = _context.Entry(nda).Property<uint>("xmin").CurrentValue;
+        return nda.ToNDAResponse(xminValue);
     }
 
     /// <summary>
@@ -405,7 +408,7 @@ public class NDAService : INDAService
             return false;
         }
 
-        _context.Entry(nda).Property(n => n.xmin).OriginalValue = xmin;
+        _context.Entry(nda).Property("xmin").OriginalValue = xmin;
         _context.NDARecords.Remove(nda);
 
         var auditLog = new AuditLog

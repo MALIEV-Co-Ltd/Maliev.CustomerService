@@ -77,11 +77,9 @@ public class CustomerDbContext : DbContext
             entity.HasQueryFilter(e => !e.IsDeleted);
 
             // Concurrency token (PostgreSQL xmin)
-            entity.Property(e => e.xmin)
-                .HasColumnName("xmin")
+            entity.Property<uint>("xmin")
                 .HasColumnType("xid")
-                .ValueGeneratedOnAddOrUpdate()
-                .IsConcurrencyToken();
+                .IsRowVersion();
         });
 
         // Configure Address entity
@@ -105,7 +103,7 @@ public class CustomerDbContext : DbContext
             entity.Property(e => e.CountryId).HasColumnOrder(12);
             entity.Property(e => e.CreatedAt).HasColumnOrder(13);
             entity.Property(e => e.UpdatedAt).HasColumnOrder(14);
-            entity.Property(e => e.xmin).HasColumnOrder(15);
+            entity.Property<uint>("xmin").HasColumnOrder(15);
 
             // Configure table with CHECK constraints for owner_type and type enums
             entity.ToTable(t =>
@@ -125,11 +123,9 @@ public class CustomerDbContext : DbContext
             entity.HasIndex(e => e.CountryId).HasDatabaseName("ix_address_country_id");
 
             // Concurrency token (PostgreSQL xmin)
-            entity.Property(e => e.xmin)
-                .HasColumnName("xmin")
+            entity.Property<uint>("xmin")
                 .HasColumnType("xid")
-                .ValueGeneratedOnAddOrUpdate()
-                .IsConcurrencyToken();
+                .IsRowVersion();
         });
 
         // Configure NDARecord
@@ -139,11 +135,9 @@ public class CustomerDbContext : DbContext
             entity.HasIndex(e => e.CustomerId);
 
             // Concurrency token (PostgreSQL xmin)
-            entity.Property(e => e.xmin)
-                .HasColumnName("xmin")
+            entity.Property<uint>("xmin")
                 .HasColumnType("xid")
-                .ValueGeneratedOnAddOrUpdate()
-                .IsConcurrencyToken();
+                .IsRowVersion();
         });
 
         // Configure DocumentReference
@@ -153,11 +147,9 @@ public class CustomerDbContext : DbContext
             entity.HasIndex(e => new { e.OwnerType, e.OwnerId });
 
             // Concurrency token (PostgreSQL xmin)
-            entity.Property(e => e.xmin)
-                .HasColumnName("xmin")
+            entity.Property<uint>("xmin")
                 .HasColumnType("xid")
-                .ValueGeneratedOnAddOrUpdate()
-                .IsConcurrencyToken();
+                .IsRowVersion();
         });
 
         // Configure AuditLog
@@ -181,11 +173,9 @@ public class CustomerDbContext : DbContext
             entity.HasIndex(e => new { e.OwnerType, e.OwnerId });
 
             // Concurrency token (PostgreSQL xmin)
-            entity.Property(e => e.xmin)
-                .HasColumnName("xmin")
+            entity.Property<uint>("xmin")
                 .HasColumnType("xid")
-                .ValueGeneratedOnAddOrUpdate()
-                .IsConcurrencyToken();
+                .IsRowVersion();
         });
 
         // Configure InternalNoteComment
@@ -195,11 +185,9 @@ public class CustomerDbContext : DbContext
             entity.HasIndex(e => e.InternalNoteId);
 
             // Concurrency token (PostgreSQL xmin)
-            entity.Property(e => e.xmin)
-                .HasColumnName("xmin")
+            entity.Property<uint>("xmin")
                 .HasColumnType("xid")
-                .ValueGeneratedOnAddOrUpdate()
-                .IsConcurrencyToken();
+                .IsRowVersion();
         });
     }
 }

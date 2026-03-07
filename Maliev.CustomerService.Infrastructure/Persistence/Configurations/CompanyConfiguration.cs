@@ -45,10 +45,8 @@ public class CompanyConfiguration : IEntityTypeConfiguration<Company>
 
         entity.HasIndex(e => e.Tier);
 
-        entity.Property(e => e.xmin)
-            .HasColumnName("xmin")
+        entity.Property<uint>("xmin")
             .HasColumnType("xid")
-            .ValueGeneratedOnAddOrUpdate()
-            .IsConcurrencyToken();
+            .IsRowVersion();
     }
 }

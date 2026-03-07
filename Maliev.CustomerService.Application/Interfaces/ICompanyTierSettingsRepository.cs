@@ -31,4 +31,9 @@ public interface ICompanyTierSettingsRepository
     /// Updates tier settings with optimistic concurrency
     /// </summary>
     Task<bool> UpdateAsync(CompanyTierSettings settings, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the current xmin value for a tracked entity
+    /// </summary>
+    uint GetXmin(CompanyTierSettings settings);
 }

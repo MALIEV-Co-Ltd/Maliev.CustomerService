@@ -93,8 +93,4 @@ public class Address
     /// </summary>
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-    /// <summary>
-    /// PostgreSQL xmin for optimistic concurrency
-    /// </summary>
-    public uint xmin { get; set; }
 }

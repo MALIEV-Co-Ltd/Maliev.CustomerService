@@ -26,11 +26,9 @@ public class CompanyDocumentConfiguration : IEntityTypeConfiguration<CompanyDocu
             .IsRequired()
             .HasMaxLength(1000);
 
-        entity.Property(e => e.xmin)
-            .HasColumnName("xmin")
+        entity.Property<uint>("xmin")
             .HasColumnType("xid")
-            .ValueGeneratedOnAddOrUpdate()
-            .IsConcurrencyToken();
+            .IsRowVersion();
 
         entity.HasOne(e => e.Company)
             .WithMany()

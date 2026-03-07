@@ -246,8 +246,7 @@ public class ExtendedControllerTests
             City = "BKK",
             StateProvince = "BKK",
             PostalCode = "10110",
-            CountryId = countryId,
-            xmin = 1
+            CountryId = countryId
         });
         await dbContext.SaveChangesAsync();
 
@@ -290,7 +289,8 @@ public class ExtendedControllerTests
 
         // Refresh to get the actual xmin value
         var address = await dbContext.Addresses.FindAsync(addressId);
-        var request = new Api.Models.Addresses.DeleteAddressRequest { xmin = address!.xmin };
+        var addressXmin = dbContext.Entry(address!).Property<uint>("xmin").CurrentValue;
+        var request = new Api.Models.Addresses.DeleteAddressRequest { xmin = addressXmin };
         var httpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/addresses/{addressId}")
         {
             Content = JsonContent.Create(request)
@@ -396,8 +396,7 @@ public class ExtendedControllerTests
             OwnerType = "Customer",
             OwnerId = Guid.NewGuid(),
             NoteText = "Original text",
-            CreatedBy = "test-user",
-            xmin = 1
+            CreatedBy = "test-user"
         });
         await dbContext.SaveChangesAsync();
 
@@ -567,8 +566,7 @@ public class ExtendedControllerTests
             Status = NDAStatus.Draft,
             ExpiresAt = DateTime.UtcNow.AddYears(1),
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            xmin = 1
+            UpdatedAt = DateTime.UtcNow
         });
         await dbContext.SaveChangesAsync();
 

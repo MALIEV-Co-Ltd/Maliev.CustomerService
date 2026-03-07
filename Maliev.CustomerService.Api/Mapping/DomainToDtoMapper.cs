@@ -17,7 +17,7 @@ public static class DomainToDtoMapper
     /// <summary>
     /// Maps a Customer entity to CustomerResponse DTO with optional company and NDA data
     /// </summary>
-    public static CustomerResponse ToCustomerResponse(this Customer customer, Company? company = null, NDARecord? nda = null)
+    public static CustomerResponse ToCustomerResponse(this Customer customer, Company? company = null, NDARecord? nda = null, uint xmin = 0)
     {
         return new CustomerResponse
         {
@@ -46,14 +46,14 @@ public static class DomainToDtoMapper
 
             CreatedAt = customer.CreatedAt,
             UpdatedAt = customer.UpdatedAt,
-            xmin = customer.xmin
+            xmin = xmin
         };
     }
 
     /// <summary>
     /// Maps a Company entity to CompanyResponse DTO
     /// </summary>
-    public static CompanyResponse ToCompanyResponse(this Company company)
+    public static CompanyResponse ToCompanyResponse(this Company company, uint xmin = 0)
     {
         return new CompanyResponse
         {
@@ -77,14 +77,14 @@ public static class DomainToDtoMapper
             StockSymbol = company.StockSymbol,
             CreatedAt = company.CreatedAt,
             UpdatedAt = company.UpdatedAt,
-            xmin = company.xmin
+            xmin = xmin
         };
     }
 
     /// <summary>
     /// Maps an Address entity to AddressResponse DTO
     /// </summary>
-    public static AddressResponse ToAddressResponse(this Address address)
+    public static AddressResponse ToAddressResponse(this Address address, uint xmin = 0)
     {
         return new AddressResponse
         {
@@ -105,7 +105,7 @@ public static class DomainToDtoMapper
             RecipientPhone = address.RecipientPhone,
             CreatedAt = address.CreatedAt,
             UpdatedAt = address.UpdatedAt,
-            xmin = address.xmin
+            xmin = xmin
         };
     }
 
@@ -131,7 +131,7 @@ public static class DomainToDtoMapper
     /// <summary>
     /// Maps an NDARecord entity to NDAResponse DTO
     /// </summary>
-    public static NDAResponse ToNDAResponse(this NDARecord nda)
+    public static NDAResponse ToNDAResponse(this NDARecord nda, uint xmin = 0)
     {
         return new NDAResponse
         {
@@ -145,14 +145,14 @@ public static class DomainToDtoMapper
             ExpiresAt = nda.ExpiresAt,
             CreatedAt = nda.CreatedAt,
             UpdatedAt = nda.UpdatedAt,
-            xmin = nda.xmin
+            xmin = xmin
         };
     }
 
     /// <summary>
     /// Maps an InternalNote entity to InternalNoteResponse DTO
     /// </summary>
-    public static InternalNoteResponse ToInternalNoteResponse(this InternalNote note)
+    public static InternalNoteResponse ToInternalNoteResponse(this InternalNote note, uint xmin = 0)
     {
         return new InternalNoteResponse
         {
@@ -163,14 +163,14 @@ public static class DomainToDtoMapper
             CreatedBy = note.CreatedBy,
             CreatedAt = note.CreatedAt,
             UpdatedAt = note.UpdatedAt,
-            xmin = note.xmin
+            xmin = xmin
         };
     }
 
     /// <summary>
     /// Maps an InternalNoteComment entity to InternalNoteCommentResponse DTO
     /// </summary>
-    public static InternalNoteCommentResponse ToInternalNoteCommentResponse(this InternalNoteComment comment)
+    public static InternalNoteCommentResponse ToInternalNoteCommentResponse(this InternalNoteComment comment, uint xmin = 0)
     {
         return new InternalNoteCommentResponse
         {
@@ -180,14 +180,14 @@ public static class DomainToDtoMapper
             CreatedBy = comment.CreatedBy,
             CreatedByName = comment.CreatedByName,
             CreatedAt = comment.CreatedAt,
-            xmin = comment.xmin
+            xmin = xmin
         };
     }
 
     /// <summary>
     /// Maps a DocumentReference entity to DocumentResponse DTO
     /// </summary>
-    public static DocumentResponse ToDocumentResponse(this DocumentReference document)
+    public static DocumentResponse ToDocumentResponse(this DocumentReference document, uint xmin = 0)
     {
         return new DocumentResponse
         {
@@ -206,7 +206,7 @@ public static class DomainToDtoMapper
             SignedAt = document.SignedAt,
             CreatedAt = document.CreatedAt,
             UpdatedAt = document.UpdatedAt,
-            xmin = document.xmin
+            xmin = xmin
         };
     }
 }

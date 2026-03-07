@@ -46,7 +46,7 @@ public class CompanyDocumentRepository : ICompanyDocumentRepository
     public async Task<bool> DeleteAsync(Guid id, uint xmin, CancellationToken cancellationToken = default)
     {
         var deleted = await _context.CompanyDocuments
-            .Where(d => d.Id == id && d.xmin == xmin)
+            .Where(d => d.Id == id)
             .ExecuteDeleteAsync(cancellationToken);
 
         return deleted > 0;

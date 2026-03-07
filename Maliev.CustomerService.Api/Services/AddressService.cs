@@ -122,7 +122,8 @@ public class AddressService : IAddressService
 
         _logger.LogInformation("Address {AddressId} created successfully", address.Id);
 
-        return address.ToAddressResponse();
+        var xminValue = _context.Entry(address).Property<uint>("xmin").CurrentValue;
+        return address.ToAddressResponse(xminValue);
     }
 
     /// <summary>
@@ -142,7 +143,7 @@ public class AddressService : IAddressService
             .ThenBy(a => a.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return addresses.Select(a => a.ToAddressResponse()).ToList();
+        return addresses.Select(a => a.ToAddressResponse(_context.Entry(a).Property<uint>("xmin").CurrentValue)).ToList();
     }
 
     /// <summary>
@@ -292,7 +293,7 @@ public class AddressService : IAddressService
 
 
             // Set the original xmin for optimistic concurrency
-            _context.Entry(address).Property(a => a.xmin).OriginalValue = request.xmin;
+            _context.Entry(address).Property("xmin").OriginalValue = request.xmin;
 
             // Create audit log
             var auditLog = new AuditLog
@@ -332,7 +333,8 @@ public class AddressService : IAddressService
             _logger.LogInformation("No changes detected for address {AddressId}", id);
         }
 
-        return address.ToAddressResponse();
+        var xminValue = _context.Entry(address).Property<uint>("xmin").CurrentValue;
+        return address.ToAddressResponse(xminValue);
     }
 
     /// <summary>
@@ -359,7 +361,7 @@ public class AddressService : IAddressService
             return false;
         }
 
-        _context.Entry(address).Property(a => a.xmin).OriginalValue = xmin;
+        _context.Entry(address).Property("xmin").OriginalValue = xmin;
 
         _context.Addresses.Remove(address);
 

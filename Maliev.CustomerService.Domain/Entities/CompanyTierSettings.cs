@@ -60,11 +60,6 @@ public class CompanyTierSettings
     public DateTime? ValidTo { get; set; }
 
     /// <summary>
-    /// PostgreSQL xmin for optimistic concurrency
-    /// </summary>
-    public uint xmin { get; set; }
-
-    /// <summary>
     /// Creation timestamp
     /// </summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

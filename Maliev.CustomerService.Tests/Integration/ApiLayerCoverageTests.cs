@@ -62,7 +62,8 @@ public class ApiLayerCoverageTests
 
         // Refresh to get the actual xmin value
         var customer = await db.Customers.FindAsync(customerId);
-        var request = new Api.Models.Customers.DeleteCustomerRequest { xmin = customer!.xmin };
+        var customerXmin = db.Entry(customer!).Property<uint>("xmin").CurrentValue;
+        var request = new Api.Models.Customers.DeleteCustomerRequest { xmin = customerXmin };
         var httpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/customers/{customerId}")
         {
             Content = JsonContent.Create(request)
@@ -257,7 +258,8 @@ public class ApiLayerCoverageTests
 
         // Refresh to get the actual xmin value
         var address = await db.Addresses.FindAsync(id);
-        var request = new Api.Models.Addresses.DeleteAddressRequest { xmin = address!.xmin };
+        var addressXmin = db.Entry(address!).Property<uint>("xmin").CurrentValue;
+        var request = new Api.Models.Addresses.DeleteAddressRequest { xmin = addressXmin };
         var httpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/addresses/{id}")
         {
             Content = JsonContent.Create(request)
@@ -389,7 +391,8 @@ public class ApiLayerCoverageTests
 
         // Refresh to get the actual xmin value
         var note = await db.InternalNotes.FindAsync(id);
-        var request = new Api.Models.InternalNotes.DeleteInternalNoteRequest { xmin = note!.xmin };
+        var noteXmin = db.Entry(note!).Property<uint>("xmin").CurrentValue;
+        var request = new Api.Models.InternalNotes.DeleteInternalNoteRequest { xmin = noteXmin };
         var httpRequest = new HttpRequestMessage(HttpMethod.Delete, $"/customer/v1/internal-notes/{id}")
         {
             Content = JsonContent.Create(request)

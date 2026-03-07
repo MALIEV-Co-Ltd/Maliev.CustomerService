@@ -231,7 +231,8 @@ public class CustomerService : ICustomerService
 
         _logger.LogInformation("Published CustomerCreatedEvent for customer {CustomerId}", customer.Id);
 
-        return customer.ToCustomerResponse();
+        var xminValue = _context.Entry(customer).Property<uint>("xmin").CurrentValue;
+        return customer.ToCustomerResponse(xmin: xminValue);
     }
 
     /// <summary>
@@ -272,7 +273,8 @@ public class CustomerService : ICustomerService
             .Where(a => a.EntityType == nameof(Customer) && a.EntityId == id.ToString() && a.Action == AuditAction.Create)
             .FirstOrDefaultAsync(cancellationToken);
 
-        var response = customer.ToCustomerResponse(company, nda);
+        var xminValue = _context.Entry(customer).Property<uint>("xmin").CurrentValue;
+        var response = customer.ToCustomerResponse(company, nda, xminValue);
 
         if (creationAudit != null && Guid.TryParse(creationAudit.ActorId, out var creatorPrincipalId))
         {
@@ -329,7 +331,8 @@ public class CustomerService : ICustomerService
             .Where(a => a.EntityType == nameof(Customer) && a.EntityId == customer.Id.ToString() && a.Action == AuditAction.Create)
             .FirstOrDefaultAsync(cancellationToken);
 
-        var response = customer.ToCustomerResponse(company, nda);
+        var xminValue = _context.Entry(customer).Property<uint>("xmin").CurrentValue;
+        var response = customer.ToCustomerResponse(company, nda, xminValue);
 
         if (creationAudit != null && Guid.TryParse(creationAudit.ActorId, out var creatorPrincipalId))
         {
@@ -506,7 +509,7 @@ public class CustomerService : ICustomerService
             customer.UpdatedAt = DateTime.UtcNow;
 
             // Set the original xmin for optimistic concurrency
-            _context.Entry(customer).Property(c => c.xmin).OriginalValue = request.xmin;
+            _context.Entry(customer).Property("xmin").OriginalValue = request.xmin;
 
             // Create audit log
             var auditLog = new AuditLog
@@ -566,7 +569,8 @@ public class CustomerService : ICustomerService
             _logger.LogInformation("No changes detected for customer {CustomerId}", id);
         }
 
-        return customer.ToCustomerResponse();
+        var xminValue = _context.Entry(customer).Property<uint>("xmin").CurrentValue;
+        return customer.ToCustomerResponse(xmin: xminValue);
     }
 
     /// <summary>
@@ -594,7 +598,7 @@ public class CustomerService : ICustomerService
             return false;
         }
 
-        _context.Entry(customer).Property(c => c.xmin).OriginalValue = xmin;
+        _context.Entry(customer).Property("xmin").OriginalValue = xmin;
 
         customer.IsDeleted = true;
         customer.UpdatedAt = DateTime.UtcNow;
@@ -782,7 +786,8 @@ public class CustomerService : ICustomerService
         {
             Items = customers.Select(c => c.ToCustomerResponse(
                 c.CompanyId.HasValue && companies.TryGetValue(c.CompanyId.Value, out var comp) ? comp : null,
-                ndas.TryGetValue(c.Id, out var nda) ? nda : null)).ToList(),
+                ndas.TryGetValue(c.Id, out var nda) ? nda : null,
+                _context.Entry(c).Property<uint>("xmin").CurrentValue)).ToList(),
             TotalCount = totalCount,
             Page = page,
             PageSize = pageSize,

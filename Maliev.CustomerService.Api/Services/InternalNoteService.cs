@@ -68,7 +68,8 @@ public class InternalNoteService : IInternalNoteService
 
         _logger.LogInformation("Internal note {NoteId} created successfully", note.Id);
 
-        var response = note.ToInternalNoteResponse();
+        var xminValue = _context.Entry(note).Property<uint>("xmin").CurrentValue;
+        var response = note.ToInternalNoteResponse(xminValue);
         if (Guid.TryParse(createdBy, out var principalId))
         {
             var principal = await _iamClient.GetPrincipalByIdAsync(principalId);
@@ -118,7 +119,7 @@ public class InternalNoteService : IInternalNoteService
 
         foreach (var note in notes)
         {
-            var response = note.ToInternalNoteResponse();
+            var response = note.ToInternalNoteResponse(_context.Entry(note).Property<uint>("xmin").CurrentValue);
             if (Guid.TryParse(note.CreatedBy, out var pId) && principalMap.TryGetValue(pId, out var p))
             {
                 response.CreatedByName = p.DisplayName;
@@ -158,7 +159,7 @@ public class InternalNoteService : IInternalNoteService
         note.NoteText = request.NoteText;
         note.UpdatedAt = DateTime.UtcNow;
 
-        _context.Entry(note).Property(n => n.xmin).OriginalValue = request.xmin;
+        _context.Entry(note).Property("xmin").OriginalValue = request.xmin;
 
         var auditLog = new AuditLog
         {
@@ -185,7 +186,8 @@ public class InternalNoteService : IInternalNoteService
             throw new InvalidOperationException("The internal note was modified by another user. Please refresh and try again.");
         }
 
-        return note.ToInternalNoteResponse();
+        var xminValue = _context.Entry(note).Property<uint>("xmin").CurrentValue;
+        return note.ToInternalNoteResponse(xminValue);
     }
 
     /// <summary>
@@ -206,7 +208,7 @@ public class InternalNoteService : IInternalNoteService
             throw new KeyNotFoundException($"Internal note with ID '{id}' not found");
         }
 
-        _context.Entry(note).Property(n => n.xmin).OriginalValue = xmin;
+        _context.Entry(note).Property("xmin").OriginalValue = xmin;
 
         _context.InternalNotes.Remove(note);
 
@@ -286,7 +288,8 @@ public class InternalNoteService : IInternalNoteService
 
         await _context.SaveChangesAsync();
 
-        var response = comment.ToInternalNoteCommentResponse();
+        var commentXmin = _context.Entry(comment).Property<uint>("xmin").CurrentValue;
+        var response = comment.ToInternalNoteCommentResponse(commentXmin);
         if (Guid.TryParse(actorId, out var pId))
         {
             var p = await _iamClient.GetPrincipalByIdAsync(pId);
@@ -322,7 +325,7 @@ public class InternalNoteService : IInternalNoteService
 
         foreach (var comment in comments)
         {
-            var res = comment.ToInternalNoteCommentResponse();
+            var res = comment.ToInternalNoteCommentResponse(_context.Entry(comment).Property<uint>("xmin").CurrentValue);
             if (Guid.TryParse(comment.CreatedBy, out var pId) && principalMap.TryGetValue(pId, out var p))
             {
                 res.CreatedByName = p.DisplayName;
