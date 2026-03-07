@@ -136,14 +136,13 @@ public async Task<CustomerResponse> CreateAsync(CreateCustomerRequest request, C
 ### Entity Framework Core Migrations
 
 - **EF Core Design Package:** Only install `Microsoft.EntityFrameworkCore.Design` in the **Infrastructure** project. Do NOT add it to Api or other projects.
-- **Creating Migrations:** Run from the Infrastructure directory with Infrastructure as both the project and startup project:
+- **Creating Migrations:**
   ```bash
-  cd Maliev.CustomerService.Infrastructure
-  dotnet ef migrations add InitialCreate --startup-project .
+  dotnet ef migrations add <Name> --project Maliev.CustomerService.Infrastructure --startup-project Maliev.CustomerService.Api
   ```
-- **Applying Migrations:** Use the same pattern:
+- **Applying Migrations:**
   ```bash
-  dotnet ef database update --startup-project .
+  dotnet ef database update --project Maliev.CustomerService.Infrastructure --startup-project Maliev.CustomerService.Api
   ```
 
 ### Key Libraries
@@ -208,3 +207,23 @@ public async Task GetByIdAsync_WithExistingCustomer_ReturnsCustomer()
 
 ---
 *Generated for AI Agents interacting with the Maliev.CustomerService repository.*
+
+
+## Database & EF Core — Mandatory Rules
+
+### EF Core Design Package
+- ❌ `Microsoft.EntityFrameworkCore.Design` MUST NOT be in Api projects
+- ✅ It belongs ONLY in the Infrastructure (or Data) project where migrations live
+- Migration commands must target Infrastructure, not Api:
+  ```
+  dotnet ef migrations add <Name> --project Maliev.<Domain>Service.Infrastructure --startup-project ../Maliev.<Domain>Service.Api
+  ```
+
+### PostgreSQL xmin Concurrency — Mandatory Pattern
+Use shadow property ONLY. Never add a Xmin/xmin property to domain entities.
+```csharp
+entity.Property<uint>("xmin").HasColumnType("xid").IsRowVersion();
+```
+- ❌ Never use `UseXminAsConcurrencyToken()` (removed in Npgsql EF v7)
+- ❌ Never use entity property `public uint Xmin { get; set; }` or `public uint xmin { get; set; }`
+- ❌ Never use `.Ignore(e => e.Xmin)` — remove the entity property instead
