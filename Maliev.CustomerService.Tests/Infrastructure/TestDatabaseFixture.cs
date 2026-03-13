@@ -27,7 +27,9 @@ public class TestDatabaseFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         // Initialize containers
-        _postgresContainer = new PostgreSqlBuilder().WithImage("postgres:18-alpine")
+        _postgresContainer = 
+                #pragma warning disable CS0618
+        new PostgreSqlBuilder().WithImage("postgres:18-alpine")
             .WithDatabase("customer_test_db")
             .WithUsername("postgres")
             .WithPassword("test_password")
@@ -93,6 +95,7 @@ public class TestDatabaseFixture : IAsyncLifetime
                 ["ASPNETCORE_ENVIRONMENT"] = "Testing"
             })
             .Build();
+#pragma warning restore CS0618
         IEncryptionService encryptionService = new EncryptionService(configuration);
         var encryptionInterceptor = new EncryptionInterceptor(encryptionService);
 
@@ -146,3 +149,7 @@ public class TestDatabaseFixture : IAsyncLifetime
         await context.SaveChangesAsync();
     }
 }
+
+
+
+

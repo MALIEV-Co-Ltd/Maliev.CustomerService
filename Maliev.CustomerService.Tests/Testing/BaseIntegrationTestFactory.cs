@@ -77,7 +77,9 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         {
             if (!_containersStarted)
             {
-                _postgresContainer = new PostgreSqlBuilder("postgres:18-alpine")
+                _postgresContainer = 
+                #pragma warning disable CS0618
+        new PostgreSqlBuilder().WithImage("postgres:18-alpine")
                     .Build();
 
                 _redisContainer = new RedisBuilder("redis:7.4-alpine")
@@ -319,6 +321,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
                         ["ASPNETCORE_ENVIRONMENT"] = "Testing"
                     })
                     .Build();
+#pragma warning restore CS0618
                 _encryptionService = new EncryptionService(configuration);
                 _encryptionInterceptor = new EncryptionInterceptor(_encryptionService);
             }
@@ -450,3 +453,6 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         return client;
     }
 }
+
+
+
