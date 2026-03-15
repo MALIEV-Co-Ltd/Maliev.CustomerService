@@ -67,4 +67,15 @@ public interface ICompanyService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>List of company search results with addresses</returns>
     Task<List<CompanySearchResultDto>> SearchWithAddressAsync(string query, int limit = 10, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Promotes a customer to be the primary contact for their company.
+    /// Clears IsPrimaryContact on all other customers in the same company.
+    /// </summary>
+    /// <param name="companyId">Company ID</param>
+    /// <param name="customerId">Customer ID to promote</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <exception cref="KeyNotFoundException">Company or customer not found, or customer not in company</exception>
+    Task PromotePrimaryContactAsync(Guid companyId, Guid customerId, string actorId, CancellationToken cancellationToken = default);
 }

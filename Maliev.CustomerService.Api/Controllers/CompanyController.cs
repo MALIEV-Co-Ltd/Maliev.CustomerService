@@ -3,6 +3,7 @@ using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.CustomerService.Api.Authorization;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Companies;
+using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Services;
 using Maliev.CustomerService.Application.Services;
 using Maliev.CustomerService.Domain.Authorization;
@@ -184,7 +185,14 @@ public class CompanyController : ControllerBase
 
             var result = await _companyService.GetAllAsync(page, pageSize, segment, tier);
 
-            return Ok(result);
+            return Ok(new PaginatedResponse<CompanyResponse>
+            {
+                Items = result.Companies,
+                TotalCount = result.TotalCount,
+                Page = page,
+                PageSize = pageSize,
+                TotalPages = (int)Math.Ceiling((double)result.TotalCount / pageSize)
+            });
         }
         catch (Exception ex)
         {
@@ -373,6 +381,40 @@ public class CompanyController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving company {CompanyId} with customers", id);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Promotes a customer to be the primary contact for their company
+    /// </summary>
+    /// <param name="companyId">Company ID</param>
+    /// <param name="customerId">Customer ID to promote</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>No content on success</returns>
+    /// <response code="204">Customer promoted successfully</response>
+    /// <response code="401">Unauthorized</response>
+    /// <response code="404">Company or customer not found</response>
+    [HttpPost("{companyId:guid}/primary-contact/{customerId:guid}")]
+    [RequirePermission(CustomerPermissions.CompaniesManage)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> PromotePrimaryContact(Guid companyId, Guid customerId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var (actorId, _) = User.GetActorInfo();
+            await _companyService.PromotePrimaryContactAsync(companyId, customerId, actorId, cancellationToken);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new ErrorResponse { Code = "NOT_FOUND", Message = ex.Message, TraceId = HttpContext.TraceIdentifier, Timestamp = DateTime.UtcNow });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error promoting primary contact for company {CompanyId}", companyId);
             throw;
         }
     }

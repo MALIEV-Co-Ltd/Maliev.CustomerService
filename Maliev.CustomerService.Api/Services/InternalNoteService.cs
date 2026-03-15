@@ -70,7 +70,11 @@ public class InternalNoteService : IInternalNoteService
 
         var xminValue = _context.Entry(note).Property<uint>("xmin").CurrentValue;
         var response = note.ToInternalNoteResponse(xminValue);
-        if (Guid.TryParse(createdBy, out var principalId))
+        if (IsSystemIdentity(createdBy))
+        {
+            response.CreatedByName = "System";
+        }
+        else if (Guid.TryParse(createdBy, out var principalId))
         {
             var principal = await _iamClient.GetPrincipalByIdAsync(principalId);
             if (principal != null)
@@ -120,7 +124,11 @@ public class InternalNoteService : IInternalNoteService
         foreach (var note in notes)
         {
             var response = note.ToInternalNoteResponse(_context.Entry(note).Property<uint>("xmin").CurrentValue);
-            if (Guid.TryParse(note.CreatedBy, out var pId) && principalMap.TryGetValue(pId, out var p))
+            if (IsSystemIdentity(note.CreatedBy))
+            {
+                response.CreatedByName = "System";
+            }
+            else if (Guid.TryParse(note.CreatedBy, out var pId) && principalMap.TryGetValue(pId, out var p))
             {
                 response.CreatedByName = p.DisplayName;
                 response.CreatedByEmail = p.Email;
@@ -255,7 +263,11 @@ public class InternalNoteService : IInternalNoteService
         }
 
         string? actorName = null;
-        if (Guid.TryParse(actorId, out var principalId))
+        if (IsSystemIdentity(actorId))
+        {
+            actorName = "System";
+        }
+        else if (Guid.TryParse(actorId, out var principalId))
         {
             var principal = await _iamClient.GetPrincipalByIdAsync(principalId);
             actorName = principal?.DisplayName;
@@ -384,4 +396,12 @@ public class InternalNoteService : IInternalNoteService
 
         return activity.OrderByDescending(a => (DateTime)a.GetType().GetProperty("Timestamp")!.GetValue(a)!).ToList();
     }
+
+    /// <summary>
+    /// Returns true if the identity is a system/service account (not a user principal GUID).
+    /// </summary>
+    private static bool IsSystemIdentity(string? identity) =>
+        !string.IsNullOrEmpty(identity) &&
+        (string.Equals(identity, "system", StringComparison.OrdinalIgnoreCase) ||
+         identity.StartsWith("system:", StringComparison.OrdinalIgnoreCase));
 }

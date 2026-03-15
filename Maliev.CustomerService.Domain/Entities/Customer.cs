@@ -111,6 +111,13 @@ public class Customer
     public string? ThaiNationalId { get; set; }
 
     /// <summary>
+    /// Whether this customer is the primary contact for their company.
+    /// Only one customer per company can have this set to true.
+    /// Enforced at service layer (not DB constraint).
+    /// </summary>
+    public bool IsPrimaryContact { get; set; } = false;
+
+    /// <summary>
     /// Soft delete flag
     /// </summary>
     public bool IsDeleted { get; set; } = false;

@@ -126,4 +126,37 @@ public class CompanyResponse
     /// </summary>
     [JsonPropertyName("xmin")]
     public uint xmin { get; set; }
+
+    /// <summary>
+    /// Primary contact for this company (customer with IsPrimaryContact = true),
+    /// or the first associated customer if none is explicitly set.
+    /// </summary>
+    [JsonPropertyName("primaryContact")]
+    public CompanyPrimaryContactDto? PrimaryContact { get; set; }
+}
+
+/// <summary>
+/// Lightweight primary contact info embedded in CompanyResponse.
+/// </summary>
+public class CompanyPrimaryContactDto
+{
+    /// <summary>Customer ID.</summary>
+    [JsonPropertyName("id")]
+    public Guid Id { get; set; }
+
+    /// <summary>Customer full name.</summary>
+    [JsonPropertyName("fullName")]
+    public string FullName { get; set; } = string.Empty;
+
+    /// <summary>Customer email address.</summary>
+    [JsonPropertyName("email")]
+    public string? Email { get; set; }
+
+    /// <summary>Customer mobile number.</summary>
+    [JsonPropertyName("mobile")]
+    public string? Mobile { get; set; }
+
+    /// <summary>Whether this customer is explicitly set as primary contact (vs inferred).</summary>
+    [JsonPropertyName("isPrimaryContact")]
+    public bool IsPrimaryContact { get; set; }
 }

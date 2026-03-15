@@ -139,7 +139,67 @@ public class CompanyService : ICompanyService
         }
 
         var xminValue = _context.Entry(company).Property<uint>("xmin").CurrentValue;
-        return company.ToCompanyResponse(xminValue);
+        var response = company.ToCompanyResponse(xminValue);
+
+        // Populate primary contact: use customer with IsPrimaryContact=true, else first customer by CreatedAt
+        var primaryContact = await _context.Customers
+            .Where(c => c.CompanyId == id && !c.IsDeleted)
+            .OrderByDescending(c => c.IsPrimaryContact)
+            .ThenBy(c => c.CreatedAt)
+            .Select(c => new CompanyPrimaryContactDto
+            {
+                Id = c.Id,
+                FullName = c.FirstName + " " + c.LastName,
+                Email = c.Email,
+                Mobile = c.Mobile,
+                IsPrimaryContact = c.IsPrimaryContact
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        response.PrimaryContact = primaryContact;
+        return response;
+    }
+
+    /// <inheritdoc />
+    public async Task PromotePrimaryContactAsync(Guid companyId, Guid customerId, string actorId, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Promoting customer {CustomerId} as primary contact for company {CompanyId} by {ActorId}",
+            customerId, companyId, actorId);
+
+        var company = await _context.Companies.FindAsync([companyId], cancellationToken);
+        if (company == null)
+            throw new KeyNotFoundException($"Company with ID '{companyId}' not found");
+
+        var customer = await _context.Customers
+            .FirstOrDefaultAsync(c => c.Id == customerId && c.CompanyId == companyId && !c.IsDeleted, cancellationToken);
+        if (customer == null)
+            throw new KeyNotFoundException($"Customer with ID '{customerId}' not found in company '{companyId}'");
+
+        // Clear primary contact flag on all other customers in this company
+        var otherCustomers = await _context.Customers
+            .Where(c => c.CompanyId == companyId && c.Id != customerId && c.IsPrimaryContact)
+            .ToListAsync(cancellationToken);
+
+        foreach (var c in otherCustomers)
+            c.IsPrimaryContact = false;
+
+        customer.IsPrimaryContact = true;
+        customer.UpdatedAt = DateTime.UtcNow;
+
+        var auditLog = new AuditLog
+        {
+            ActorId = actorId,
+            ActorType = "Employee",
+            Action = "PromotePrimaryContact",
+            EntityType = nameof(Customer),
+            EntityId = customerId.ToString(),
+            Timestamp = DateTime.UtcNow,
+            ChangedFields = JsonSerializer.Serialize(new { CompanyId = companyId, CustomerId = customerId })
+        };
+        _context.AuditLogs.Add(auditLog);
+
+        await _context.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation("Customer {CustomerId} is now primary contact for company {CompanyId}", customerId, companyId);
     }
 
     /// <summary>
