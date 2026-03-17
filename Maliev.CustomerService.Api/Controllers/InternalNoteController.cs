@@ -15,7 +15,7 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for internal note management operations
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("customer/v{version:apiVersion}/internal-notes")]
 public class InternalNoteController : ControllerBase
 {

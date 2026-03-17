@@ -15,7 +15,7 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for company document management
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("customer/v{version:apiVersion}/companies/{companyId:guid}/documents")]
 public class CompanyDocumentsController : ControllerBase
 {

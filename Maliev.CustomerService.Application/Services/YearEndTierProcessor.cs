@@ -15,6 +15,12 @@ public class YearEndTierProcessor : IYearEndTierProcessor
     private readonly ITierCalculationService _tierCalculationService;
     private readonly ILogger<YearEndTierProcessor> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="YearEndTierProcessor"/> class.
+    /// </summary>
+    /// <param name="companyRepository">Repository for company data access.</param>
+    /// <param name="tierCalculationService">Service for tier calculation operations.</param>
+    /// <param name="logger">Logger for recording processor operations.</param>
     public YearEndTierProcessor(
         ICompanyRepository companyRepository,
         ITierCalculationService tierCalculationService,

@@ -16,6 +16,12 @@ public class TierCalculationService : ITierCalculationService
 
     private static readonly string[] TierOrder = { "Classic", "Silver", "Gold" };
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TierCalculationService"/> class.
+    /// </summary>
+    /// <param name="companyRepository">Repository for company data access.</param>
+    /// <param name="tierSettingsRepository">Repository for tier settings data access.</param>
+    /// <param name="logger">Logger for recording service operations.</param>
     public TierCalculationService(
         ICompanyRepository companyRepository,
         ICompanyTierSettingsRepository tierSettingsRepository,

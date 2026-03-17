@@ -20,12 +20,21 @@ public class YearEndTierJob : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<YearEndTierJob> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="YearEndTierJob"/> class.
+    /// </summary>
+    /// <param name="scopeFactory">Factory for creating dependency injection scopes.</param>
+    /// <param name="logger">Logger for recording job execution events.</param>
     public YearEndTierJob(IServiceScopeFactory scopeFactory, ILogger<YearEndTierJob> logger)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Executes the background service logic to process year-end tier demotions.
+    /// </summary>
+    /// <param name="stoppingToken">Cancellation token to stop the service.</param>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)

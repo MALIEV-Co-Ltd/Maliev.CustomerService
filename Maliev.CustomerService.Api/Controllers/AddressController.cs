@@ -15,7 +15,7 @@ namespace Maliev.CustomerService.Api.Controllers;
 /// Controller for address management operations
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("customer/v{version:apiVersion}/addresses")]
 public class AddressController : ControllerBase
 {
