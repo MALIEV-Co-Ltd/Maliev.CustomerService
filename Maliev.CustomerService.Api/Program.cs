@@ -112,8 +112,13 @@ try
 
 
     // Force instantiation of MetricsService to ensure OpenTelemetry meters are created
-
     var metricsService = app.Services.GetRequiredService<Maliev.CustomerService.Api.Services.MetricsService>();
+
+    // Warm up database connection pool to avoid first-request timeout
+    using var warmupScope = app.Services.CreateScope();
+    var dbContext = warmupScope.ServiceProvider.GetRequiredService<CustomerDbContext>();
+    await dbContext.Database.ExecuteSqlRawAsync("SELECT 1");
+    logger.LogInformation("Database connection pool warmed up");
 
     // Middleware Pipeline
     app.UseStandardMiddleware();
