@@ -9,10 +9,10 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Maliev.CustomerService.Infrastructure.Migrations
+namespace Maliev.CustomerService.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(CustomerDbContext))]
-    [Migration("20260306082219_InitialCreate")]
+    [Migration("20260325114541_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -20,9 +20,10 @@ namespace Maliev.CustomerService.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.3")
+                .HasAnnotation("ProductVersion", "10.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Maliev.CustomerService.Domain.Entities.Address", b =>
@@ -400,6 +401,9 @@ namespace Maliev.CustomerService.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsPrimaryContact")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Landline")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
@@ -454,10 +458,25 @@ namespace Maliev.CustomerService.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Email")
+                    b.HasIndex("PrincipalId")
                         .IsUnique();
 
-                    b.HasIndex("PrincipalId")
+                    b.HasIndex(new[] { "Email" }, "ix_customer_email_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "Email" }, "ix_customer_email_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "Email" }, "ix_customer_email_trgm"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex(new[] { "FirstName" }, "ix_customer_first_name_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "FirstName" }, "ix_customer_first_name_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "FirstName" }, "ix_customer_first_name_trgm"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex(new[] { "LastName" }, "ix_customer_last_name_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "LastName" }, "ix_customer_last_name_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "LastName" }, "ix_customer_last_name_trgm"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex(new[] { "Email" }, "ix_customers_email_unique")
                         .IsUnique();
 
                     b.ToTable("Customers");

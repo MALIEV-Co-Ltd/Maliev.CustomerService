@@ -1,9 +1,9 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Maliev.CustomerService.Infrastructure.Migrations
+namespace Maliev.CustomerService.Infrastructure.Data.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration
@@ -11,6 +11,9 @@ namespace Maliev.CustomerService.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AlterDatabase()
+                .Annotation("Npgsql:PostgresExtension:pg_trgm", ",,");
+
             migrationBuilder.CreateTable(
                 name: "Addresses",
                 columns: table => new
@@ -107,9 +110,9 @@ namespace Maliev.CustomerService.Infrastructure.Migrations
                     CoinRewardPercentage = table.Column<decimal>(type: "numeric(5,2)", nullable: true),
                     ValidFrom = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     ValidTo = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -136,6 +139,7 @@ namespace Maliev.CustomerService.Infrastructure.Migrations
                     CompanyId = table.Column<Guid>(type: "uuid", nullable: true),
                     UsesCompanyBillingAddress = table.Column<bool>(type: "boolean", nullable: false),
                     ThaiNationalId = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    IsPrimaryContact = table.Column<bool>(type: "boolean", nullable: false),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
@@ -307,7 +311,28 @@ namespace Maliev.CustomerService.Infrastructure.Migrations
                 columns: new[] { "TierName", "ValidFrom" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Customers_Email",
+                name: "ix_customer_email_trgm",
+                table: "Customers",
+                column: "Email")
+                .Annotation("Npgsql:IndexMethod", "gin")
+                .Annotation("Npgsql:IndexOperators", new[] { "gin_trgm_ops" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_customer_first_name_trgm",
+                table: "Customers",
+                column: "FirstName")
+                .Annotation("Npgsql:IndexMethod", "gin")
+                .Annotation("Npgsql:IndexOperators", new[] { "gin_trgm_ops" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_customer_last_name_trgm",
+                table: "Customers",
+                column: "LastName")
+                .Annotation("Npgsql:IndexMethod", "gin")
+                .Annotation("Npgsql:IndexOperators", new[] { "gin_trgm_ops" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_customers_email_unique",
                 table: "Customers",
                 column: "Email",
                 unique: true);

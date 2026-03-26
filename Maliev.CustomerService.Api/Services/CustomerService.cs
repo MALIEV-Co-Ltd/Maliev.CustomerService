@@ -701,11 +701,27 @@ public class CustomerService : ICustomerService
         if (!string.IsNullOrEmpty(query))
         {
             var searchTerm = $"%{query}%";
-            customersQuery = customersQuery.Where(c =>
-                EF.Functions.ILike(c.FirstName, searchTerm) ||
-                EF.Functions.ILike(c.LastName, searchTerm) ||
-                EF.Functions.ILike(c.Email, searchTerm) ||
-                (c.FirstName + " " + c.LastName).Contains(query)); // Fallback for name concat
+            var terms = query.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+            if (terms.Length >= 2)
+            {
+                // If two or more terms are provided, optimize for "FirstName LastName" search
+                var first = $"{terms[0]}%";
+                var last = $"{terms[1]}%";
+                
+                customersQuery = customersQuery.Where(c =>
+                    (EF.Functions.ILike(c.FirstName, first) && EF.Functions.ILike(c.LastName, last)) ||
+                    EF.Functions.ILike(c.FirstName, searchTerm) ||
+                    EF.Functions.ILike(c.LastName, searchTerm) ||
+                    EF.Functions.ILike(c.Email, searchTerm));
+            }
+            else
+            {
+                customersQuery = customersQuery.Where(c =>
+                    EF.Functions.ILike(c.FirstName, searchTerm) ||
+                    EF.Functions.ILike(c.LastName, searchTerm) ||
+                    EF.Functions.ILike(c.Email, searchTerm));
+            }
         }
 
         // Apply filters (T119, T126)

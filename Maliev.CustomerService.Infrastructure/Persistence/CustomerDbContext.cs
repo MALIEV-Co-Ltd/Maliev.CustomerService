@@ -62,6 +62,8 @@ public class CustomerDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        modelBuilder.HasPostgresExtension("pg_trgm");
+
         modelBuilder.ApplyConfiguration(new CompanyConfiguration());
         modelBuilder.ApplyConfiguration(new CompanyTierSettingsConfiguration());
         modelBuilder.ApplyConfiguration(new CompanyDocumentConfiguration());
@@ -70,8 +72,23 @@ public class CustomerDbContext : DbContext
         modelBuilder.Entity<Customer>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.Email).IsUnique();
+            // B-tree unique index — enforces email uniqueness and supports equality lookups
+            entity.HasIndex(e => e.Email, "ix_customers_email_unique").IsUnique();
             entity.HasIndex(e => e.PrincipalId).IsUnique();
+
+            // Trigram GIN indexes for efficient partial string matches (ILIKE %term%)
+            // Note: GIN does not support unique constraints — uniqueness is on ix_customers_email_unique above
+            entity.HasIndex(e => e.FirstName, "ix_customer_first_name_trgm")
+                .HasMethod("gin")
+                .HasOperators("gin_trgm_ops");
+
+            entity.HasIndex(e => e.LastName, "ix_customer_last_name_trgm")
+                .HasMethod("gin")
+                .HasOperators("gin_trgm_ops");
+
+            entity.HasIndex(e => e.Email, "ix_customer_email_trgm")
+                .HasMethod("gin")
+                .HasOperators("gin_trgm_ops");
 
             // Soft delete filter
             entity.HasQueryFilter(e => !e.IsDeleted);
