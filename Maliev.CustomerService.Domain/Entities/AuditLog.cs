@@ -104,7 +104,9 @@ public static class AuditAction
     public const string Logout = "Logout";
     /// <summary>Validate credentials action.</summary>
     public const string ValidateCredentials = "ValidateCredentials";
+    /// <summary>Self-registration action.</summary>
+    public const string SelfRegister = "SelfRegister";
 
     /// <summary>All audit actions.</summary>
-    public static readonly string[] All = { Create, Update, Delete, SoftDelete, Restore, Login, Logout, ValidateCredentials };
+    public static readonly string[] All = { Create, Update, Delete, SoftDelete, Restore, Login, Logout, ValidateCredentials, SelfRegister };
 }

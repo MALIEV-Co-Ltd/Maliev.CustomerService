@@ -235,6 +235,149 @@ public class CustomerService : ICustomerService
         return customer.ToCustomerResponse(xmin: xminValue);
     }
 
+    /// <inheritdoc />
+    public async Task<CustomerResponse> RegisterAsync(RegisterCustomerRequest request, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Customer self-registration for {Email}", request.Email);
+
+        if (string.IsNullOrEmpty(request.Email) || !Regex.IsMatch(request.Email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.IgnoreCase))
+        {
+            _logger.LogWarning("Invalid email format for self-registration: {Email}", request.Email);
+            throw new ArgumentException($"'{request.Email}' is not a valid email address.");
+        }
+
+        var existingCustomer = await _context.Customers
+            .Where(c => c.Email == request.Email && !c.IsDeleted)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (existingCustomer != null)
+        {
+            _logger.LogWarning("Duplicate email {Email} for self-registration", request.Email);
+            throw new InvalidOperationException($"A customer with email '{request.Email}' already exists");
+        }
+
+        _logger.LogInformation("Creating IAM principal for self-registered customer with email {Email}", request.Email);
+        Guid principalId;
+        bool isNewPrincipal = false;
+        try
+        {
+            var existingPrincipal = await _iamClient.GetPrincipalByEmailAsync(request.Email, cancellationToken);
+            if (existingPrincipal != null)
+            {
+                _logger.LogInformation("Using existing IAM principal {PrincipalId} for email {Email}", existingPrincipal.PrincipalId, request.Email);
+                principalId = existingPrincipal.PrincipalId;
+            }
+            else
+            {
+                var principalResponse = await _iamClient.CreatePrincipalAsync(new CreatePrincipalRequest
+                {
+                    Email = request.Email,
+                    DisplayName = $"{request.FirstName} {request.LastName}",
+                    PrincipalType = "user",
+                    LinkedService = "CustomerService"
+                }, cancellationToken);
+                principalId = principalResponse.PrincipalId;
+                isNewPrincipal = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create or retrieve IAM principal for email {Email}", request.Email);
+            throw new InvalidOperationException("Failed to create customer identity in central system", ex);
+        }
+
+        var customer = new Customer
+        {
+            Id = Guid.NewGuid(),
+            PrincipalId = principalId,
+            FirstName = request.FirstName,
+            LastName = request.LastName,
+            Email = request.Email,
+            Mobile = request.Phone,
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = request.PreferredLanguage,
+            Timezone = request.Timezone,
+            IsDeleted = false,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.Customers.Add(customer);
+
+        var auditLog = new AuditLog
+        {
+            ActorId = customer.Id.ToString(),
+            ActorType = "Customer",
+            Action = AuditAction.SelfRegister,
+            EntityType = nameof(Customer),
+            EntityId = customer.Id.ToString(),
+            Timestamp = DateTime.UtcNow,
+            ChangedFields = JsonSerializer.Serialize(new
+            {
+                customer.FirstName,
+                customer.LastName,
+                customer.Email,
+                customer.Segment,
+                customer.Tier,
+                customer.PreferredLanguage,
+                customer.Timezone,
+                RegistrationMethod = request.RegistrationMethod
+            })
+        };
+
+        _context.AuditLogs.Add(auditLog);
+
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Customer {CustomerId} self-registered successfully", customer.Id);
+        }
+        catch (Exception ex)
+        {
+            if (isNewPrincipal)
+            {
+                _logger.LogError(ex, "Failed to save customer to database. Attempting to delete orphaned IAM principal {PrincipalId}", principalId);
+                await _iamClient.DeletePrincipalAsync(principalId, cancellationToken);
+            }
+            else
+            {
+                _logger.LogError(ex, "Failed to save customer to database. Keeping existing IAM principal {PrincipalId}", principalId);
+            }
+
+            var innerMessage = ex.InnerException?.Message ?? ex.Message;
+            throw new InvalidOperationException($"Failed to create customer due to database error: {innerMessage}", ex);
+        }
+
+        _metricsService.RecordCustomerRegistration(customer.Segment);
+
+        await _publishEndpoint.Publish(new CustomerRegisteredEvent(
+            MessageId: Guid.NewGuid(),
+            MessageName: "CustomerRegisteredEvent",
+            MessageType: MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy: "CustomerService",
+            ConsumedBy: ["NotificationService", "AuthService"],
+            CorrelationId: Guid.NewGuid(),
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
+            Payload: new CustomerRegisteredEventPayload(
+                CustomerId: customer.Id,
+                PrincipalId: principalId,
+                Email: customer.Email,
+                FirstName: customer.FirstName,
+                LastName: customer.LastName,
+                RegistrationMethod: request.RegistrationMethod,
+                RegisteredAtUtc: DateTimeOffset.UtcNow)
+        ), cancellationToken);
+
+        _logger.LogInformation("Published CustomerRegisteredEvent for customer {CustomerId}", customer.Id);
+
+        var xminValue = _context.Entry(customer).Property<uint>("xmin").CurrentValue;
+        return customer.ToCustomerResponse(xmin: xminValue);
+    }
+
     /// <summary>
     /// Retrieves a customer by ID
     /// </summary>

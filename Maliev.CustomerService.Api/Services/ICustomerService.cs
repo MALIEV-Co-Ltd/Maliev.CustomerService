@@ -84,6 +84,15 @@ public interface ICustomerService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Registers a new customer (self-registration via public endpoint).
+    /// Creates IAM principal if needed and publishes <c>CustomerRegisteredEvent</c>.
+    /// </summary>
+    /// <param name="request">Self-registration request data</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Created customer response</returns>
+    Task<CustomerResponse> RegisterAsync(RegisterCustomerRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Checks if a customer with the specified email already exists
     /// </summary>
     /// <param name="email">Email address to check (will be normalized to lowercase)</param>

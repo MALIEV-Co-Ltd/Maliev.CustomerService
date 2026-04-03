@@ -36,6 +36,97 @@ public class CustomerController : ControllerBase
     }
 
     /// <summary>
+    /// Self-register as a new customer. No authentication required.
+    /// </summary>
+    /// <param name="request">Customer self-registration request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Created customer response</returns>
+    /// <response code="201">Customer registered successfully</response>
+    /// <response code="400">Invalid request data</response>
+    /// <response code="409">Duplicate email</response>
+    [HttpPost("register")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(CustomerResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<CustomerResponse>> Register(
+        [FromBody] RegisterCustomerRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                var errors = string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage));
+                _logger.LogWarning("Validation failed for customer self-registration: {Errors}", errors);
+
+                var errorResponse = new ErrorResponse
+                {
+                    Code = "VALIDATION_ERROR",
+                    Message = "One or more validation errors occurred: " + errors,
+                    Details = ModelState
+                        .Where(ms => ms.Value?.Errors.Count > 0)
+                        .ToDictionary(
+                            kvp => kvp.Key,
+                            kvp => kvp.Value!.Errors.Select(e => e.ErrorMessage).ToArray()),
+                    TraceId = HttpContext.TraceIdentifier,
+                    Timestamp = DateTime.UtcNow
+                };
+
+                return BadRequest(errorResponse);
+            }
+
+            var customer = await _customerService.RegisterAsync(request, cancellationToken);
+
+            return CreatedAtAction(nameof(GetById), new { id = customer.Id }, customer);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("already exists"))
+        {
+            _logger.LogWarning(ex, "Duplicate email detected during self-registration");
+            return Conflict(new ErrorResponse
+            {
+                Code = "DUPLICATE_EMAIL",
+                Message = ex.Message,
+                TraceId = HttpContext.TraceIdentifier,
+                Timestamp = DateTime.UtcNow
+            });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("identity in central system"))
+        {
+            _logger.LogWarning(ex, "Central identity failure during self-registration");
+            return BadRequest(new ErrorResponse
+            {
+                Code = "IAM_FAILURE",
+                Message = ex.Message,
+                TraceId = HttpContext.TraceIdentifier,
+                Timestamp = DateTime.UtcNow
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Invalid input during self-registration");
+            return BadRequest(new ErrorResponse
+            {
+                Code = "INVALID_INPUT",
+                Message = ex.Message,
+                TraceId = HttpContext.TraceIdentifier,
+                Timestamp = DateTime.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during customer self-registration");
+            return StatusCode(500, new ErrorResponse
+            {
+                Code = "INTERNAL_SERVER_ERROR",
+                Message = "An unexpected error occurred while registering the customer: " + ex.Message,
+                TraceId = HttpContext.TraceIdentifier,
+                Timestamp = DateTime.UtcNow
+            });
+        }
+    }
+
+    /// <summary>
     /// Creates a new customer
     /// </summary>
     /// <param name="request">Customer creation request</param>

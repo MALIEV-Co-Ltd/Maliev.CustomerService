@@ -28,6 +28,8 @@ public static class CustomerPermissions
     public const string CustomersList = "customer.customers.list";
     /// <summary>Permission to search customers.</summary>
     public const string CustomersSearch = "customer.customers.search";
+    /// <summary>Self-register as a customer (anonymous — no auth required).</summary>
+    public const string CustomersRegister = "customer.customers.register";
 
     // Address Operations
     /// <summary>Permission to manage customer addresses.</summary>
@@ -81,6 +83,7 @@ public static class CustomerPermissions
         { CustomersDelete, "Delete customers" },
         { CustomersList, "List all customers" },
         { CustomersSearch, "Search customers" },
+        { CustomersRegister, "Self-register as a customer (anonymous)" },
         { AddressesManage, "Manage customer addresses" },
         { DocumentsCreate, "Create customer documents" },
         { DocumentsRead, "Read customer documents" },

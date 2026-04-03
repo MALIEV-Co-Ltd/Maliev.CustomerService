@@ -43,7 +43,8 @@ public static class CustomerPredefinedRoles
             CustomerPermissions.NdasRead,
             CustomerPermissions.NdasUpdate,
             CustomerPermissions.TiersRead,
-            CustomerPermissions.TiersManage
+            CustomerPermissions.TiersManage,
+            CustomerPermissions.CustomersRegister
         }),
 
         (Representative, "Create and update customer data, view documents and notes", new[]
