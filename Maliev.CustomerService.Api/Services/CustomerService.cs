@@ -139,6 +139,7 @@ public class CustomerService : ICustomerService
                 ? JsonSerializer.Serialize(request.CommunicationPreferences)
                 : null,
             CompanyId = request.CompanyId,
+            AccountManagerEmployeeId = request.AccountManagerEmployeeId,
             UsesCompanyBillingAddress = request.UsesCompanyBillingAddress,
             IsDeleted = false,
             CreatedAt = DateTime.UtcNow,
@@ -171,6 +172,7 @@ public class CustomerService : ICustomerService
                 customer.Timezone,
                 customer.CommunicationPreferences,
                 customer.CompanyId,
+                customer.AccountManagerEmployeeId,
                 customer.UsesCompanyBillingAddress
             })
         };
@@ -543,7 +545,8 @@ public class CustomerService : ICustomerService
             customer.PreferredLanguage,
             customer.Timezone,
             customer.CommunicationPreferences,
-            customer.CompanyId
+            customer.CompanyId,
+            customer.AccountManagerEmployeeId
         };
 
         // Track changed fields
@@ -648,6 +651,17 @@ public class CustomerService : ICustomerService
         {
             changedFields["CompanyId"] = request.CompanyId;
             customer.CompanyId = request.CompanyId;
+        }
+
+        if (request.ClearAccountManager && customer.AccountManagerEmployeeId.HasValue)
+        {
+            changedFields["AccountManagerEmployeeId"] = null!;
+            customer.AccountManagerEmployeeId = null;
+        }
+        else if (request.AccountManagerEmployeeId.HasValue && request.AccountManagerEmployeeId != customer.AccountManagerEmployeeId)
+        {
+            changedFields["AccountManagerEmployeeId"] = request.AccountManagerEmployeeId.Value;
+            customer.AccountManagerEmployeeId = request.AccountManagerEmployeeId.Value;
         }
 
         if (changedFields.Count > 0)

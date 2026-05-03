@@ -375,6 +375,9 @@ namespace Maliev.CustomerService.Infrastructure.Data.Migrations
                     b.Property<string>("CommunicationPreferences")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("AccountManagerEmployeeId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("CompanyId")
                         .HasColumnType("uuid");
 
@@ -454,6 +457,9 @@ namespace Maliev.CustomerService.Infrastructure.Data.Migrations
                         .HasColumnName("xmin");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AccountManagerEmployeeId")
+                        .HasDatabaseName("ix_customers_account_manager_employee_id");
 
                     b.HasIndex("PrincipalId")
                         .IsUnique();

@@ -100,6 +100,18 @@ public class UpdateCustomerRequest
     public Guid? CompanyId { get; set; }
 
     /// <summary>
+    /// Optional EmployeeService employee ID for the internal account manager.
+    /// </summary>
+    [JsonPropertyName("accountManagerEmployeeId")]
+    public Guid? AccountManagerEmployeeId { get; set; }
+
+    /// <summary>
+    /// Clears the current account manager assignment when set to true.
+    /// </summary>
+    [JsonPropertyName("clearAccountManager")]
+    public bool ClearAccountManager { get; set; }
+
+    /// <summary>
     /// PostgreSQL xmin for optimistic concurrency control (required)
     /// </summary>
     [Required(ErrorMessage = "xmin is required for updates")]

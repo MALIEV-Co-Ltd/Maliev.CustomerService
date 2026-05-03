@@ -179,6 +179,38 @@ public class CustomerServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_WithAccountManager_PersistsEmployeeReference()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var accountManagerId = Guid.NewGuid();
+
+        var request = new CreateCustomerRequest
+        {
+            FirstName = "Managed",
+            LastName = "Customer",
+            Email = "managed.customer@example.com",
+            Segment = "Enterprise",
+            Tier = "Gold",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok",
+            AccountManagerEmployeeId = accountManagerId
+        };
+
+        // Act
+        var result = await service.CreateAsync(request, "test-actor", "Employee");
+
+        // Assert
+        Assert.Equal(accountManagerId, result.AccountManagerEmployeeId);
+
+        await using var context = _fixture.CreateDbContext();
+        var customerInDb = await context.Customers.FindAsync(result.Id);
+        Assert.NotNull(customerInDb);
+        Assert.Equal(accountManagerId, customerInDb!.AccountManagerEmployeeId);
+    }
+
+    [Fact]
     public async Task CreateAsync_WithDuplicateEmail_ThrowsInvalidOperationException()
     {
         // Arrange
@@ -347,6 +379,70 @@ public class CustomerServiceTests
         Assert.Equal("Test", result.LastName); // Unchanged
         Assert.Equal("update.test@example.com", result.Email); // Unchanged
         Assert.True(result.UpdatedAt > created.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithAccountManager_UpdatesEmployeeReference()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var accountManagerId = Guid.NewGuid();
+
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Update",
+            LastName = "Manager",
+            Email = "update.manager@example.com",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "test-actor", "Employee");
+
+        var updateRequest = new UpdateCustomerRequest
+        {
+            AccountManagerEmployeeId = accountManagerId,
+            xmin = created.xmin
+        };
+
+        // Act
+        var result = await service.UpdateAsync(created.Id, updateRequest, "test-actor2", "Employee");
+
+        // Assert
+        Assert.Equal(accountManagerId, result.AccountManagerEmployeeId);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithClearAccountManager_ClearsEmployeeReference()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Clear",
+            LastName = "Manager",
+            Email = "clear.manager@example.com",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok",
+            AccountManagerEmployeeId = Guid.NewGuid()
+        }, "test-actor", "Employee");
+
+        var updateRequest = new UpdateCustomerRequest
+        {
+            ClearAccountManager = true,
+            xmin = created.xmin
+        };
+
+        // Act
+        var result = await service.UpdateAsync(created.Id, updateRequest, "test-actor2", "Employee");
+
+        // Assert
+        Assert.Null(result.AccountManagerEmployeeId);
     }
 
     [Fact]

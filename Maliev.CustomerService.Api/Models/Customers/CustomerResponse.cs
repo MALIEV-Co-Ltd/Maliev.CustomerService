@@ -147,6 +147,12 @@ public class CustomerResponse
     public Guid? CompanyId { get; set; }
 
     /// <summary>
+    /// EmployeeService employee ID for the internal account manager.
+    /// </summary>
+    [JsonPropertyName("accountManagerEmployeeId")]
+    public Guid? AccountManagerEmployeeId { get; set; }
+
+    /// <summary>
     /// Whether to use the company's billing address
     /// </summary>
     [JsonPropertyName("usesCompanyBillingAddress")]

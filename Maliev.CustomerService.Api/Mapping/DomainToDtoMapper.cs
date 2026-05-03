@@ -38,6 +38,7 @@ public static class DomainToDtoMapper
                 ? JsonSerializer.Deserialize<Dictionary<string, bool>>(customer.CommunicationPreferences)
                 : null,
             CompanyId = customer.CompanyId,
+            AccountManagerEmployeeId = customer.AccountManagerEmployeeId,
             CompanyName = company?.Name,
             CompanyPhone = company?.ContactPhone,
             NDAStatus = nda?.Status,

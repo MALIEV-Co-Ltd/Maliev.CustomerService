@@ -97,6 +97,11 @@ public class Customer
     public Guid? CompanyId { get; set; }
 
     /// <summary>
+    /// Optional EmployeeService employee ID for the internal account manager assigned to this customer.
+    /// </summary>
+    public Guid? AccountManagerEmployeeId { get; set; }
+
+    /// <summary>
     /// Whether to use the company's billing address instead of a personal one
     /// </summary>
     public bool UsesCompanyBillingAddress { get; set; } = true;

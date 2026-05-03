@@ -75,6 +75,8 @@ public class CustomerDbContext : DbContext
             // B-tree unique index — enforces email uniqueness and supports equality lookups
             entity.HasIndex(e => e.Email, "ix_customers_email_unique").IsUnique();
             entity.HasIndex(e => e.PrincipalId).IsUnique();
+            entity.HasIndex(e => e.AccountManagerEmployeeId)
+                .HasDatabaseName("ix_customers_account_manager_employee_id");
 
             // Trigram GIN indexes for efficient partial string matches (ILIKE %term%)
             // Note: GIN does not support unique constraints — uniqueness is on ix_customers_email_unique above
