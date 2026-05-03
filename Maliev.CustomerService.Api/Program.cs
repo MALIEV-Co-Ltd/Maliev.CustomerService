@@ -32,6 +32,7 @@ try
         x.AddConsumer<Maliev.CustomerService.Api.Consumers.GetCustomerDetailsConsumer>();
         x.AddConsumer<Maliev.CustomerService.Api.Consumers.FileDeletedEventConsumer>();
         x.AddConsumer<Maliev.CustomerService.Api.Consumers.OrderPaidEventConsumer>();
+        x.AddConsumer<Maliev.CustomerService.Api.Consumers.SearchReindexRequestedConsumer>();
     }); // RabbitMQ message bus (non-blocking startup)
     builder.AddPostgresDbContext<CustomerDbContext>(connectionName: "CustomerDbContext"); // PostgreSQL with retry logic
 

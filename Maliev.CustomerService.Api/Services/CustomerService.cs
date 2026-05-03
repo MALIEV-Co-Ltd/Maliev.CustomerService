@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Models.IAM;
+using Maliev.CustomerService.Api.Search;
 using Maliev.CustomerService.Domain.Entities;
 using Maliev.CustomerService.Infrastructure.Persistence;
 using Maliev.MessagingContracts;
@@ -230,6 +231,7 @@ public class CustomerService : ICustomerService
         ), cancellationToken);
 
         _logger.LogInformation("Published CustomerCreatedEvent for customer {CustomerId}", customer.Id);
+        await PublishCustomerSearchUpsertAsync(customer, DateTimeOffset.UtcNow, cancellationToken);
 
         var xminValue = _context.Entry(customer).Property<uint>("xmin").CurrentValue;
         return customer.ToCustomerResponse(xmin: xminValue);
@@ -373,6 +375,7 @@ public class CustomerService : ICustomerService
         ), cancellationToken);
 
         _logger.LogInformation("Published CustomerRegisteredEvent for customer {CustomerId}", customer.Id);
+        await PublishCustomerSearchUpsertAsync(customer, DateTimeOffset.UtcNow, cancellationToken);
 
         var xminValue = _context.Entry(customer).Property<uint>("xmin").CurrentValue;
         return customer.ToCustomerResponse(xmin: xminValue);
@@ -700,6 +703,7 @@ public class CustomerService : ICustomerService
                 ), cancellationToken);
 
                 _logger.LogInformation("Published CustomerUpdatedEvent for customer {CustomerId}", id);
+                await PublishCustomerSearchUpsertAsync(customer, DateTimeOffset.UtcNow, cancellationToken);
             }
             catch (DbUpdateConcurrencyException ex)
             {
@@ -785,6 +789,9 @@ public class CustomerService : ICustomerService
             ), cancellationToken);
 
             _logger.LogInformation("Published CustomerDeletedEvent for customer {CustomerId}", id);
+            await _publishEndpoint.Publish(
+                CustomerSearchDocumentMapper.ToDeletedEvent(customer.Id, DateTimeOffset.UtcNow),
+                cancellationToken);
 
             return true;
         }
@@ -1123,6 +1130,21 @@ public class CustomerService : ICustomerService
             PageSize = pageSize,
             TotalPages = totalPages
         };
+    }
+
+    private async Task PublishCustomerSearchUpsertAsync(Customer customer, DateTimeOffset occurredAtUtc, CancellationToken cancellationToken)
+    {
+        Company? company = null;
+        if (customer.CompanyId.HasValue)
+        {
+            company = await _context.Companies
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Id == customer.CompanyId.Value, cancellationToken);
+        }
+
+        await _publishEndpoint.Publish(
+            CustomerSearchDocumentMapper.ToUpsertEvent(customer, company, occurredAtUtc),
+            cancellationToken);
     }
 
     private static string GetEntityDisplayName(string entityType) => entityType switch
