@@ -872,7 +872,7 @@ public class CustomerService : ICustomerService
                 // If two or more terms are provided, optimize for "FirstName LastName" search
                 var first = $"{terms[0]}%";
                 var last = $"{terms[1]}%";
-                
+
                 customersQuery = customersQuery.Where(c =>
                     (EF.Functions.ILike(c.FirstName, first) && EF.Functions.ILike(c.LastName, last)) ||
                     EF.Functions.ILike(c.FirstName, searchTerm) ||
