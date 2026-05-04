@@ -414,6 +414,49 @@ public class CustomerServiceTests
     }
 
     [Fact]
+    public async Task GetActivityAsync_WhenCompanyChanges_UsesCompanyNamesInDescription()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        await using (var context = _fixture.CreateDbContext())
+        {
+            context.Companies.AddRange(
+                new Company { Id = Guid.Parse("db741b8f-67cf-40ba-8db8-5b899ad80001"), Name = "Old Robotics", Segment = "Enterprise" },
+                new Company { Id = Guid.Parse("efdd1db7-7225-4c40-914f-83dc3af80002"), Name = "New Manufacturing", Segment = "Enterprise" });
+            await context.SaveChangesAsync();
+        }
+
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Company",
+            LastName = "Change",
+            Email = "company.change@example.com",
+            Segment = "Enterprise",
+            Tier = "Gold",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok",
+            CompanyId = Guid.Parse("db741b8f-67cf-40ba-8db8-5b899ad80001")
+        }, "employee-1", "Employee");
+
+        await service.UpdateAsync(created.Id, new UpdateCustomerRequest
+        {
+            CompanyId = Guid.Parse("efdd1db7-7225-4c40-914f-83dc3af80002"),
+            xmin = created.xmin
+        }, "employee-2", "Employee");
+
+        // Act
+        var activity = await service.GetActivityAsync(created.Id, page: 1, pageSize: 10);
+
+        // Assert
+        var update = Assert.Single(activity.Items, item => item.Action == AuditAction.Update);
+        Assert.Contains("changed company from '**Old Robotics**' to '**New Manufacturing**'", update.Description);
+        Assert.DoesNotContain("CompanyId", update.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("db741b8f", update.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("efdd1db7", update.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task UpdateAsync_WithClearAccountManager_ClearsEmployeeReference()
     {
         // Arrange

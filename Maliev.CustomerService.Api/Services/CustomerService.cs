@@ -1089,6 +1089,7 @@ public class CustomerService : ICustomerService
             .ToListAsync(cancellationToken);
 
         var activities = new List<CustomerActivityResponse>();
+        var companyNameById = await ResolveCompanyNamesForAuditLogsAsync(auditLogs, cancellationToken);
 
         // Resolve actor names
         var actorIds = auditLogs
@@ -1109,7 +1110,7 @@ public class CustomerService : ICustomerService
             string description = audit.Action switch
             {
                 AuditAction.Create => GetCreateDescription(audit),
-                AuditAction.Update => GetUpdateDescription(audit.EntityType, audit.ChangedFields, audit.PreviousValues),
+                AuditAction.Update => GetUpdateDescription(audit.EntityType, audit.ChangedFields, audit.PreviousValues, companyNameById),
                 AuditAction.SoftDelete => $"{GetEntityDisplayName(audit.EntityType)} deactivated",
                 AuditAction.Delete => $"{GetEntityDisplayName(audit.EntityType)} deleted",
                 _ => $"Action: {audit.Action} on {GetEntityDisplayName(audit.EntityType)}"
@@ -1144,6 +1145,76 @@ public class CustomerService : ICustomerService
             PageSize = pageSize,
             TotalPages = totalPages
         };
+    }
+
+    private async Task<Dictionary<Guid, string>> ResolveCompanyNamesForAuditLogsAsync(
+        IReadOnlyCollection<AuditLog> auditLogs,
+        CancellationToken cancellationToken)
+    {
+        var companyIds = new HashSet<Guid>();
+
+        foreach (var audit in auditLogs)
+        {
+            CollectCompanyIds(audit.ChangedFields, companyIds);
+            CollectCompanyIds(audit.PreviousValues, companyIds);
+        }
+
+        if (companyIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await _context.Companies
+            .AsNoTracking()
+            .Where(company => companyIds.Contains(company.Id))
+            .ToDictionaryAsync(company => company.Id, company => company.Name, cancellationToken);
+    }
+
+    private static void CollectCompanyIds(string? json, ISet<Guid> companyIds)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return;
+        }
+
+        try
+        {
+            var fields = JsonSerializer.Deserialize<Dictionary<string, object>>(json);
+            if (fields is null)
+            {
+                return;
+            }
+
+            if (fields.TryGetValue("Fields", out var nestedFields) && nestedFields is JsonElement nestedElement)
+            {
+                fields = JsonSerializer.Deserialize<Dictionary<string, object>>(nestedElement.GetRawText()) ?? fields;
+            }
+
+            if (fields.TryGetValue("CompanyId", out var companyId) && TryReadGuid(companyId, out var id))
+            {
+                companyIds.Add(id);
+            }
+        }
+        catch
+        {
+            // Audit history should remain readable even if an old row has malformed details.
+        }
+    }
+
+    private static bool TryReadGuid(object? value, out Guid id)
+    {
+        if (value is JsonElement element)
+        {
+            if (element.ValueKind == JsonValueKind.String)
+            {
+                return Guid.TryParse(element.GetString(), out id);
+            }
+
+            id = default;
+            return false;
+        }
+
+        return Guid.TryParse(value?.ToString(), out id);
     }
 
     private async Task PublishCustomerSearchUpsertAsync(Customer customer, DateTimeOffset occurredAtUtc, CancellationToken cancellationToken)
@@ -1202,7 +1273,11 @@ public class CustomerService : ICustomerService
         return "Added a new address";
     }
 
-    private static string GetUpdateDescription(string entityType, string? changedFieldsJson, string? previousValuesJson)
+    private static string GetUpdateDescription(
+        string entityType,
+        string? changedFieldsJson,
+        string? previousValuesJson,
+        IReadOnlyDictionary<Guid, string>? companyNameById = null)
     {
         var entityDisplayName = GetEntityDisplayName(entityType);
         if (string.IsNullOrEmpty(changedFieldsJson)) return $"{entityDisplayName} updated";
@@ -1288,12 +1363,19 @@ public class CustomerService : ICustomerService
                     "City" => "city",
                     "PostalCode" => "postal code",
                     "IsDefault" => "default status",
+                    "CompanyId" => "company",
                     _ => field.ToLowerInvariant()
                 };
 
                 // Truncate long values for readability
                 var displayOld = oldValue.Length > 30 ? oldValue.Substring(0, 27) + "..." : oldValue;
                 var displayNew = newValue.Length > 30 ? newValue.Substring(0, 27) + "..." : newValue;
+
+                if (field == "CompanyId")
+                {
+                    displayOld = FormatCompanyAuditValue(oldValue, companyNameById);
+                    displayNew = FormatCompanyAuditValue(newValue, companyNameById);
+                }
 
                 // Humanize boolean values
                 if (field == "IsDefault")
@@ -1325,5 +1407,22 @@ public class CustomerService : ICustomerService
         {
             return $"{GetEntityDisplayName(entityType)} updated";
         }
+    }
+
+    private static string FormatCompanyAuditValue(string value, IReadOnlyDictionary<Guid, string>? companyNameById)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Equals("empty", StringComparison.OrdinalIgnoreCase))
+        {
+            return "No company";
+        }
+
+        if (Guid.TryParse(value, out var companyId))
+        {
+            return companyNameById != null && companyNameById.TryGetValue(companyId, out var companyName)
+                ? companyName
+                : "Unknown company";
+        }
+
+        return value;
     }
 }
