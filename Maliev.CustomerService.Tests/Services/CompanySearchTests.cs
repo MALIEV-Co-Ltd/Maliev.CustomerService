@@ -129,4 +129,42 @@ public class CompanySearchTests
         Assert.Single(results);
         Assert.Equal("Vat Company", results[0].Name);
     }
+
+    [Fact]
+    public async Task SearchWithAddressAsync_WithLimit_ReturnsCompaniesOrderedByName()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        using (var context = _fixture.CreateDbContext())
+        {
+            context.Companies.AddRange(
+                new Company
+                {
+                    Name = "Search Match Zeta",
+                    VatNumber = "TH-3333333333"
+                },
+                new Company
+                {
+                    Name = "Search Match Alpha",
+                    VatNumber = "TH-1111111111"
+                },
+                new Company
+                {
+                    Name = "Search Match Beta",
+                    VatNumber = "TH-2222222222"
+                });
+
+            await context.SaveChangesAsync();
+        }
+
+        // Act
+        var results = await service.SearchWithAddressAsync("Search Match", limit: 2);
+
+        // Assert
+        Assert.Equal(2, results.Count);
+        Assert.Equal("Search Match Alpha", results[0].Name);
+        Assert.Equal("Search Match Beta", results[1].Name);
+    }
 }

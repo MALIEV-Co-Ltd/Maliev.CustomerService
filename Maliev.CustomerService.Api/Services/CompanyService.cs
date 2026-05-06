@@ -483,6 +483,8 @@ public class CompanyService : ICompanyService
 
         var companies = await _context.Companies
             .Where(c => EF.Functions.ILike(c.Name, $"%{query}%") || (c.VatNumber != null && EF.Functions.ILike(c.VatNumber, $"%{query}%")))
+            .OrderBy(c => c.Name)
+            .ThenBy(c => c.Id)
             .Take(limit)
             .ToListAsync(cancellationToken);
 
