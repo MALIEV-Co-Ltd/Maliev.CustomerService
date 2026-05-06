@@ -1364,6 +1364,7 @@ public class CustomerService : ICustomerService
                     "PostalCode" => "postal code",
                     "IsDefault" => "default status",
                     "CompanyId" => "company",
+                    "AccountManagerEmployeeId" => "account manager",
                     _ => field.ToLowerInvariant()
                 };
 
@@ -1375,6 +1376,11 @@ public class CustomerService : ICustomerService
                 {
                     displayOld = FormatCompanyAuditValue(oldValue, companyNameById);
                     displayNew = FormatCompanyAuditValue(newValue, companyNameById);
+                }
+                else if (field == "AccountManagerEmployeeId")
+                {
+                    displayOld = FormatAccountManagerAuditValue(oldValue);
+                    displayNew = FormatAccountManagerAuditValue(newValue);
                 }
 
                 // Humanize boolean values
@@ -1424,5 +1430,17 @@ public class CustomerService : ICustomerService
         }
 
         return value;
+    }
+
+    private static string FormatAccountManagerAuditValue(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Equals("empty", StringComparison.OrdinalIgnoreCase))
+        {
+            return "No account manager";
+        }
+
+        return Guid.TryParse(value, out _)
+            ? "assigned employee"
+            : value;
     }
 }

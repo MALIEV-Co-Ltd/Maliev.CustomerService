@@ -457,6 +457,42 @@ public class CustomerServiceTests
     }
 
     [Fact]
+    public async Task GetActivityAsync_WhenAccountManagerChanges_UsesHumanReadableDescription()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var accountManagerId = Guid.Parse("ea3ff5ea-244b-48db-95ab-829000000001");
+
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Account",
+            LastName = "Manager",
+            Email = "account.manager.activity@example.com",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "employee-1", "Employee");
+
+        await service.UpdateAsync(created.Id, new UpdateCustomerRequest
+        {
+            AccountManagerEmployeeId = accountManagerId,
+            xmin = created.xmin
+        }, "employee-2", "Employee");
+
+        // Act
+        var activity = await service.GetActivityAsync(created.Id, page: 1, pageSize: 10);
+
+        // Assert
+        var update = Assert.Single(activity.Items, item => item.Action == AuditAction.Update);
+        Assert.Contains("set account manager to '**assigned employee**'", update.Description);
+        Assert.DoesNotContain("AccountManagerEmployeeId", update.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("accountmanageremployeeid", update.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ea3ff5ea", update.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task UpdateAsync_WithClearAccountManager_ClearsEmployeeReference()
     {
         // Arrange
