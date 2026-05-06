@@ -113,41 +113,12 @@ public class CustomerDbContext : DbContext
         {
             entity.HasKey(e => e.Code);
             entity.Property(e => e.Code).HasMaxLength(50);
+            entity.Property(e => e.Category).IsRequired().HasMaxLength(50);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Description).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.TypicalUse).IsRequired().HasMaxLength(500);
 
-            entity.HasData(
-                new PaymentTerm
-                {
-                    Code = "DUE_ON_RECEIPT",
-                    Name = Domain.Entities.PaymentTerms.DueOnReceipt,
-                    DueDays = 0,
-                    IsDefault = true,
-                    SortOrder = 0
-                },
-                new PaymentTerm
-                {
-                    Code = "NET_15",
-                    Name = Domain.Entities.PaymentTerms.Net15,
-                    DueDays = 15,
-                    IsDefault = false,
-                    SortOrder = 15
-                },
-                new PaymentTerm
-                {
-                    Code = "NET_30",
-                    Name = Domain.Entities.PaymentTerms.Net30,
-                    DueDays = 30,
-                    IsDefault = false,
-                    SortOrder = 30
-                },
-                new PaymentTerm
-                {
-                    Code = "NET_45",
-                    Name = Domain.Entities.PaymentTerms.Net45,
-                    DueDays = 45,
-                    IsDefault = false,
-                    SortOrder = 45
-                });
+            entity.HasData(Domain.Entities.PaymentTerms.SeedData);
         });
 
         // Configure Address entity

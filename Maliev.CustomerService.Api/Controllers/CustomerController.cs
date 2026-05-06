@@ -473,6 +473,21 @@ public class CustomerController : ControllerBase
     }
 
     /// <summary>
+    /// Gets available payment terms for customer profiles.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Payment term reference data ordered for presentation.</returns>
+    [HttpGet("payment-terms")]
+    [RequirePermission(CustomerPermissions.CustomersRead)]
+    [ProducesResponseType(typeof(IReadOnlyList<PaymentTermResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<PaymentTermResponse>>> GetPaymentTerms(CancellationToken cancellationToken = default)
+    {
+        var result = await _customerService.GetPaymentTermsAsync(cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Gets customer preferences for compliance/audit purposes (T123)
     /// </summary>
     [HttpGet("preferences")]

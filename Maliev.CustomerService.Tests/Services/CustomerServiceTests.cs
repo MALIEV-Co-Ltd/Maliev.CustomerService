@@ -419,6 +419,27 @@ public class CustomerServiceTests
     }
 
     [Fact]
+    public async Task GetPaymentTermsAsync_ReturnsSeededTermsWithDescriptions()
+    {
+        // Arrange
+        var service = CreateService();
+
+        // Act
+        var result = await service.GetPaymentTermsAsync();
+
+        // Assert
+        Assert.Contains(result, term => term.Name == PaymentTerms.DueOnReceipt && term.IsDefault);
+        Assert.Contains(result, term => term.Name == PaymentTerms.Net90 && term.DueDays == 90);
+        Assert.Contains(result, term => term.Name == PaymentTerms.TwoTenNet30 && term.DiscountPercent == 2m && term.DiscountDays == 10);
+        Assert.Contains(result, term => term.Name == PaymentTerms.MilestoneProgress && term.Category == "Milestone");
+        Assert.All(result, term =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(term.Description));
+            Assert.False(string.IsNullOrWhiteSpace(term.TypicalUse));
+        });
+    }
+
+    [Fact]
     public async Task UpdateAsync_WithAccountManager_UpdatesEmployeeReference()
     {
         // Arrange

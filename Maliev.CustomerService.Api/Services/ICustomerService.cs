@@ -84,6 +84,13 @@ public interface ICustomerService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets available payment terms for customer profile selection.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Payment term reference data ordered for presentation</returns>
+    Task<IReadOnlyList<PaymentTermResponse>> GetPaymentTermsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Registers a new customer (self-registration via public endpoint).
     /// Creates IAM principal if needed and publishes <c>CustomerRegisteredEvent</c>.
     /// </summary>

@@ -358,6 +358,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
                   WHERE table_schema = 'public'
                   AND table_type = 'BASE TABLE'
                   AND table_name != '__EFMigrationsHistory'
+                  AND table_name != 'PaymentTerms'
                   ORDER BY table_name")
             .ToListAsync();
 

@@ -747,6 +747,29 @@ public class CustomerService : ICustomerService
         return customer.ToCustomerResponse(xmin: xminValue);
     }
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PaymentTermResponse>> GetPaymentTermsAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.PaymentTerms
+            .AsNoTracking()
+            .OrderBy(term => term.SortOrder)
+            .ThenBy(term => term.Name)
+            .Select(term => new PaymentTermResponse
+            {
+                Code = term.Code,
+                Name = term.Name,
+                Category = term.Category,
+                Description = term.Description,
+                TypicalUse = term.TypicalUse,
+                DueDays = term.DueDays,
+                DiscountPercent = term.DiscountPercent,
+                DiscountDays = term.DiscountDays,
+                IsDefault = term.IsDefault,
+                SortOrder = term.SortOrder
+            })
+            .ToListAsync(cancellationToken);
+    }
+
     private static string NormalizePaymentTerms(string? paymentTerms)
     {
         if (string.IsNullOrWhiteSpace(paymentTerms))

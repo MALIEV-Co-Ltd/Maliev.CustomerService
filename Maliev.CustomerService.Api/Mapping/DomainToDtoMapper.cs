@@ -53,6 +53,26 @@ public static class DomainToDtoMapper
     }
 
     /// <summary>
+    /// Maps payment term reference data to a response DTO.
+    /// </summary>
+    public static PaymentTermResponse ToPaymentTermResponse(this PaymentTerm paymentTerm)
+    {
+        return new PaymentTermResponse
+        {
+            Code = paymentTerm.Code,
+            Name = paymentTerm.Name,
+            Category = paymentTerm.Category,
+            Description = paymentTerm.Description,
+            TypicalUse = paymentTerm.TypicalUse,
+            DueDays = paymentTerm.DueDays,
+            DiscountPercent = paymentTerm.DiscountPercent,
+            DiscountDays = paymentTerm.DiscountDays,
+            IsDefault = paymentTerm.IsDefault,
+            SortOrder = paymentTerm.SortOrder
+        };
+    }
+
+    /// <summary>
     /// Maps a Company entity to CompanyResponse DTO
     /// </summary>
     public static CompanyResponse ToCompanyResponse(this Company company, uint xmin = 0)
