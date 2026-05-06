@@ -101,6 +101,14 @@ public class CreateCustomerRequest
     public Dictionary<string, object>? CommunicationPreferences { get; set; }
 
     /// <summary>
+    /// Payment terms for this customer (default: Due on receipt)
+    /// </summary>
+    [Required(ErrorMessage = "Payment terms are required")]
+    [MaxLength(100, ErrorMessage = "Payment terms must not exceed 100 characters")]
+    [JsonPropertyName("paymentTerms")]
+    public string PaymentTerms { get; set; } = Maliev.CustomerService.Domain.Entities.PaymentTerms.DueOnReceipt;
+
+    /// <summary>
     /// Optional link to Company entity
     /// </summary>
     [JsonPropertyName("companyId")]

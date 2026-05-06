@@ -37,6 +37,7 @@ public static class DomainToDtoMapper
             CommunicationPreferences = !string.IsNullOrEmpty(customer.CommunicationPreferences)
                 ? JsonSerializer.Deserialize<Dictionary<string, bool>>(customer.CommunicationPreferences)
                 : null,
+            PaymentTerms = customer.PaymentTerms,
             CompanyId = customer.CompanyId,
             AccountManagerEmployeeId = customer.AccountManagerEmployeeId,
             CompanyName = company?.Name,

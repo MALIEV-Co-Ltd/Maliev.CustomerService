@@ -138,6 +138,7 @@ public class CustomerService : ICustomerService
             CommunicationPreferences = request.CommunicationPreferences != null
                 ? JsonSerializer.Serialize(request.CommunicationPreferences)
                 : null,
+            PaymentTerms = NormalizePaymentTerms(request.PaymentTerms),
             CompanyId = request.CompanyId,
             AccountManagerEmployeeId = request.AccountManagerEmployeeId,
             UsesCompanyBillingAddress = request.UsesCompanyBillingAddress,
@@ -171,6 +172,7 @@ public class CustomerService : ICustomerService
                 customer.PreferredLanguage,
                 customer.Timezone,
                 customer.CommunicationPreferences,
+                customer.PaymentTerms,
                 customer.CompanyId,
                 customer.AccountManagerEmployeeId,
                 customer.UsesCompanyBillingAddress
@@ -545,6 +547,7 @@ public class CustomerService : ICustomerService
             customer.PreferredLanguage,
             customer.Timezone,
             customer.CommunicationPreferences,
+            customer.PaymentTerms,
             customer.CompanyId,
             customer.AccountManagerEmployeeId
         };
@@ -647,6 +650,16 @@ public class CustomerService : ICustomerService
             }
         }
 
+        if (!string.IsNullOrWhiteSpace(request.PaymentTerms))
+        {
+            var paymentTerms = NormalizePaymentTerms(request.PaymentTerms);
+            if (!string.Equals(paymentTerms, customer.PaymentTerms, StringComparison.Ordinal))
+            {
+                changedFields["PaymentTerms"] = paymentTerms;
+                customer.PaymentTerms = paymentTerms;
+            }
+        }
+
         if (request.CompanyId.HasValue && request.CompanyId != customer.CompanyId)
         {
             changedFields["CompanyId"] = request.CompanyId;
@@ -732,6 +745,19 @@ public class CustomerService : ICustomerService
 
         var xminValue = _context.Entry(customer).Property<uint>("xmin").CurrentValue;
         return customer.ToCustomerResponse(xmin: xminValue);
+    }
+
+    private static string NormalizePaymentTerms(string? paymentTerms)
+    {
+        if (string.IsNullOrWhiteSpace(paymentTerms))
+        {
+            return PaymentTerms.DueOnReceipt;
+        }
+
+        var normalized = paymentTerms.Trim();
+        return PaymentTerms.All.Contains(normalized, StringComparer.Ordinal)
+            ? normalized
+            : throw new InvalidOperationException($"Payment terms '{paymentTerms}' are not supported.");
     }
 
     /// <summary>

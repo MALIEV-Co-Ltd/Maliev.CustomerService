@@ -94,6 +94,13 @@ public class UpdateCustomerRequest
     public Dictionary<string, object>? CommunicationPreferences { get; set; }
 
     /// <summary>
+    /// Payment terms for this customer.
+    /// </summary>
+    [MaxLength(100, ErrorMessage = "Payment terms must not exceed 100 characters")]
+    [JsonPropertyName("paymentTerms")]
+    public string? PaymentTerms { get; set; }
+
+    /// <summary>
     /// Optional link to Company entity
     /// </summary>
     [JsonPropertyName("companyId")]

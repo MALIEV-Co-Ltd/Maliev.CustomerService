@@ -38,6 +38,8 @@ public class CustomerDbContext : DbContext
 
     /// <summary>Customers set</summary>
     public DbSet<Customer> Customers => Set<Customer>();
+    /// <summary>Payment terms set</summary>
+    public DbSet<PaymentTerm> PaymentTerms => Set<PaymentTerm>();
     /// <summary>Companies set</summary>
     public DbSet<Company> Companies => Set<Company>();
     /// <summary>Addresses set</summary>
@@ -78,6 +80,11 @@ public class CustomerDbContext : DbContext
             entity.HasIndex(e => e.AccountManagerEmployeeId)
                 .HasDatabaseName("ix_customers_account_manager_employee_id");
 
+            entity.Property(e => e.PaymentTerms)
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasDefaultValue(Domain.Entities.PaymentTerms.DueOnReceipt);
+
             // Trigram GIN indexes for efficient partial string matches (ILIKE %term%)
             // Note: GIN does not support unique constraints — uniqueness is on ix_customers_email_unique above
             entity.HasIndex(e => e.FirstName, "ix_customer_first_name_trgm")
@@ -99,6 +106,48 @@ public class CustomerDbContext : DbContext
             entity.Property<uint>("xmin")
                 .HasColumnType("xid")
                 .IsRowVersion();
+        });
+
+        // Configure PaymentTerm reference data
+        modelBuilder.Entity<PaymentTerm>(entity =>
+        {
+            entity.HasKey(e => e.Code);
+            entity.Property(e => e.Code).HasMaxLength(50);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+
+            entity.HasData(
+                new PaymentTerm
+                {
+                    Code = "DUE_ON_RECEIPT",
+                    Name = Domain.Entities.PaymentTerms.DueOnReceipt,
+                    DueDays = 0,
+                    IsDefault = true,
+                    SortOrder = 0
+                },
+                new PaymentTerm
+                {
+                    Code = "NET_15",
+                    Name = Domain.Entities.PaymentTerms.Net15,
+                    DueDays = 15,
+                    IsDefault = false,
+                    SortOrder = 15
+                },
+                new PaymentTerm
+                {
+                    Code = "NET_30",
+                    Name = Domain.Entities.PaymentTerms.Net30,
+                    DueDays = 30,
+                    IsDefault = false,
+                    SortOrder = 30
+                },
+                new PaymentTerm
+                {
+                    Code = "NET_45",
+                    Name = Domain.Entities.PaymentTerms.Net45,
+                    DueDays = 45,
+                    IsDefault = false,
+                    SortOrder = 45
+                });
         });
 
         // Configure Address entity

@@ -92,6 +92,13 @@ public class Customer
     public string? CommunicationPreferences { get; set; }
 
     /// <summary>
+    /// Payment terms agreed for this customer profile.
+    /// </summary>
+    [Required]
+    [MaxLength(100)]
+    public string PaymentTerms { get; set; } = global::Maliev.CustomerService.Domain.Entities.PaymentTerms.DueOnReceipt;
+
+    /// <summary>
     /// Optional link to Company entity
     /// </summary>
     public Guid? CompanyId { get; set; }

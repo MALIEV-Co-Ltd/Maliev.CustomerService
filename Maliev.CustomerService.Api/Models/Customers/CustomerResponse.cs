@@ -141,6 +141,12 @@ public class CustomerResponse
     public Dictionary<string, bool>? CommunicationPreferences { get; set; }
 
     /// <summary>
+    /// Payment terms for this customer.
+    /// </summary>
+    [JsonPropertyName("paymentTerms")]
+    public string PaymentTerms { get; set; } = string.Empty;
+
+    /// <summary>
     /// Optional link to Company entity
     /// </summary>
     [JsonPropertyName("companyId")]

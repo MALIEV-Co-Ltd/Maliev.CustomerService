@@ -153,6 +153,7 @@ public class CustomerServiceTests
             Tier = "Bronze",
             PreferredLanguage = "en",
             Timezone = "Asia/Bangkok",
+            PaymentTerms = PaymentTerms.Net30,
             CommunicationPreferences = new Dictionary<string, object>
             {
                 { "email_opt_in", true },
@@ -174,6 +175,7 @@ public class CustomerServiceTests
         Assert.Equal("Bronze", result.Tier);
         Assert.Equal("en", result.PreferredLanguage);
         Assert.Equal("Asia/Bangkok", result.Timezone);
+        Assert.Equal(PaymentTerms.Net30, result.PaymentTerms);
         Assert.NotNull(result.CommunicationPreferences);
         Assert.True(result.CreatedAt > DateTime.UtcNow.AddSeconds(-5) && result.CreatedAt <= DateTime.UtcNow.AddSeconds(5));
     }
@@ -379,6 +381,41 @@ public class CustomerServiceTests
         Assert.Equal("Test", result.LastName); // Unchanged
         Assert.Equal("update.test@example.com", result.Email); // Unchanged
         Assert.True(result.UpdatedAt > created.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithPaymentTerms_PersistsPaymentTerms()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Payment",
+            LastName = "Terms",
+            Email = "payment.terms@example.com",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "test-actor", "Employee");
+
+        var updateRequest = new UpdateCustomerRequest
+        {
+            PaymentTerms = PaymentTerms.Net45,
+            xmin = created.xmin
+        };
+
+        // Act
+        var result = await service.UpdateAsync(created.Id, updateRequest, "test-actor2", "Employee");
+
+        // Assert
+        Assert.Equal(PaymentTerms.Net45, result.PaymentTerms);
+
+        await using var context = _fixture.CreateDbContext();
+        var customerInDb = await context.Customers.FindAsync(created.Id);
+        Assert.NotNull(customerInDb);
+        Assert.Equal(PaymentTerms.Net45, customerInDb!.PaymentTerms);
     }
 
     [Fact]
