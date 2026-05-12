@@ -908,7 +908,7 @@ public class CustomerService : ICustomerService
         account.UpdatedAtUtc = DateTimeOffset.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
 
-        return new ConfirmPasswordResetResponse { Accepted = true };
+        return new ConfirmPasswordResetResponse { Accepted = true, CustomerId = account.CustomerId };
     }
 
     /// <inheritdoc />

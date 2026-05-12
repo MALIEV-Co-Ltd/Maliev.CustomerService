@@ -190,4 +190,8 @@ public sealed class ConfirmPasswordResetResponse
     /// <summary>Whether the reset was accepted.</summary>
     [JsonPropertyName("accepted")]
     public bool Accepted { get; set; }
+
+    /// <summary>Canonical customer identifier for downstream session revocation.</summary>
+    [JsonPropertyName("customerId")]
+    public Guid? CustomerId { get; set; }
 }

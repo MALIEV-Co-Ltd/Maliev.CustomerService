@@ -263,7 +263,7 @@ public class CustomerServiceTests
         // Arrange
         await _fixture.ClearDatabaseAsync();
         var service = CreateService();
-        await service.RegisterAsync(new RegisterCustomerRequest
+        var registered = await service.RegisterAsync(new RegisterCustomerRequest
         {
             FirstName = "Reset",
             LastName = "Customer",
@@ -294,6 +294,7 @@ public class CustomerServiceTests
         // Assert
         Assert.True(reset.Accepted);
         Assert.True(confirmed.Accepted);
+        Assert.Equal(registered.Id, confirmed.CustomerId);
         Assert.False(oldPassword.IsValid);
         Assert.True(newPassword.IsValid);
     }
