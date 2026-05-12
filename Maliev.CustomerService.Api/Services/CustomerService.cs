@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Security.Cryptography;
+using System.Text;
 using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Models.IAM;
@@ -9,6 +11,7 @@ using Maliev.CustomerService.Infrastructure.Persistence;
 using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Customers;
 using MassTransit;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.CustomerService.Api.Services;
@@ -18,6 +21,7 @@ namespace Maliev.CustomerService.Api.Services;
 /// </summary>
 public class CustomerService : ICustomerService
 {
+    private static readonly PasswordHasher<CustomerAccount> PasswordHasher = new();
     private readonly CustomerDbContext _context;
     private readonly IIAMClient _iamClient;
     private readonly IConfiguration _configuration;
@@ -310,6 +314,7 @@ public class CustomerService : ICustomerService
         };
 
         _context.Customers.Add(customer);
+        CreateOrUpdateAccount(customer, request.Password, request.GoogleSub, string.Equals(request.RegistrationMethod, "Google", StringComparison.OrdinalIgnoreCase));
 
         var auditLog = new AuditLog
         {
@@ -745,6 +750,165 @@ public class CustomerService : ICustomerService
 
         var xminValue = _context.Entry(customer).Property<uint>("xmin").CurrentValue;
         return customer.ToCustomerResponse(xmin: xminValue);
+    }
+
+    /// <inheritdoc />
+    public async Task<ValidateCustomerCredentialsResponse> ValidateCredentialsAsync(ValidateCustomerCredentialsRequest request, CancellationToken cancellationToken = default)
+    {
+        var email = NormalizeEmail(request.Email);
+        var account = await _context.CustomerAccounts
+            .Include(a => a.Customer)
+            .FirstOrDefaultAsync(a => a.Email == email, cancellationToken);
+
+        if (account?.Customer is null || account.PasswordHash is null)
+        {
+            return InvalidCredentials("invalid_credentials");
+        }
+
+        if (!string.Equals(account.Status, CustomerAccountStatus.Active, StringComparison.Ordinal))
+        {
+            return InvalidCredentials("account_not_active");
+        }
+
+        var verification = PasswordHasher.VerifyHashedPassword(account, account.PasswordHash, request.Password);
+        if (verification == PasswordVerificationResult.Failed)
+        {
+            return InvalidCredentials("invalid_credentials");
+        }
+
+        if (verification == PasswordVerificationResult.SuccessRehashNeeded)
+        {
+            account.PasswordHash = PasswordHasher.HashPassword(account, request.Password);
+        }
+
+        account.LastLoginAtUtc = DateTimeOffset.UtcNow;
+        account.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return new ValidateCustomerCredentialsResponse
+        {
+            IsValid = true,
+            CustomerId = account.CustomerId,
+            PrincipalId = account.PrincipalId,
+            Email = account.Email,
+            DisplayName = $"{account.Customer.FirstName} {account.Customer.LastName}".Trim(),
+            PreferredLanguage = account.Customer.PreferredLanguage
+        };
+
+        static ValidateCustomerCredentialsResponse InvalidCredentials(string reason) => new()
+        {
+            IsValid = false,
+            Reason = reason
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<CustomerAccountSessionResponse> LinkOrRegisterGoogleAsync(LinkOrRegisterGoogleCustomerRequest request, CancellationToken cancellationToken = default)
+    {
+        var email = NormalizeEmail(request.Email);
+        var googleSubject = request.GoogleSubject.Trim();
+
+        var existingByGoogle = await _context.CustomerAccounts
+            .Include(a => a.Customer)
+            .FirstOrDefaultAsync(a => a.GoogleSubject == googleSubject, cancellationToken);
+
+        if (existingByGoogle?.Customer is not null)
+        {
+            existingByGoogle.LastLoginAtUtc = DateTimeOffset.UtcNow;
+            existingByGoogle.EmailVerified = existingByGoogle.EmailVerified || request.EmailVerified;
+            existingByGoogle.UpdatedAtUtc = DateTimeOffset.UtcNow;
+            await _context.SaveChangesAsync(cancellationToken);
+            return ToAccountSession(existingByGoogle, existingByGoogle.Customer);
+        }
+
+        var customer = await _context.Customers
+            .FirstOrDefaultAsync(c => c.Email == email && !c.IsDeleted, cancellationToken);
+
+        if (customer is null)
+        {
+            var registered = await RegisterAsync(new RegisterCustomerRequest
+            {
+                Email = email,
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                RegistrationMethod = "Google",
+                PreferredLanguage = request.PreferredLanguage,
+                Timezone = request.Timezone,
+                GoogleSub = googleSubject
+            }, cancellationToken);
+
+            customer = await _context.Customers.FirstAsync(c => c.Id == registered.Id, cancellationToken);
+        }
+
+        var account = await _context.CustomerAccounts
+            .FirstOrDefaultAsync(a => a.CustomerId == customer.Id, cancellationToken);
+
+        if (account is null)
+        {
+            account = new CustomerAccount
+            {
+                Id = Guid.NewGuid(),
+                CustomerId = customer.Id,
+                PrincipalId = customer.PrincipalId,
+                Email = email,
+                Status = CustomerAccountStatus.Active,
+                CreatedAtUtc = DateTimeOffset.UtcNow
+            };
+            _context.CustomerAccounts.Add(account);
+        }
+
+        account.GoogleSubject = googleSubject;
+        account.EmailVerified = request.EmailVerified;
+        account.LastLoginAtUtc = DateTimeOffset.UtcNow;
+        account.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return ToAccountSession(account, customer);
+    }
+
+    /// <inheritdoc />
+    public async Task<PasswordResetResponse> RequestPasswordResetAsync(PasswordResetRequest request, CancellationToken cancellationToken = default)
+    {
+        var email = NormalizeEmail(request.Email);
+        var account = await _context.CustomerAccounts
+            .FirstOrDefaultAsync(a => a.Email == email, cancellationToken);
+
+        if (account is null)
+        {
+            return new PasswordResetResponse { Accepted = true };
+        }
+
+        var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        account.PasswordResetTokenHash = HashToken(token);
+        account.PasswordResetTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(30);
+        account.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return new PasswordResetResponse { Accepted = true, ResetToken = token };
+    }
+
+    /// <inheritdoc />
+    public async Task<ConfirmPasswordResetResponse> ConfirmPasswordResetAsync(ConfirmPasswordResetRequest request, CancellationToken cancellationToken = default)
+    {
+        var email = NormalizeEmail(request.Email);
+        var tokenHash = HashToken(request.Token);
+        var account = await _context.CustomerAccounts
+            .FirstOrDefaultAsync(a => a.Email == email && a.PasswordResetTokenHash == tokenHash, cancellationToken);
+
+        if (account is null || account.PasswordResetTokenExpiresAtUtc is null || account.PasswordResetTokenExpiresAtUtc <= DateTimeOffset.UtcNow)
+        {
+            return new ConfirmPasswordResetResponse { Accepted = false };
+        }
+
+        account.PasswordHash = PasswordHasher.HashPassword(account, request.NewPassword);
+        account.PasswordResetTokenHash = null;
+        account.PasswordResetTokenExpiresAtUtc = null;
+        account.EmailVerified = true;
+        account.Status = CustomerAccountStatus.Active;
+        account.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return new ConfirmPasswordResetResponse { Accepted = true };
     }
 
     /// <inheritdoc />
@@ -1491,5 +1655,57 @@ public class CustomerService : ICustomerService
         return Guid.TryParse(value, out _)
             ? "assigned employee"
             : value;
+    }
+
+    private void CreateOrUpdateAccount(Customer customer, string? password, string? googleSubject, bool emailVerified)
+    {
+        if (string.IsNullOrWhiteSpace(password) && string.IsNullOrWhiteSpace(googleSubject))
+        {
+            return;
+        }
+
+        var account = new CustomerAccount
+        {
+            Id = Guid.NewGuid(),
+            CustomerId = customer.Id,
+            PrincipalId = customer.PrincipalId,
+            Email = NormalizeEmail(customer.Email),
+            GoogleSubject = string.IsNullOrWhiteSpace(googleSubject) ? null : googleSubject.Trim(),
+            EmailVerified = emailVerified || !string.IsNullOrWhiteSpace(password),
+            Status = CustomerAccountStatus.Active,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        };
+
+        if (!string.IsNullOrWhiteSpace(password))
+        {
+            account.PasswordHash = PasswordHasher.HashPassword(account, password);
+        }
+
+        _context.CustomerAccounts.Add(account);
+    }
+
+    private static CustomerAccountSessionResponse ToAccountSession(CustomerAccount account, Customer customer)
+    {
+        return new CustomerAccountSessionResponse
+        {
+            CustomerId = customer.Id,
+            PrincipalId = customer.PrincipalId,
+            Email = customer.Email,
+            DisplayName = $"{customer.FirstName} {customer.LastName}".Trim(),
+            PreferredLanguage = customer.PreferredLanguage,
+            GoogleSubject = account.GoogleSubject
+        };
+    }
+
+    private static string NormalizeEmail(string email)
+    {
+        return email.Trim().ToLowerInvariant();
+    }
+
+    private static string HashToken(string token)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+        return Convert.ToHexString(bytes);
     }
 }

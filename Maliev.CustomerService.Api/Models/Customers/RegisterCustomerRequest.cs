@@ -53,4 +53,10 @@ public class RegisterCustomerRequest
     /// <summary>Google SSO subject claim (optional — set when registering via Google).</summary>
     [JsonPropertyName("googleSub")]
     public string? GoogleSub { get; set; }
+
+    /// <summary>Password for email/password customer accounts.</summary>
+    [MinLength(12)]
+    [MaxLength(256)]
+    [JsonPropertyName("password")]
+    public string? Password { get; set; }
 }

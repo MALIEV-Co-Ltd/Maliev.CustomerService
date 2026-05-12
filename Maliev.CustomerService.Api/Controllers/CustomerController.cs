@@ -127,6 +127,78 @@ public class CustomerController : ControllerBase
     }
 
     /// <summary>
+    /// Validates customer portal credentials for AuthService.
+    /// </summary>
+    /// <param name="request">Credential validation request.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Credential validation result.</returns>
+    [HttpPost("validate")]
+    [RequirePermission(CustomerPermissions.AccountsManage)]
+    [ProducesResponseType(typeof(ValidateCustomerCredentialsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ValidateCustomerCredentialsResponse>> ValidateCredentials(
+        [FromBody] ValidateCustomerCredentialsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _customerService.ValidateCredentialsAsync(request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Links an existing customer or registers a new customer from Google SSO.
+    /// </summary>
+    /// <param name="request">Google account request.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Customer account session response.</returns>
+    [HttpPost("google/link-or-register")]
+    [RequirePermission(CustomerPermissions.AccountsManage)]
+    [ProducesResponseType(typeof(CustomerAccountSessionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<CustomerAccountSessionResponse>> LinkOrRegisterGoogle(
+        [FromBody] LinkOrRegisterGoogleCustomerRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _customerService.LinkOrRegisterGoogleAsync(request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Starts customer password reset.
+    /// </summary>
+    /// <param name="request">Password reset request.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Password reset response.</returns>
+    [HttpPost("password-reset/request")]
+    [RequirePermission(CustomerPermissions.AccountsManage)]
+    [ProducesResponseType(typeof(PasswordResetResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<PasswordResetResponse>> RequestPasswordReset(
+        [FromBody] PasswordResetRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _customerService.RequestPasswordResetAsync(request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Confirms customer password reset.
+    /// </summary>
+    /// <param name="request">Password reset confirmation request.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Password reset confirmation response.</returns>
+    [HttpPost("password-reset/confirm")]
+    [RequirePermission(CustomerPermissions.AccountsManage)]
+    [ProducesResponseType(typeof(ConfirmPasswordResetResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ConfirmPasswordResetResponse>> ConfirmPasswordReset(
+        [FromBody] ConfirmPasswordResetRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _customerService.ConfirmPasswordResetAsync(request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Creates a new customer
     /// </summary>
     /// <param name="request">Customer creation request</param>

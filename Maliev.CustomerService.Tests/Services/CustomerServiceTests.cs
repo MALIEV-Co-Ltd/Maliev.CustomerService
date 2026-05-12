@@ -181,6 +181,124 @@ public class CustomerServiceTests
     }
 
     [Fact]
+    public async Task RegisterAsync_WithEmailPassword_CreatesAccountAndValidatesCredentials()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var principalId = Guid.NewGuid();
+        _mockIamClient.Setup(x => x.CreatePrincipalAsync(It.IsAny<CreatePrincipalRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CreatePrincipalResponse { PrincipalId = principalId, CreatedAt = DateTime.UtcNow });
+        var service = CreateService();
+
+        var request = new RegisterCustomerRequest
+        {
+            FirstName = "Portal",
+            LastName = "Customer",
+            Email = "portal.customer@example.com",
+            RegistrationMethod = "Email",
+            Password = "Correct-Horse-1234"
+        };
+
+        // Act
+        var registered = await service.RegisterAsync(request);
+        var validation = await service.ValidateCredentialsAsync(
+            new ValidateCustomerCredentialsRequest { Email = request.Email, Password = request.Password });
+
+        // Assert
+        Assert.True(validation.IsValid);
+        Assert.Equal(registered.Id, validation.CustomerId);
+        Assert.Equal(principalId, validation.PrincipalId);
+        Assert.Equal("Portal Customer", validation.DisplayName);
+
+        await using var context = _fixture.CreateDbContext();
+        var account = await context.CustomerAccounts.SingleAsync();
+        Assert.Equal(registered.Id, account.CustomerId);
+        Assert.NotEqual(request.Password, account.PasswordHash);
+        Assert.True(account.EmailVerified);
+    }
+
+    [Fact]
+    public async Task LinkOrRegisterGoogleAsync_WithExistingCustomer_LinksAccountToSameCustomer()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var principalId = Guid.NewGuid();
+        _mockIamClient.Setup(x => x.CreatePrincipalAsync(It.IsAny<CreatePrincipalRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CreatePrincipalResponse { PrincipalId = principalId, CreatedAt = DateTime.UtcNow });
+        var service = CreateService();
+
+        var registered = await service.RegisterAsync(new RegisterCustomerRequest
+        {
+            FirstName = "Google",
+            LastName = "Customer",
+            Email = "google.customer@example.com",
+            RegistrationMethod = "Email",
+            Password = "Initial-Password-1234"
+        });
+
+        // Act
+        var linked = await service.LinkOrRegisterGoogleAsync(new LinkOrRegisterGoogleCustomerRequest
+        {
+            Email = "google.customer@example.com",
+            FirstName = "Google",
+            LastName = "Customer",
+            GoogleSubject = "google-subject-123",
+            EmailVerified = true
+        });
+
+        // Assert
+        Assert.Equal(registered.Id, linked.CustomerId);
+        Assert.Equal(principalId, linked.PrincipalId);
+        Assert.Equal("google-subject-123", linked.GoogleSubject);
+
+        await using var context = _fixture.CreateDbContext();
+        var account = await context.CustomerAccounts.SingleAsync();
+        Assert.Equal(registered.Id, account.CustomerId);
+        Assert.Equal("google-subject-123", account.GoogleSubject);
+    }
+
+    [Fact]
+    public async Task ConfirmPasswordResetAsync_WithIssuedToken_ChangesValidatedPassword()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        await service.RegisterAsync(new RegisterCustomerRequest
+        {
+            FirstName = "Reset",
+            LastName = "Customer",
+            Email = "reset.customer@example.com",
+            RegistrationMethod = "Email",
+            Password = "Old-Password-1234"
+        });
+
+        // Act
+        var reset = await service.RequestPasswordResetAsync(new PasswordResetRequest { Email = "reset.customer@example.com" });
+        var confirmed = await service.ConfirmPasswordResetAsync(new ConfirmPasswordResetRequest
+        {
+            Email = "reset.customer@example.com",
+            Token = reset.ResetToken!,
+            NewPassword = "New-Password-1234"
+        });
+        var oldPassword = await service.ValidateCredentialsAsync(new ValidateCustomerCredentialsRequest
+        {
+            Email = "reset.customer@example.com",
+            Password = "Old-Password-1234"
+        });
+        var newPassword = await service.ValidateCredentialsAsync(new ValidateCustomerCredentialsRequest
+        {
+            Email = "reset.customer@example.com",
+            Password = "New-Password-1234"
+        });
+
+        // Assert
+        Assert.True(reset.Accepted);
+        Assert.True(confirmed.Accepted);
+        Assert.False(oldPassword.IsValid);
+        Assert.True(newPassword.IsValid);
+    }
+
+    [Fact]
     public async Task CreateAsync_WithAccountManager_PersistsEmployeeReference()
     {
         // Arrange

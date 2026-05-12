@@ -31,6 +31,12 @@ public static class CustomerPermissions
     /// <summary>Self-register as a customer (anonymous — no auth required).</summary>
     public const string CustomersRegister = "customer.customers.register";
 
+    // Account Operations
+    /// <summary>Permission to read customer portal account status.</summary>
+    public const string AccountsRead = "customer.accounts.read";
+    /// <summary>Permission to manage customer portal accounts and credential operations.</summary>
+    public const string AccountsManage = "customer.accounts.manage";
+
     // Address Operations
     /// <summary>Permission to manage customer addresses.</summary>
     public const string AddressesManage = "customer.addresses.manage";
@@ -84,6 +90,8 @@ public static class CustomerPermissions
         { CustomersList, "List all customers" },
         { CustomersSearch, "Search customers" },
         { CustomersRegister, "Self-register as a customer (anonymous)" },
+        { AccountsRead, "Read customer portal account status" },
+        { AccountsManage, "Manage customer portal accounts and credentials" },
         { AddressesManage, "Manage customer addresses" },
         { DocumentsCreate, "Create customer documents" },
         { DocumentsRead, "Read customer documents" },

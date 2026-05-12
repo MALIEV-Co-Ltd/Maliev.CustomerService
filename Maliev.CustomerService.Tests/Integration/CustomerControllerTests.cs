@@ -18,6 +18,68 @@ public class CustomerControllerTests
         _factory = factory;
     }
 
+    [Fact]
+    public async Task POST_CustomersValidate_WithAccountPermission_ReturnsValidCustomerIdentity()
+    {
+        // Arrange
+        await _factory.ClearDatabaseAsync();
+        var anonymousClient = _factory.CreateClient();
+        var email = $"portal.{Guid.NewGuid():N}@example.com";
+
+        var registerResponse = await anonymousClient.PostAsJsonAsync("/customer/v1/customers/register", new RegisterCustomerRequest
+        {
+            FirstName = "Portal",
+            LastName = "Customer",
+            Email = email,
+            RegistrationMethod = "Email",
+            Password = "Correct-Horse-1234"
+        });
+        Assert.Equal(HttpStatusCode.Created, registerResponse.StatusCode);
+        var registered = await registerResponse.Content.ReadFromJsonAsync<CustomerResponse>();
+        Assert.NotNull(registered);
+
+        var client = _factory.CreateAuthenticatedClient(
+            "auth-service",
+            new[] { "roles.customer.account-service" },
+            new[] { "customer.accounts.manage" });
+
+        // Act
+        var response = await client.PostAsJsonAsync("/customer/v1/customers/validate", new ValidateCustomerCredentialsRequest
+        {
+            Email = email,
+            Password = "Correct-Horse-1234"
+        });
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var validation = await response.Content.ReadFromJsonAsync<ValidateCustomerCredentialsResponse>();
+        Assert.NotNull(validation);
+        Assert.True(validation!.IsValid);
+        Assert.Equal(registered!.Id, validation.CustomerId);
+        Assert.Equal(registered.PrincipalId, validation.PrincipalId);
+    }
+
+    [Fact]
+    public async Task POST_CustomersValidate_WithoutAccountPermission_ReturnsForbidden()
+    {
+        // Arrange
+        await _factory.ClearDatabaseAsync();
+        var client = _factory.CreateAuthenticatedClient(
+            "auth-service",
+            new[] { "roles.customer.account-service" },
+            permissions: null);
+
+        // Act
+        var response = await client.PostAsJsonAsync("/customer/v1/customers/validate", new ValidateCustomerCredentialsRequest
+        {
+            Email = "missing@example.com",
+            Password = "Wrong-Password-1234"
+        });
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
 
     [Fact]
     public async Task GetByPrincipalId_ReturnsCustomer_WhenExists()

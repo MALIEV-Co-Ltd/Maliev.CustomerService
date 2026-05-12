@@ -38,6 +38,8 @@ public class CustomerDbContext : DbContext
 
     /// <summary>Customers set</summary>
     public DbSet<Customer> Customers => Set<Customer>();
+    /// <summary>Customer portal accounts set</summary>
+    public DbSet<CustomerAccount> CustomerAccounts => Set<CustomerAccount>();
     /// <summary>Payment terms set</summary>
     public DbSet<PaymentTerm> PaymentTerms => Set<PaymentTerm>();
     /// <summary>Companies set</summary>
@@ -103,6 +105,29 @@ public class CustomerDbContext : DbContext
             entity.HasQueryFilter(e => !e.IsDeleted);
 
             // Concurrency token (PostgreSQL xmin)
+            entity.Property<uint>("xmin")
+                .HasColumnType("xid")
+                .IsRowVersion();
+        });
+
+        // Configure CustomerAccount entity
+        modelBuilder.Entity<CustomerAccount>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.CustomerId).IsUnique();
+            entity.HasIndex(e => e.PrincipalId).IsUnique();
+            entity.HasIndex(e => e.Email).IsUnique();
+            entity.HasIndex(e => e.GoogleSubject).IsUnique();
+            entity.Property(e => e.Email).IsRequired().HasMaxLength(256);
+            entity.Property(e => e.PasswordHash).HasMaxLength(1000);
+            entity.Property(e => e.GoogleSubject).HasMaxLength(255);
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(40);
+            entity.Property(e => e.PasswordResetTokenHash).HasMaxLength(128);
+            entity.HasOne(e => e.Customer)
+                .WithOne()
+                .HasForeignKey<CustomerAccount>(e => e.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(e => e.Customer != null && !e.Customer.IsDeleted);
             entity.Property<uint>("xmin")
                 .HasColumnType("xid")
                 .IsRowVersion();

@@ -100,6 +100,38 @@ public interface ICustomerService
     Task<CustomerResponse> RegisterAsync(RegisterCustomerRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Validates customer email/password credentials for AuthService.
+    /// </summary>
+    /// <param name="request">Credential validation request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Validation response</returns>
+    Task<ValidateCustomerCredentialsResponse> ValidateCredentialsAsync(ValidateCustomerCredentialsRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Links an existing customer or registers a new one using Google SSO identity.
+    /// </summary>
+    /// <param name="request">Google account request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Customer account session response</returns>
+    Task<CustomerAccountSessionResponse> LinkOrRegisterGoogleAsync(LinkOrRegisterGoogleCustomerRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Starts password reset for a customer account.
+    /// </summary>
+    /// <param name="request">Password reset request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Password reset response</returns>
+    Task<PasswordResetResponse> RequestPasswordResetAsync(PasswordResetRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Confirms a password reset token and updates the password hash.
+    /// </summary>
+    /// <param name="request">Password reset confirmation request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Password reset confirmation response</returns>
+    Task<ConfirmPasswordResetResponse> ConfirmPasswordResetAsync(ConfirmPasswordResetRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Checks if a customer with the specified email already exists
     /// </summary>
     /// <param name="email">Email address to check (will be normalized to lowercase)</param>
