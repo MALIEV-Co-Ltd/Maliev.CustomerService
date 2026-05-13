@@ -85,7 +85,19 @@ try
     builder.AddIAMServiceClient("customer");
     builder.Services.AddIAMRegistration<CustomerIAMRegistrationService>("customer");
     builder.Services.AddHttpClient<Maliev.CustomerService.Api.Services.IIAMClient,
-        Maliev.CustomerService.Api.Services.IAMClient>("IAMService");
+        Maliev.CustomerService.Api.Services.IAMClient>("CustomerService.IAM", (sp, client) =>
+        {
+            var configuration = sp.GetRequiredService<IConfiguration>();
+            var explicitUrl = configuration["Services:IAMService:BaseUrl"];
+
+            client.BaseAddress = new Uri(!string.IsNullOrEmpty(explicitUrl)
+                ? explicitUrl
+                : "https+http://IAMService");
+            client.DefaultRequestHeaders.Add("X-Service-Name", "customer");
+            client.Timeout = TimeSpan.FromSeconds(90);
+        })
+        .AddServiceDiscovery()
+        .AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>();
 
     // External Service Clients
     builder.AddAuthenticatedServiceClient<Maliev.CustomerService.Api.Services.External.ICountryServiceClient,
