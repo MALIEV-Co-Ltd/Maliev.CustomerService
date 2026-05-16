@@ -101,6 +101,13 @@ public class UpdateCustomerRequest
     public string? PaymentTerms { get; set; }
 
     /// <summary>
+    /// Employee-facing customer lifecycle status (Active, Lead, or Inactive).
+    /// </summary>
+    [MaxLength(40, ErrorMessage = "Status must not exceed 40 characters")]
+    [JsonPropertyName("status")]
+    public string? Status { get; set; }
+
+    /// <summary>
     /// Optional link to Company entity
     /// </summary>
     [JsonPropertyName("companyId")]

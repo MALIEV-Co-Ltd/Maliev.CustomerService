@@ -87,6 +87,11 @@ public class CustomerDbContext : DbContext
                 .HasMaxLength(100)
                 .HasDefaultValue(Domain.Entities.PaymentTerms.DueOnReceipt);
 
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasDefaultValue(CustomerLifecycleStatus.Active);
+
             // Trigram GIN indexes for efficient partial string matches (ILIKE %term%)
             // Note: GIN does not support unique constraints — uniqueness is on ix_customers_email_unique above
             entity.HasIndex(e => e.FirstName, "ix_customer_first_name_trgm")

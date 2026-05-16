@@ -44,10 +44,10 @@ public class CustomerResponse
     public string Email { get; set; } = string.Empty;
 
     /// <summary>
-    /// Customer status (Active/Inactive)
+    /// Employee-facing customer lifecycle status.
     /// </summary>
     [JsonPropertyName("status")]
-    public string Status => IsDeleted ? "Inactive" : "Active";
+    public string Status { get; set; } = string.Empty;
 
     /// <summary>
     /// Customer's mobile phone number

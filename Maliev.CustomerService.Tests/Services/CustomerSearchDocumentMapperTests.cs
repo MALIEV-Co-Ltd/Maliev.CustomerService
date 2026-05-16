@@ -23,6 +23,7 @@ public class CustomerSearchDocumentMapperTests
             LastName = "Larsson",
             Email = "kanya@example.com",
             Mobile = "+66812345678",
+            Status = CustomerLifecycleStatus.Lead,
             Segment = "Enterprise",
             Tier = "VIP",
             PreferredLanguage = "th",
@@ -48,7 +49,7 @@ public class CustomerSearchDocumentMapperTests
         Assert.Contains("Wanasriwilai Engineering", message.Payload.Subtitle);
         Assert.Contains("Kanya", message.Payload.Keywords);
         Assert.Contains("Wanasriwilai Engineering", message.Payload.Keywords);
-        Assert.Equal("Active", message.Payload.Status);
+        Assert.Equal("Lead", message.Payload.Status);
         Assert.Equal(CustomerPermissions.CustomersRead, message.Payload.RequiredPermission);
         Assert.Equal(occurredAtUtc, message.Payload.OccurredAtUtc);
     }

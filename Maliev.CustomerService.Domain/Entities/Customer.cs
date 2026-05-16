@@ -99,6 +99,13 @@ public class Customer
     public string PaymentTerms { get; set; } = global::Maliev.CustomerService.Domain.Entities.PaymentTerms.DueOnReceipt;
 
     /// <summary>
+    /// Employee-facing lifecycle status for sales and account management.
+    /// </summary>
+    [Required]
+    [MaxLength(40)]
+    public string Status { get; set; } = CustomerLifecycleStatus.Active;
+
+    /// <summary>
     /// Optional link to Company entity
     /// </summary>
     public Guid? CompanyId { get; set; }
@@ -182,4 +189,20 @@ public static class CustomerTier
 
     /// <summary>All customer tiers.</summary>
     public static readonly string[] All = { Bronze, Silver, Gold, Platinum, VIP };
+}
+
+/// <summary>
+/// Employee-facing customer lifecycle statuses.
+/// </summary>
+public static class CustomerLifecycleStatus
+{
+    /// <summary>Active customer record.</summary>
+    public const string Active = "Active";
+    /// <summary>Lead or prospect record.</summary>
+    public const string Lead = "Lead";
+    /// <summary>Inactive customer record that remains retained for history.</summary>
+    public const string Inactive = "Inactive";
+
+    /// <summary>All supported customer lifecycle statuses.</summary>
+    public static readonly string[] All = { Active, Lead, Inactive };
 }

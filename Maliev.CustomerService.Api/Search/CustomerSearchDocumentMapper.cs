@@ -30,6 +30,7 @@ public static class CustomerSearchDocumentMapper
 
         var subtitle = CompactKeywords(customer.Email, company?.Name).ToArray();
         var summary = string.Join(" ",
+            customer.Status,
             customer.Segment,
             customer.Tier,
             customer.Mobile,
@@ -52,6 +53,7 @@ public static class CustomerSearchDocumentMapper
             customer.Extension,
             customer.Segment,
             customer.Tier,
+            customer.Status,
             customer.PreferredLanguage,
             customer.Timezone,
             customer.CompanyId?.ToString(),
@@ -81,7 +83,7 @@ public static class CustomerSearchDocumentMapper
                 Subtitle: subtitle.Length == 0 ? null : string.Join(" - ", subtitle),
                 Summary: string.IsNullOrWhiteSpace(summary) ? null : summary,
                 Keywords: keywords,
-                Status: customer.IsDeleted ? "Inactive" : "Active",
+                Status: customer.IsDeleted ? CustomerLifecycleStatus.Inactive : customer.Status,
                 RequiredPermission: CustomerPermissions.CustomersRead,
                 OccurredAtUtc: occurredAtUtc));
     }

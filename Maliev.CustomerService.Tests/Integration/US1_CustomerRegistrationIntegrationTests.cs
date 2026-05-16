@@ -218,6 +218,7 @@ public class US1_CustomerRegistrationIntegrationTests
         {
             mobile = "+6622222222",
             lastName = "Wilson-Updated",
+            status = "Lead",
             xmin = createdCustomer!.xmin
         };
 
@@ -231,6 +232,7 @@ public class US1_CustomerRegistrationIntegrationTests
         Assert.Equal("+6622222222", updatedCustomer!.Mobile);
         Assert.Equal("Wilson-Updated", updatedCustomer.LastName);
         Assert.Equal("Bob", updatedCustomer.FirstName); // Unchanged
+        Assert.Equal("Lead", updatedCustomer.Status);
         Assert.True(updatedCustomer.UpdatedAt > updatedCustomer.CreatedAt);
 
         // Verify audit log entry exists for employee actor

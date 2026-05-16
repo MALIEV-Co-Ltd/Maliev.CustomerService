@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using Maliev.CustomerService.Domain.Entities;
 
 namespace Maliev.CustomerService.Api.Models.Customers;
 
@@ -107,6 +108,13 @@ public class CreateCustomerRequest
     [MaxLength(100, ErrorMessage = "Payment terms must not exceed 100 characters")]
     [JsonPropertyName("paymentTerms")]
     public string PaymentTerms { get; set; } = Maliev.CustomerService.Domain.Entities.PaymentTerms.DueOnReceipt;
+
+    /// <summary>
+    /// Initial employee-facing customer lifecycle status.
+    /// </summary>
+    [MaxLength(40, ErrorMessage = "Status must not exceed 40 characters")]
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = CustomerLifecycleStatus.Active;
 
     /// <summary>
     /// Optional link to Company entity

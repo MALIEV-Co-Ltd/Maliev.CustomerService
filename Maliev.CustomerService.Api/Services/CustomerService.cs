@@ -143,6 +143,7 @@ public class CustomerService : ICustomerService
                 ? JsonSerializer.Serialize(request.CommunicationPreferences)
                 : null,
             PaymentTerms = NormalizePaymentTerms(request.PaymentTerms),
+            Status = NormalizeCustomerStatus(request.Status),
             CompanyId = request.CompanyId,
             AccountManagerEmployeeId = request.AccountManagerEmployeeId,
             UsesCompanyBillingAddress = request.UsesCompanyBillingAddress,
@@ -177,6 +178,7 @@ public class CustomerService : ICustomerService
                 customer.Timezone,
                 customer.CommunicationPreferences,
                 customer.PaymentTerms,
+                customer.Status,
                 customer.CompanyId,
                 customer.AccountManagerEmployeeId,
                 customer.UsesCompanyBillingAddress
@@ -553,6 +555,7 @@ public class CustomerService : ICustomerService
             customer.Timezone,
             customer.CommunicationPreferences,
             customer.PaymentTerms,
+            customer.Status,
             customer.CompanyId,
             customer.AccountManagerEmployeeId
         };
@@ -662,6 +665,16 @@ public class CustomerService : ICustomerService
             {
                 changedFields["PaymentTerms"] = paymentTerms;
                 customer.PaymentTerms = paymentTerms;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Status))
+        {
+            var status = NormalizeCustomerStatus(request.Status);
+            if (!string.Equals(status, customer.Status, StringComparison.Ordinal))
+            {
+                changedFields["Status"] = status;
+                customer.Status = status;
             }
         }
 
@@ -945,6 +958,19 @@ public class CustomerService : ICustomerService
         return PaymentTerms.All.Contains(normalized, StringComparer.Ordinal)
             ? normalized
             : throw new InvalidOperationException($"Payment terms '{paymentTerms}' are not supported.");
+    }
+
+    private static string NormalizeCustomerStatus(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            return CustomerLifecycleStatus.Active;
+        }
+
+        var normalized = status.Trim();
+        return CustomerLifecycleStatus.All.Contains(normalized, StringComparer.Ordinal)
+            ? normalized
+            : throw new InvalidOperationException($"Customer status '{status}' is not supported.");
     }
 
     /// <summary>
