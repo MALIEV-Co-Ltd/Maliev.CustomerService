@@ -82,6 +82,56 @@ public class AddressServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_WithDefaultAddress_UnsetsExistingDefaultForSameOwnerAndType()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var ownerId = Guid.NewGuid();
+        var countryId = Guid.NewGuid();
+        _mockCountryServiceClient.Setup(x => x.ValidateCountryIdAsync(countryId))
+            .ReturnsAsync(true);
+
+        var first = await service.CreateAsync(new CreateAddressRequest
+        {
+            OwnerType = "Customer",
+            OwnerId = ownerId,
+            Type = "Billing",
+            IsDefault = true,
+            AddressLine1 = "123 Main Street",
+            City = "Bangkok",
+            StateProvince = "Bangkok",
+            PostalCode = "10110",
+            CountryId = countryId
+        }, "test-actor", "Employee");
+
+        // Act
+        var second = await service.CreateAsync(new CreateAddressRequest
+        {
+            OwnerType = "Customer",
+            OwnerId = ownerId,
+            Type = "Billing",
+            IsDefault = true,
+            AddressLine1 = "999 New Billing Street",
+            City = "Bangkok",
+            StateProvince = "Bangkok",
+            PostalCode = "10110",
+            CountryId = countryId
+        }, "test-actor", "Employee");
+
+        // Assert
+        await using var context = _fixture.CreateDbContext();
+        var addresses = await context.Addresses
+            .Where(address => address.OwnerId == ownerId && address.Type == "Billing")
+            .OrderBy(address => address.AddressLine1)
+            .ToListAsync();
+
+        Assert.Equal(2, addresses.Count);
+        Assert.False(addresses.Single(address => address.Id == first.Id).IsDefault);
+        Assert.True(addresses.Single(address => address.Id == second.Id).IsDefault);
+    }
+
+    [Fact]
     public async Task CreateAsync_WithInvalidCountryId_ThrowsInvalidOperationException()
     {
         // Arrange
@@ -332,6 +382,72 @@ public class AddressServiceTests
         Assert.Equal("50000", result.PostalCode);
         Assert.Equal("Bangkok", result.StateProvince); // Unchanged
         Assert.True(result.UpdatedAt > created.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WhenAddressAlreadyDefault_UnsetsOtherDefaultsForSameOwnerAndType()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var ownerId = Guid.NewGuid();
+        var countryId = Guid.NewGuid();
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+        uint secondXmin;
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var first = new Address
+            {
+                Id = firstId,
+                OwnerType = "Customer",
+                OwnerId = ownerId,
+                Type = "Billing",
+                IsDefault = true,
+                AddressLine1 = "123 Main Street",
+                City = "Bangkok",
+                StateProvince = "Bangkok",
+                PostalCode = "10110",
+                CountryId = countryId
+            };
+            var second = new Address
+            {
+                Id = secondId,
+                OwnerType = "Customer",
+                OwnerId = ownerId,
+                Type = "Billing",
+                IsDefault = true,
+                AddressLine1 = "999 New Billing Street",
+                City = "Bangkok",
+                StateProvince = "Bangkok",
+                PostalCode = "10110",
+                CountryId = countryId
+            };
+
+            context.Addresses.AddRange(first, second);
+            await context.SaveChangesAsync();
+            secondXmin = context.Entry(second).Property<uint>("xmin").CurrentValue;
+        }
+
+        var updateRequest = new UpdateAddressRequest
+        {
+            IsDefault = true,
+            xmin = secondXmin
+        };
+
+        // Act
+        var result = await service.UpdateAsync(secondId, updateRequest, "test-actor", "Employee");
+
+        // Assert
+        Assert.True(result.IsDefault);
+        await using var verificationContext = _fixture.CreateDbContext();
+        var addresses = await verificationContext.Addresses
+            .Where(address => address.OwnerId == ownerId && address.Type == "Billing")
+            .ToListAsync();
+
+        Assert.False(addresses.Single(address => address.Id == firstId).IsDefault);
+        Assert.True(addresses.Single(address => address.Id == secondId).IsDefault);
     }
 
     [Fact]

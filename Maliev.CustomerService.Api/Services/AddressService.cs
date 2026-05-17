@@ -87,6 +87,10 @@ public class AddressService : IAddressService
         };
 
         _context.Addresses.Add(address);
+        if (address.IsDefault)
+        {
+            await EnsureSingleDefaultAsync(address.OwnerType, address.OwnerId, address.Type, address.Id, cancellationToken);
+        }
 
         // Create audit log
         var auditLog = new AuditLog
@@ -282,33 +286,28 @@ public class AddressService : IAddressService
             address.RecipientPhone = request.RecipientPhone;
         }
 
-        if (changedFields.Count > 0)
+        var shouldEnsureSingleDefault = request.IsDefault == true;
+        if (changedFields.Count > 0 || shouldEnsureSingleDefault)
         {
-            if (address.IsDefault)
+            if (changedFields.Count > 0)
             {
-                await EnsureSingleDefaultAsync(address.OwnerType, address.OwnerId, address.Type, address.Id, cancellationToken);
+                address.UpdatedAt = DateTime.UtcNow;
+
+                // Create audit log
+                var auditLog = new AuditLog
+                {
+                    ActorId = actorId,
+                    ActorType = actorType,
+                    Action = AuditAction.Update,
+                    EntityType = nameof(Address),
+                    EntityId = address.Id.ToString(),
+                    Timestamp = DateTime.UtcNow,
+                    ChangedFields = JsonSerializer.Serialize(new { Fields = changedFields, address.OwnerId, address.OwnerType }),
+                    PreviousValues = JsonSerializer.Serialize(new { Fields = previousValues, address.OwnerId, address.OwnerType })
+                };
+
+                _context.AuditLogs.Add(auditLog);
             }
-
-            address.UpdatedAt = DateTime.UtcNow;
-
-
-            // Set the original xmin for optimistic concurrency
-            _context.Entry(address).Property("xmin").OriginalValue = request.xmin;
-
-            // Create audit log
-            var auditLog = new AuditLog
-            {
-                ActorId = actorId,
-                ActorType = actorType,
-                Action = AuditAction.Update,
-                EntityType = nameof(Address),
-                EntityId = address.Id.ToString(),
-                Timestamp = DateTime.UtcNow,
-                ChangedFields = JsonSerializer.Serialize(new { Fields = changedFields, address.OwnerId, address.OwnerType }),
-                PreviousValues = JsonSerializer.Serialize(new { Fields = previousValues, address.OwnerId, address.OwnerType })
-            };
-
-            _context.AuditLogs.Add(auditLog);
 
             try
             {
@@ -316,6 +315,9 @@ public class AddressService : IAddressService
                 {
                     await EnsureSingleDefaultAsync(address.OwnerType, address.OwnerId, address.Type, address.Id, cancellationToken);
                 }
+
+                // Set the original xmin for optimistic concurrency
+                _context.Entry(address).Property("xmin").OriginalValue = request.xmin;
 
                 await _context.SaveChangesAsync(cancellationToken);
 
