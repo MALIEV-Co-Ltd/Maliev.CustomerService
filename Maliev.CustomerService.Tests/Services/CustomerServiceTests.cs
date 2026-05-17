@@ -670,6 +670,73 @@ public class CustomerServiceTests
     }
 
     [Fact]
+    public async Task GetActivityAsync_WithSearch_FiltersBeforePagination()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Activity",
+            LastName = "Search",
+            Email = "activity.search@example.com",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "employee-1", "Employee");
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            context.AuditLogs.AddRange(
+                new AuditLog
+                {
+                    Id = Guid.NewGuid(),
+                    EntityType = nameof(InternalNote),
+                    EntityId = Guid.NewGuid().ToString(),
+                    Action = AuditAction.Create,
+                    ActorId = "employee-2",
+                    ActorType = "Employee",
+                    ChangedFields = $"{{\"OwnerId\":\"{created.Id}\",\"NoteText\":\"First internal follow-up\"}}",
+                    Timestamp = DateTime.UtcNow.AddMinutes(2)
+                },
+                new AuditLog
+                {
+                    Id = Guid.NewGuid(),
+                    EntityType = nameof(InternalNote),
+                    EntityId = Guid.NewGuid().ToString(),
+                    Action = AuditAction.Create,
+                    ActorId = "employee-3",
+                    ActorType = "Employee",
+                    ChangedFields = $"{{\"OwnerId\":\"{created.Id}\",\"NoteText\":\"Second internal follow-up\"}}",
+                    Timestamp = DateTime.UtcNow.AddMinutes(1)
+                },
+                new AuditLog
+                {
+                    Id = Guid.NewGuid(),
+                    EntityType = nameof(Address),
+                    EntityId = Guid.NewGuid().ToString(),
+                    Action = AuditAction.Create,
+                    ActorId = "employee-4",
+                    ActorType = "Employee",
+                    ChangedFields = $"{{\"CustomerId\":\"{created.Id}\",\"Type\":\"Billing\"}}",
+                    Timestamp = DateTime.UtcNow
+                });
+            await context.SaveChangesAsync();
+        }
+
+        // Act
+        var activity = await service.GetActivityAsync(created.Id, page: 1, pageSize: 1, search: "internal note");
+
+        // Assert
+        Assert.Equal(2, activity.TotalCount);
+        Assert.Equal(2, activity.TotalPages);
+        var item = Assert.Single(activity.Items);
+        Assert.Equal(AuditAction.Create, item.Action);
+        Assert.Contains("internal note", item.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task UpdateAsync_WithClearAccountManager_ClearsEmployeeReference()
     {
         // Arrange

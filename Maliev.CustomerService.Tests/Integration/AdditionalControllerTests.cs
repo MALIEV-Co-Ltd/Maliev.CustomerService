@@ -232,6 +232,61 @@ public class AdditionalControllerTests
     }
 
     [Fact]
+    public async Task GetHistory_WithSearch_ReturnsFilteredActivity()
+    {
+        await _factory.ClearDatabaseAsync();
+        var client = _factory.CreateAuthenticatedClient(
+            "test-employee",
+            new[] { "roles.customer.representative" },
+            new[] { "customer.customers.read" });
+
+        var customerId = Guid.NewGuid();
+        using var dbContext = _factory.GetDbContext();
+        dbContext.Customers.Add(new Customer
+        {
+            Id = customerId,
+            FirstName = "Test",
+            LastName = "User",
+            Email = "history-search@example.com",
+            Segment = "Retail",
+            Tier = "Bronze"
+        });
+        dbContext.AuditLogs.AddRange(
+            new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                EntityType = nameof(InternalNote),
+                EntityId = Guid.NewGuid().ToString(),
+                Action = AuditAction.Create,
+                ActorId = "test-actor",
+                ActorType = "Employee",
+                ChangedFields = $"{{\"OwnerId\":\"{customerId}\",\"NoteText\":\"Follow up\"}}",
+                Timestamp = DateTime.UtcNow.AddMinutes(1)
+            },
+            new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                EntityType = nameof(Address),
+                EntityId = Guid.NewGuid().ToString(),
+                Action = AuditAction.Create,
+                ActorId = "test-actor",
+                ActorType = "Employee",
+                ChangedFields = $"{{\"CustomerId\":\"{customerId}\",\"Type\":\"Billing\"}}",
+                Timestamp = DateTime.UtcNow
+            });
+        await dbContext.SaveChangesAsync();
+
+        var response = await client.GetAsync($"/customer/v1/customers/{customerId}/history?search=internal%20note&page=1&pageSize=10");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResponse<CustomerActivityResponse>>();
+        Assert.NotNull(body);
+        Assert.Equal(1, body.TotalCount);
+        var item = Assert.Single(body.Items);
+        Assert.Contains("internal note", item.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task GetPreferences_ReturnsPreferences()
     {
         await _factory.ClearDatabaseAsync();

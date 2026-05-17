@@ -142,5 +142,5 @@ public interface ICustomerService
     /// <summary>
     /// Gets activity history for a customer with pagination or skip/take
     /// </summary>
-    Task<PaginatedResponse<CustomerActivityResponse>> GetActivityAsync(Guid id, int? skip = null, int? take = null, int page = 1, int pageSize = 50, CancellationToken cancellationToken = default);
+    Task<PaginatedResponse<CustomerActivityResponse>> GetActivityAsync(Guid id, int? skip = null, int? take = null, int page = 1, int pageSize = 50, string? search = null, CancellationToken cancellationToken = default);
 }

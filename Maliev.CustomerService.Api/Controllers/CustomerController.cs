@@ -679,7 +679,7 @@ public class CustomerController : ControllerBase
     }
 
     /// <summary>
-    /// Gets activity history for a customer with pagination or skip/take
+    /// Gets activity history for a customer with pagination, skip/take, and optional search.
     /// </summary>
     [HttpGet("{id:guid}/history")]
     [RequirePermission(CustomerPermissions.CustomersRead)]
@@ -690,9 +690,10 @@ public class CustomerController : ControllerBase
         [FromQuery] int? take = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
+        [FromQuery] string? search = null,
         CancellationToken cancellationToken = default)
     {
-        var result = await _customerService.GetActivityAsync(id, skip, take, page, pageSize, cancellationToken);
+        var result = await _customerService.GetActivityAsync(id, skip, take, page, pageSize, search, cancellationToken);
         return Ok(result);
     }
 }

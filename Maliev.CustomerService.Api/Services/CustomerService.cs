@@ -1304,9 +1304,9 @@ public class CustomerService : ICustomerService
     }
 
     /// <inheritdoc />
-    public async Task<PaginatedResponse<CustomerActivityResponse>> GetActivityAsync(Guid id, int? skip = null, int? take = null, int page = 1, int pageSize = 50, CancellationToken cancellationToken = default)
+    public async Task<PaginatedResponse<CustomerActivityResponse>> GetActivityAsync(Guid id, int? skip = null, int? take = null, int page = 1, int pageSize = 50, string? search = null, CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Retrieving activity history for customer {CustomerId} (Skip {Skip}, Take {Take}, Page {Page}, Size {PageSize})", id, skip, take, page, pageSize);
+        _logger.LogDebug("Retrieving activity history for customer {CustomerId} (Skip {Skip}, Take {Take}, Page {Page}, Size {PageSize}, Search {Search})", id, skip, take, page, pageSize, search);
 
         var customerIdStr = id.ToString();
 
@@ -1314,6 +1314,8 @@ public class CustomerService : ICustomerService
             .Where(a => (a.EntityType == nameof(Customer) && a.EntityId == customerIdStr) ||
                         (a.EntityType != nameof(Customer) && a.ChangedFields != null && a.ChangedFields.Contains($"\"{customerIdStr}\"")) ||
                         (a.EntityType != nameof(Customer) && a.PreviousValues != null && a.PreviousValues.Contains($"\"{customerIdStr}\"")));
+
+        query = ApplyActivitySearch(query, search);
 
         var totalCount = await query.CountAsync(cancellationToken);
 
@@ -1385,6 +1387,41 @@ public class CustomerService : ICustomerService
             TotalPages = totalPages
         };
     }
+
+    private static IQueryable<AuditLog> ApplyActivitySearch(IQueryable<AuditLog> query, string? search)
+    {
+        if (string.IsNullOrWhiteSpace(search))
+        {
+            return query;
+        }
+
+        var searchTerm = search.Trim();
+        var compactSearchTerm = RemoveWhitespace(searchTerm);
+        var searchPattern = $"%{searchTerm}%";
+        var compactSearchPattern = $"%{compactSearchTerm}%";
+        var matchesCreateAction = ContainsAny(searchTerm, "add", "added", "create", "created", "upload", "uploaded");
+        var matchesUpdateAction = ContainsAny(searchTerm, "update", "updated", "change", "changed", "edit", "edited");
+        var matchesDeleteAction = ContainsAny(searchTerm, "delete", "deleted", "remove", "removed");
+
+        return query.Where(a =>
+            EF.Functions.ILike(a.Action, searchPattern) ||
+            EF.Functions.ILike(a.EntityType, searchPattern) ||
+            EF.Functions.ILike(a.EntityId, searchPattern) ||
+            EF.Functions.ILike(a.ActorId, searchPattern) ||
+            EF.Functions.ILike(a.ActorType, searchPattern) ||
+            (a.ActorName != null && EF.Functions.ILike(a.ActorName, searchPattern)) ||
+            (a.ChangedFields != null && EF.Functions.ILike(a.ChangedFields, searchPattern)) ||
+            (a.PreviousValues != null && EF.Functions.ILike(a.PreviousValues, searchPattern)) ||
+            EF.Functions.ILike(a.EntityType, compactSearchPattern) ||
+            matchesCreateAction && a.Action == AuditAction.Create ||
+            matchesUpdateAction && a.Action == AuditAction.Update ||
+            matchesDeleteAction && (a.Action == AuditAction.Delete || a.Action == AuditAction.SoftDelete));
+    }
+
+    private static string RemoveWhitespace(string value) => new(value.Where(character => !char.IsWhiteSpace(character)).ToArray());
+
+    private static bool ContainsAny(string value, params string[] terms) =>
+        terms.Any(term => value.Contains(term, StringComparison.OrdinalIgnoreCase));
 
     private async Task<Dictionary<Guid, string>> ResolveCompanyNamesForAuditLogsAsync(
         IReadOnlyCollection<AuditLog> auditLogs,
