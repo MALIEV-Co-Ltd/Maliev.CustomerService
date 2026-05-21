@@ -38,6 +38,18 @@ public class AddressResponse
     public bool IsDefault { get; set; }
 
     /// <summary>
+    /// Friendly place label selected by the user, such as Home, Work, or Other
+    /// </summary>
+    [JsonPropertyName("placeLabel")]
+    public string? PlaceLabel { get; set; }
+
+    /// <summary>
+    /// Custom place label text when placeLabel is Other
+    /// </summary>
+    [JsonPropertyName("placeLabelOther")]
+    public string? PlaceLabelOther { get; set; }
+
+    /// <summary>
     /// First line of address
     /// </summary>
     [JsonPropertyName("addressLine1")]
@@ -96,6 +108,42 @@ public class AddressResponse
     /// </summary>
     [JsonPropertyName("recipientPhone")]
     public string? RecipientPhone { get; set; }
+
+    /// <summary>
+    /// Optional delivery instruction shown to the driver
+    /// </summary>
+    [JsonPropertyName("driverNote")]
+    public string? DriverNote { get; set; }
+
+    /// <summary>
+    /// Source used to populate this address, such as Manual, GooglePlace, or GoogleMapPin
+    /// </summary>
+    [JsonPropertyName("addressSource")]
+    public string AddressSource { get; set; } = "Manual";
+
+    /// <summary>
+    /// Google Place identifier returned by Places API when available
+    /// </summary>
+    [JsonPropertyName("googlePlaceId")]
+    public string? GooglePlaceId { get; set; }
+
+    /// <summary>
+    /// Provider formatted address text returned by Google Maps
+    /// </summary>
+    [JsonPropertyName("formattedAddress")]
+    public string? FormattedAddress { get; set; }
+
+    /// <summary>
+    /// Latitude selected from Google Maps or Places
+    /// </summary>
+    [JsonPropertyName("latitude")]
+    public decimal? Latitude { get; set; }
+
+    /// <summary>
+    /// Longitude selected from Google Maps or Places
+    /// </summary>
+    [JsonPropertyName("longitude")]
+    public decimal? Longitude { get; set; }
 
     /// <summary>
     /// Creation timestamp

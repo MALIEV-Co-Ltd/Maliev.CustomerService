@@ -173,6 +173,14 @@ public class CustomerDbContext : DbContext
             entity.Property(e => e.CreatedAt).HasColumnOrder(13);
             entity.Property(e => e.UpdatedAt).HasColumnOrder(14);
             entity.Property<uint>("xmin").HasColumnOrder(15);
+            entity.Property(e => e.PlaceLabel).HasMaxLength(50);
+            entity.Property(e => e.PlaceLabelOther).HasMaxLength(100);
+            entity.Property(e => e.DriverNote).HasMaxLength(500);
+            entity.Property(e => e.AddressSource).IsRequired().HasMaxLength(50).HasDefaultValue("Manual");
+            entity.Property(e => e.GooglePlaceId).HasMaxLength(255);
+            entity.Property(e => e.FormattedAddress).HasMaxLength(500);
+            entity.Property(e => e.Latitude).HasPrecision(9, 6);
+            entity.Property(e => e.Longitude).HasPrecision(9, 6);
 
             // Configure table with CHECK constraints for owner_type and type enums
             entity.ToTable(t =>

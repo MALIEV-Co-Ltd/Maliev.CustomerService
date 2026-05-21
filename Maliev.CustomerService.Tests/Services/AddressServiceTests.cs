@@ -82,6 +82,61 @@ public class AddressServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_WithGooglePlaceMetadata_PersistsAndReturnsAddressSourceFields()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var countryId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        _mockCountryServiceClient.Setup(x => x.ValidateCountryIdAsync(countryId))
+            .ReturnsAsync(true);
+
+        var request = new CreateAddressRequest
+        {
+            OwnerType = "Customer",
+            OwnerId = ownerId,
+            Type = "Shipping",
+            IsDefault = true,
+            PlaceLabel = "Work",
+            DriverNote = "Call before unloading parts.",
+            AddressSource = "GooglePlace",
+            GooglePlaceId = "ChIJMALIEVPlace",
+            FormattedAddress = "MALIEV Co., Ltd., Nonthaburi 11120, Thailand",
+            Latitude = 13.92525m,
+            Longitude = 100.47135m,
+            AddressLine1 = "36/1 Moo 3",
+            District = "Khlong Khoi",
+            City = "Pak Kret",
+            StateProvince = "Nonthaburi",
+            PostalCode = "11120",
+            CountryId = countryId,
+            RecipientName = "Natthapon",
+            RecipientPhone = "0812345678"
+        };
+
+        // Act
+        var result = await service.CreateAsync(request, "test-actor", "Employee");
+
+        // Assert
+        Assert.Equal("Work", result.PlaceLabel);
+        Assert.Equal("Call before unloading parts.", result.DriverNote);
+        Assert.Equal("GooglePlace", result.AddressSource);
+        Assert.Equal("ChIJMALIEVPlace", result.GooglePlaceId);
+        Assert.Equal("MALIEV Co., Ltd., Nonthaburi 11120, Thailand", result.FormattedAddress);
+        Assert.Equal(13.92525m, result.Latitude);
+        Assert.Equal(100.47135m, result.Longitude);
+
+        await using var context = _fixture.CreateDbContext();
+        var persisted = await context.Addresses.SingleAsync(address => address.Id == result.Id);
+        Assert.Equal("Work", persisted.PlaceLabel);
+        Assert.Equal("GooglePlace", persisted.AddressSource);
+        Assert.Equal("ChIJMALIEVPlace", persisted.GooglePlaceId);
+        Assert.Equal(13.92525m, persisted.Latitude);
+        Assert.Equal(100.47135m, persisted.Longitude);
+    }
+
+    [Fact]
     public async Task CreateAsync_WithDefaultAddress_UnsetsExistingDefaultForSameOwnerAndType()
     {
         // Arrange
@@ -382,6 +437,55 @@ public class AddressServiceTests
         Assert.Equal("50000", result.PostalCode);
         Assert.Equal("Bangkok", result.StateProvince); // Unchanged
         Assert.True(result.UpdatedAt > created.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithGoogleMapPinMetadata_UpdatesAddressSourceFields()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var countryId = Guid.NewGuid();
+        _mockCountryServiceClient.Setup(x => x.ValidateCountryIdAsync(countryId))
+            .ReturnsAsync(true);
+
+        var created = await service.CreateAsync(new CreateAddressRequest
+        {
+            OwnerType = "Customer",
+            OwnerId = Guid.NewGuid(),
+            Type = "Shipping",
+            PlaceLabel = "Home",
+            AddressSource = "Manual",
+            AddressLine1 = "123 Main Street",
+            City = "Bangkok",
+            StateProvince = "Bangkok",
+            PostalCode = "10110",
+            CountryId = countryId
+        }, "test-actor", "Employee");
+
+        var updateRequest = new UpdateAddressRequest
+        {
+            PlaceLabel = "Other",
+            PlaceLabelOther = "Factory gate",
+            DriverNote = "Security guard receives deliveries.",
+            AddressSource = "GoogleMapPin",
+            FormattedAddress = "Factory Gate, Pak Kret, Nonthaburi 11120, Thailand",
+            Latitude = 13.92530m,
+            Longitude = 100.47140m,
+            xmin = created.xmin
+        };
+
+        // Act
+        var result = await service.UpdateAsync(created.Id, updateRequest, "test-actor", "Employee");
+
+        // Assert
+        Assert.Equal("Other", result.PlaceLabel);
+        Assert.Equal("Factory gate", result.PlaceLabelOther);
+        Assert.Equal("Security guard receives deliveries.", result.DriverNote);
+        Assert.Equal("GoogleMapPin", result.AddressSource);
+        Assert.Equal("Factory Gate, Pak Kret, Nonthaburi 11120, Thailand", result.FormattedAddress);
+        Assert.Equal(13.92530m, result.Latitude);
+        Assert.Equal(100.47140m, result.Longitude);
     }
 
     [Fact]

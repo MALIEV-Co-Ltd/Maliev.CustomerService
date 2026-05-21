@@ -38,6 +38,20 @@ public class CreateAddressRequest
     public bool IsDefault { get; set; } = false;
 
     /// <summary>
+    /// Friendly place label selected by the user, such as Home, Work, or Other
+    /// </summary>
+    [MaxLength(50)]
+    [JsonPropertyName("placeLabel")]
+    public string? PlaceLabel { get; set; }
+
+    /// <summary>
+    /// Custom place label text when placeLabel is Other
+    /// </summary>
+    [MaxLength(100)]
+    [JsonPropertyName("placeLabelOther")]
+    public string? PlaceLabelOther { get; set; }
+
+    /// <summary>
     /// First line of address
     /// </summary>
     [Required(ErrorMessage = "Address line 1 is required")]
@@ -110,4 +124,44 @@ public class CreateAddressRequest
     [JsonPropertyName("recipientPhone")]
     [MaxLength(20)]
     public string? RecipientPhone { get; set; }
+
+    /// <summary>
+    /// Optional delivery instruction shown to the driver
+    /// </summary>
+    [JsonPropertyName("driverNote")]
+    [MaxLength(500)]
+    public string? DriverNote { get; set; }
+
+    /// <summary>
+    /// Source used to populate this address, such as Manual, GooglePlace, or GoogleMapPin
+    /// </summary>
+    [JsonPropertyName("addressSource")]
+    [MaxLength(50)]
+    public string AddressSource { get; set; } = "Manual";
+
+    /// <summary>
+    /// Google Place identifier returned by Places API when available
+    /// </summary>
+    [JsonPropertyName("googlePlaceId")]
+    [MaxLength(255)]
+    public string? GooglePlaceId { get; set; }
+
+    /// <summary>
+    /// Provider formatted address text returned by Google Maps
+    /// </summary>
+    [JsonPropertyName("formattedAddress")]
+    [MaxLength(500)]
+    public string? FormattedAddress { get; set; }
+
+    /// <summary>
+    /// Latitude selected from Google Maps or Places
+    /// </summary>
+    [JsonPropertyName("latitude")]
+    public decimal? Latitude { get; set; }
+
+    /// <summary>
+    /// Longitude selected from Google Maps or Places
+    /// </summary>
+    [JsonPropertyName("longitude")]
+    public decimal? Longitude { get; set; }
 }

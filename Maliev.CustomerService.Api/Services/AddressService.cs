@@ -72,6 +72,8 @@ public class AddressService : IAddressService
             OwnerId = request.OwnerId,
             Type = request.Type,
             IsDefault = request.IsDefault,
+            PlaceLabel = request.PlaceLabel,
+            PlaceLabelOther = request.PlaceLabelOther,
             AddressLine1 = request.AddressLine1,
             AddressLine2 = request.AddressLine2,
             AddressLine3 = request.AddressLine3,
@@ -82,6 +84,12 @@ public class AddressService : IAddressService
             CountryId = request.CountryId,
             RecipientName = request.RecipientName,
             RecipientPhone = request.RecipientPhone,
+            DriverNote = request.DriverNote,
+            AddressSource = string.IsNullOrWhiteSpace(request.AddressSource) ? "Manual" : request.AddressSource,
+            GooglePlaceId = request.GooglePlaceId,
+            FormattedAddress = request.FormattedAddress,
+            Latitude = request.Latitude,
+            Longitude = request.Longitude,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -107,6 +115,8 @@ public class AddressService : IAddressService
                 address.OwnerId,
                 address.Type,
                 address.IsDefault,
+                address.PlaceLabel,
+                address.PlaceLabelOther,
                 address.AddressLine1,
                 address.AddressLine2,
                 address.AddressLine3,
@@ -116,7 +126,13 @@ public class AddressService : IAddressService
                 address.PostalCode,
                 address.CountryId,
                 address.RecipientName,
-                address.RecipientPhone
+                address.RecipientPhone,
+                address.DriverNote,
+                address.AddressSource,
+                address.GooglePlaceId,
+                address.FormattedAddress,
+                address.Latitude,
+                address.Longitude
             })
         };
 
@@ -180,6 +196,8 @@ public class AddressService : IAddressService
         {
             address.Type,
             address.IsDefault,
+            address.PlaceLabel,
+            address.PlaceLabelOther,
             address.AddressLine1,
             address.AddressLine2,
             address.AddressLine3,
@@ -189,7 +207,13 @@ public class AddressService : IAddressService
             address.PostalCode,
             address.CountryId,
             address.RecipientName,
-            address.RecipientPhone
+            address.RecipientPhone,
+            address.DriverNote,
+            address.AddressSource,
+            address.GooglePlaceId,
+            address.FormattedAddress,
+            address.Latitude,
+            address.Longitude
         };
 
         // Track changed fields
@@ -205,6 +229,18 @@ public class AddressService : IAddressService
         {
             changedFields["IsDefault"] = request.IsDefault.Value;
             address.IsDefault = request.IsDefault.Value;
+        }
+
+        if (request.PlaceLabel != null && request.PlaceLabel != address.PlaceLabel)
+        {
+            changedFields["PlaceLabel"] = request.PlaceLabel;
+            address.PlaceLabel = request.PlaceLabel;
+        }
+
+        if (request.PlaceLabelOther != null && request.PlaceLabelOther != address.PlaceLabelOther)
+        {
+            changedFields["PlaceLabelOther"] = request.PlaceLabelOther;
+            address.PlaceLabelOther = request.PlaceLabelOther;
         }
 
         if (request.AddressLine1 != null && request.AddressLine1 != address.AddressLine1)
@@ -284,6 +320,42 @@ public class AddressService : IAddressService
         {
             changedFields["RecipientPhone"] = request.RecipientPhone;
             address.RecipientPhone = request.RecipientPhone;
+        }
+
+        if (request.DriverNote != null && request.DriverNote != address.DriverNote)
+        {
+            changedFields["DriverNote"] = request.DriverNote;
+            address.DriverNote = request.DriverNote;
+        }
+
+        if (request.AddressSource != null && request.AddressSource != address.AddressSource)
+        {
+            changedFields["AddressSource"] = request.AddressSource;
+            address.AddressSource = request.AddressSource;
+        }
+
+        if (request.GooglePlaceId != null && request.GooglePlaceId != address.GooglePlaceId)
+        {
+            changedFields["GooglePlaceId"] = request.GooglePlaceId;
+            address.GooglePlaceId = request.GooglePlaceId;
+        }
+
+        if (request.FormattedAddress != null && request.FormattedAddress != address.FormattedAddress)
+        {
+            changedFields["FormattedAddress"] = request.FormattedAddress;
+            address.FormattedAddress = request.FormattedAddress;
+        }
+
+        if (request.Latitude.HasValue && request.Latitude != address.Latitude)
+        {
+            changedFields["Latitude"] = request.Latitude.Value;
+            address.Latitude = request.Latitude.Value;
+        }
+
+        if (request.Longitude.HasValue && request.Longitude != address.Longitude)
+        {
+            changedFields["Longitude"] = request.Longitude.Value;
+            address.Longitude = request.Longitude.Value;
         }
 
         var shouldEnsureSingleDefault = request.IsDefault == true;

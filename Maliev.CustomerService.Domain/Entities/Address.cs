@@ -34,6 +34,16 @@ public class Address
     public bool IsDefault { get; set; } = false;
 
     /// <summary>
+    /// Friendly place label selected by the user, such as Home, Work, or Other
+    /// </summary>
+    public string? PlaceLabel { get; set; }
+
+    /// <summary>
+    /// Custom place label text when <see cref="PlaceLabel"/> is Other
+    /// </summary>
+    public string? PlaceLabelOther { get; set; }
+
+    /// <summary>
     /// First line of address
     /// </summary>
     public string AddressLine1 { get; set; } = string.Empty;
@@ -82,6 +92,36 @@ public class Address
     /// Phone number of the recipient
     /// </summary>
     public string? RecipientPhone { get; set; }
+
+    /// <summary>
+    /// Optional delivery instruction shown to the driver
+    /// </summary>
+    public string? DriverNote { get; set; }
+
+    /// <summary>
+    /// Source used to populate this address, such as Manual, GooglePlace, or GoogleMapPin
+    /// </summary>
+    public string AddressSource { get; set; } = "Manual";
+
+    /// <summary>
+    /// Google Place identifier returned by Places API when available
+    /// </summary>
+    public string? GooglePlaceId { get; set; }
+
+    /// <summary>
+    /// Provider formatted address text returned by Google Maps
+    /// </summary>
+    public string? FormattedAddress { get; set; }
+
+    /// <summary>
+    /// Latitude selected from Google Maps or Places
+    /// </summary>
+    public decimal? Latitude { get; set; }
+
+    /// <summary>
+    /// Longitude selected from Google Maps or Places
+    /// </summary>
+    public decimal? Longitude { get; set; }
 
     /// <summary>
     /// Creation timestamp
