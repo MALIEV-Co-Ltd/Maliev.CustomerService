@@ -58,6 +58,13 @@ public class CreateCustomerRequest
     public string? Landline { get; set; }
 
     /// <summary>
+    /// Customer's profile image URL.
+    /// </summary>
+    [MaxLength(2048, ErrorMessage = "Profile image URL must not exceed 2048 characters")]
+    [JsonPropertyName("profileImageUrl")]
+    public string? ProfileImageUrl { get; set; }
+
+    /// <summary>
     /// Thai National ID (13 digits) - Optional, encrypted at rest for PDPA compliance
     /// </summary>
     [MaxLength(13, ErrorMessage = "Thai National ID must be exactly 13 digits")]

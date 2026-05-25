@@ -59,6 +59,12 @@ public class Customer
     public string? Landline { get; set; }
 
     /// <summary>
+    /// URL for the customer's profile image, usually imported from an external identity provider.
+    /// </summary>
+    [MaxLength(2048)]
+    public string? ProfileImageUrl { get; set; }
+
+    /// <summary>
     /// Customer segmentation: Retail, Wholesale, Enterprise, Government
     /// </summary>
     [Required]

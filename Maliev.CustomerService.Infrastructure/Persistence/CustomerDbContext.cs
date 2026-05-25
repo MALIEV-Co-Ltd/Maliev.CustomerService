@@ -92,6 +92,9 @@ public class CustomerDbContext : DbContext
                 .HasMaxLength(40)
                 .HasDefaultValue(CustomerLifecycleStatus.Active);
 
+            entity.Property(e => e.ProfileImageUrl)
+                .HasMaxLength(2048);
+
             // Trigram GIN indexes for efficient partial string matches (ILIKE %term%)
             // Note: GIN does not support unique constraints — uniqueness is on ix_customers_email_unique above
             entity.HasIndex(e => e.FirstName, "ix_customer_first_name_trgm")

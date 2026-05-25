@@ -34,6 +34,11 @@ public class RegisterCustomerRequest
     [JsonPropertyName("phone")]
     public string? Phone { get; set; }
 
+    /// <summary>Profile image URL imported from the registration provider.</summary>
+    [MaxLength(2048)]
+    [JsonPropertyName("profileImageUrl")]
+    public string? ProfileImageUrl { get; set; }
+
     /// <summary>Registration method: "Google" or "Email".</summary>
     [Required]
     [MaxLength(20)]

@@ -134,6 +134,7 @@ public class CustomerService : ICustomerService
             Mobile = request.Mobile,
             Extension = request.Extension,
             Landline = request.Landline,
+            ProfileImageUrl = NormalizeProfileImageUrl(request.ProfileImageUrl),
             ThaiNationalId = request.ThaiNationalId,
             Segment = request.Segment,
             Tier = request.Tier,
@@ -171,6 +172,7 @@ public class CustomerService : ICustomerService
                 customer.Mobile,
                 customer.Extension,
                 customer.Landline,
+                customer.ProfileImageUrl,
                 ThaiNationalId = customer.ThaiNationalId != null ? "***REDACTED***" : null, // Don't log PII
                 customer.Segment,
                 customer.Tier,
@@ -306,6 +308,7 @@ public class CustomerService : ICustomerService
             LastName = request.LastName,
             Email = request.Email,
             Mobile = request.Phone,
+            ProfileImageUrl = NormalizeProfileImageUrl(request.ProfileImageUrl),
             Segment = "Retail",
             Tier = "Bronze",
             PreferredLanguage = request.PreferredLanguage,
@@ -331,6 +334,7 @@ public class CustomerService : ICustomerService
                 customer.FirstName,
                 customer.LastName,
                 customer.Email,
+                customer.ProfileImageUrl,
                 customer.Segment,
                 customer.Tier,
                 customer.PreferredLanguage,
@@ -548,6 +552,7 @@ public class CustomerService : ICustomerService
             customer.Mobile,
             customer.Extension,
             customer.Landline,
+            customer.ProfileImageUrl,
             ThaiNationalId = customer.ThaiNationalId != null ? "***REDACTED***" : null, // Don't log PII
             customer.Segment,
             customer.Tier,
@@ -616,6 +621,16 @@ public class CustomerService : ICustomerService
         {
             changedFields["Landline"] = request.Landline;
             customer.Landline = request.Landline;
+        }
+
+        if (request.ProfileImageUrl != null)
+        {
+            var profileImageUrl = NormalizeProfileImageUrl(request.ProfileImageUrl);
+            if (!string.Equals(profileImageUrl, customer.ProfileImageUrl, StringComparison.Ordinal))
+            {
+                changedFields["ProfileImageUrl"] = profileImageUrl ?? string.Empty;
+                customer.ProfileImageUrl = profileImageUrl;
+            }
         }
 
         if (request.ThaiNationalId != null && request.ThaiNationalId != customer.ThaiNationalId)
@@ -827,6 +842,7 @@ public class CustomerService : ICustomerService
 
         if (existingByGoogle?.Customer is not null)
         {
+            ApplyProfileImageUrl(existingByGoogle.Customer, request.ProfileImageUrl);
             existingByGoogle.LastLoginAtUtc = DateTimeOffset.UtcNow;
             existingByGoogle.EmailVerified = existingByGoogle.EmailVerified || request.EmailVerified;
             existingByGoogle.UpdatedAtUtc = DateTimeOffset.UtcNow;
@@ -847,6 +863,7 @@ public class CustomerService : ICustomerService
                 RegistrationMethod = "Google",
                 PreferredLanguage = request.PreferredLanguage,
                 Timezone = request.Timezone,
+                ProfileImageUrl = request.ProfileImageUrl,
                 GoogleSub = googleSubject
             }, cancellationToken);
 
@@ -869,6 +886,8 @@ public class CustomerService : ICustomerService
             };
             _context.CustomerAccounts.Add(account);
         }
+
+        ApplyProfileImageUrl(customer, request.ProfileImageUrl);
 
         account.GoogleSubject = googleSubject;
         account.EmailVerified = request.EmailVerified;
@@ -1756,9 +1775,28 @@ public class CustomerService : ICustomerService
             PrincipalId = customer.PrincipalId,
             Email = customer.Email,
             DisplayName = $"{customer.FirstName} {customer.LastName}".Trim(),
+            ProfileImageUrl = customer.ProfileImageUrl,
             PreferredLanguage = customer.PreferredLanguage,
             GoogleSubject = account.GoogleSubject
         };
+    }
+
+    private static void ApplyProfileImageUrl(Customer customer, string? profileImageUrl)
+    {
+        var normalized = NormalizeProfileImageUrl(profileImageUrl);
+        if (string.IsNullOrWhiteSpace(normalized) ||
+            string.Equals(normalized, customer.ProfileImageUrl, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        customer.ProfileImageUrl = normalized;
+        customer.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static string? NormalizeProfileImageUrl(string? profileImageUrl)
+    {
+        return string.IsNullOrWhiteSpace(profileImageUrl) ? null : profileImageUrl.Trim();
     }
 
     private static string NormalizeEmail(string email)

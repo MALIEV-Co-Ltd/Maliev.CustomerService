@@ -258,6 +258,36 @@ public class CustomerServiceTests
     }
 
     [Fact]
+    public async Task LinkOrRegisterGoogleAsync_WithGoogleProfileImage_PersistsCustomerProfileImage()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var profileImageUrl = "https://lh3.googleusercontent.com/a/profile-photo";
+        var service = CreateService();
+
+        // Act
+        var linked = await service.LinkOrRegisterGoogleAsync(new LinkOrRegisterGoogleCustomerRequest
+        {
+            Email = "google.photo@example.com",
+            FirstName = "Google",
+            LastName = "Photo",
+            GoogleSubject = "google-photo-subject-123",
+            EmailVerified = true,
+            ProfileImageUrl = profileImageUrl
+        });
+
+        var profile = await service.GetByIdAsync(linked.CustomerId);
+
+        // Assert
+        Assert.Equal(profileImageUrl, linked.ProfileImageUrl);
+        Assert.Equal(profileImageUrl, profile?.ProfileImageUrl);
+
+        await using var context = _fixture.CreateDbContext();
+        var customer = await context.Customers.SingleAsync();
+        Assert.Equal(profileImageUrl, customer.ProfileImageUrl);
+    }
+
+    [Fact]
     public async Task ConfirmPasswordResetAsync_WithIssuedToken_ChangesValidatedPassword()
     {
         // Arrange

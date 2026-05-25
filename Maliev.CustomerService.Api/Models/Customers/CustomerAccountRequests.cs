@@ -89,6 +89,11 @@ public sealed class LinkOrRegisterGoogleCustomerRequest
     [JsonPropertyName("emailVerified")]
     public bool EmailVerified { get; set; }
 
+    /// <summary>Profile image URL from Google profile data.</summary>
+    [MaxLength(2048)]
+    [JsonPropertyName("profileImageUrl")]
+    public string? ProfileImageUrl { get; set; }
+
     /// <summary>Preferred language.</summary>
     [MaxLength(10)]
     [JsonPropertyName("preferredLanguage")]
@@ -120,6 +125,10 @@ public sealed class CustomerAccountSessionResponse
     /// <summary>Customer display name.</summary>
     [JsonPropertyName("displayName")]
     public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>Customer profile image URL.</summary>
+    [JsonPropertyName("profileImageUrl")]
+    public string? ProfileImageUrl { get; set; }
 
     /// <summary>Preferred language.</summary>
     [JsonPropertyName("preferredLanguage")]

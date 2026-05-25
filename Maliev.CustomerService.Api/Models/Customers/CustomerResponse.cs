@@ -68,6 +68,12 @@ public class CustomerResponse
     public string? Landline { get; set; }
 
     /// <summary>
+    /// Customer profile image URL.
+    /// </summary>
+    [JsonPropertyName("profileImageUrl")]
+    public string? ProfileImageUrl { get; set; }
+
+    /// <summary>
     /// Company name associated with the customer
     /// </summary>
     [JsonPropertyName("companyName")]

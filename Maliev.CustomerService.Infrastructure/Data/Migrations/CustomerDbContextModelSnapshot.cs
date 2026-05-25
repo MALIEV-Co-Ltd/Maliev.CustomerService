@@ -464,6 +464,10 @@ namespace Maliev.CustomerService.Infrastructure.Data.Migrations
                         .HasMaxLength(2)
                         .HasColumnType("character varying(2)");
 
+                    b.Property<string>("ProfileImageUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
                     b.Property<Guid>("PrincipalId")
                         .HasColumnType("uuid");
 
