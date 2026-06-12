@@ -2,6 +2,7 @@ using Maliev.CustomerService.Application.Interfaces;
 using Maliev.CustomerService.Domain.Entities;
 using Maliev.CustomerService.Infrastructure.Persistence.Configurations;
 using Maliev.CustomerService.Infrastructure.Persistence.Interceptors;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.CustomerService.Infrastructure.Persistence;
@@ -65,6 +66,10 @@ public class CustomerDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
 
         modelBuilder.HasPostgresExtension("pg_trgm");
 

@@ -2,6 +2,7 @@ using Maliev.CustomerService.Application.Interfaces;
 using Maliev.CustomerService.Infrastructure.Persistence;
 using Maliev.CustomerService.Infrastructure.Persistence.Interceptors;
 using Maliev.CustomerService.Infrastructure.Security;
+using MassTransit.EntityFrameworkCoreIntegration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -41,5 +42,28 @@ public class ModelIntegrityTests
         Assert.False(hasChanges,
             "The EF Core model for 'CustomerDbContext' has changed but no migration has been added. " +
             "Run 'dotnet ef migrations add <Name> --project Maliev.CustomerService.Infrastructure --startup-project Maliev.CustomerService.Api' to fix this.");
+    }
+
+    [Fact]
+    public void Model_ShouldIncludeMassTransitOutboxEntities()
+    {
+        var options = new DbContextOptionsBuilder<CustomerDbContext>()
+            .UseNpgsql("Host=localhost;Database=customer_model_test;Username=postgres;Password=postgres")
+            .Options;
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ASPNETCORE_ENVIRONMENT"] = "Testing"
+            })
+            .Build();
+        IEncryptionService encryptionService = new EncryptionService(configuration);
+        var encryptionInterceptor = new EncryptionInterceptor(encryptionService);
+
+        using var context = new CustomerDbContext(options, encryptionService, encryptionInterceptor);
+
+        Assert.NotNull(context.Model.FindEntityType(typeof(InboxState)));
+        Assert.NotNull(context.Model.FindEntityType(typeof(OutboxMessage)));
+        Assert.NotNull(context.Model.FindEntityType(typeof(OutboxState)));
     }
 }

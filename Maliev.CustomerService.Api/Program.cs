@@ -3,6 +3,7 @@ using Maliev.CustomerService.Infrastructure.Persistence;
 using Maliev.CustomerService.Infrastructure.Persistence.Interceptors;
 using Maliev.CustomerService.Infrastructure.Persistence.Repositories;
 using Maliev.CustomerService.Infrastructure.Security;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 // Initialize bootstrap logging
@@ -29,6 +30,12 @@ try
     builder.AddStandardCache("customer:"); // Redis + in-memory fallback, memory-optimized
     builder.AddMassTransitWithRabbitMq(configure: x =>
     {
+        x.AddEntityFrameworkOutbox<CustomerDbContext>(options =>
+        {
+            _ = options.UsePostgres();
+            options.UseBusOutbox();
+        });
+
         x.AddConsumer<Maliev.CustomerService.Api.Consumers.GetCustomerDetailsConsumer>();
         x.AddConsumer<Maliev.CustomerService.Api.Consumers.FileDeletedEventConsumer>();
         x.AddConsumer<Maliev.CustomerService.Api.Consumers.OrderPaidEventConsumer>();
