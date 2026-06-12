@@ -451,6 +451,45 @@ public class CustomerServiceTests
     }
 
     [Fact]
+    public async Task GetByIdAsync_WithLinkedCompany_ReturnsCompanyVatNumber()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        await using var context = _fixture.CreateDbContext();
+        var company = new Company
+        {
+            Name = "MALIEV Test Buyer Co., Ltd.",
+            VatNumber = "TH-0123456789012",
+            Segment = "Enterprise",
+            Tier = "Gold"
+        };
+        context.Companies.Add(company);
+        await context.SaveChangesAsync();
+
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Vat",
+            LastName = "Buyer",
+            Email = "vat.buyer@example.com",
+            CompanyId = company.Id,
+            Segment = "Enterprise",
+            Tier = "Gold",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "test-actor", "Employee");
+
+        // Act
+        var result = await service.GetByIdAsync(created.Id);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("MALIEV Test Buyer Co., Ltd.", result!.CompanyName);
+        Assert.Equal("TH-0123456789012", result.VatNumber);
+    }
+
+    [Fact]
     public async Task GetByIdAsync_WithNonExistentCustomer_ReturnsNull()
     {
         // Arrange

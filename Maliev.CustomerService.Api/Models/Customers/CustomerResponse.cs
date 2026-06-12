@@ -80,6 +80,12 @@ public class CustomerResponse
     public string? CompanyName { get; set; }
 
     /// <summary>
+    /// VAT/tax number for the associated company
+    /// </summary>
+    [JsonPropertyName("vatNumber")]
+    public string? VatNumber { get; set; }
+
+    /// <summary>
     /// Company's landline phone number
     /// </summary>
     [JsonPropertyName("companyPhone")]

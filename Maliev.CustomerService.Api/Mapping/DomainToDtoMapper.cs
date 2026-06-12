@@ -43,6 +43,7 @@ public static class DomainToDtoMapper
             CompanyId = customer.CompanyId,
             AccountManagerEmployeeId = customer.AccountManagerEmployeeId,
             CompanyName = company?.Name,
+            VatNumber = company?.VatNumber,
             CompanyPhone = company?.ContactPhone,
             NDAStatus = nda?.Status,
             UsesCompanyBillingAddress = customer.UsesCompanyBillingAddress,
