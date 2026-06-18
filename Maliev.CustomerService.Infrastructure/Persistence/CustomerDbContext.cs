@@ -51,6 +51,8 @@ public class CustomerDbContext : DbContext
     public DbSet<NDARecord> NDARecords => Set<NDARecord>();
     /// <summary>Document references set</summary>
     public DbSet<DocumentReference> DocumentReferences => Set<DocumentReference>();
+    /// <summary>Customer-scoped memories set</summary>
+    public DbSet<CustomerMemory> CustomerMemories => Set<CustomerMemory>();
     /// <summary>Audit logs set</summary>
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     /// <summary>Internal notes set</summary>
@@ -220,6 +222,32 @@ public class CustomerDbContext : DbContext
             entity.HasIndex(e => e.CustomerId);
 
             // Concurrency token (PostgreSQL xmin)
+            entity.Property<uint>("xmin")
+                .HasColumnType("xid")
+                .IsRowVersion();
+        });
+
+        // Configure CustomerMemory
+        modelBuilder.Entity<CustomerMemory>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.MemoryType).IsRequired().HasMaxLength(80);
+            entity.Property(e => e.Key).IsRequired().HasMaxLength(120);
+            entity.Property(e => e.Value).IsRequired().HasMaxLength(1200);
+            entity.Property(e => e.Confidence).HasPrecision(5, 4);
+            entity.Property(e => e.Source).IsRequired().HasMaxLength(80);
+            entity.HasOne(e => e.Customer)
+                .WithMany()
+                .HasForeignKey(e => e.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(e => new { e.CustomerId, e.MemoryType, e.Key })
+                .IsUnique()
+                .HasDatabaseName("ix_customer_memories_customer_type_key");
+            entity.HasIndex(e => new { e.CustomerId, e.LastObservedAt })
+                .HasDatabaseName("ix_customer_memories_customer_last_observed");
+            entity.HasIndex(e => e.Value, "ix_customer_memories_value_trgm")
+                .HasMethod("gin")
+                .HasOperators("gin_trgm_ops");
             entity.Property<uint>("xmin")
                 .HasColumnType("xid")
                 .IsRowVersion();

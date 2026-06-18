@@ -49,6 +49,12 @@ public static class CustomerPermissions
     /// <summary>Permission to delete customer documents.</summary>
     public const string DocumentsDelete = "customer.documents.delete";
 
+    // Memory Operations
+    /// <summary>Permission to read customer-scoped memories.</summary>
+    public const string MemoriesRead = "customer.memories.read";
+    /// <summary>Permission to write customer-scoped memories.</summary>
+    public const string MemoriesWrite = "customer.memories.write";
+
     // Internal Note Operations
     /// <summary>Permission to create internal notes.</summary>
     public const string NotesCreate = "customer.notes.create";
@@ -96,6 +102,8 @@ public static class CustomerPermissions
         { DocumentsCreate, "Create customer documents" },
         { DocumentsRead, "Read customer documents" },
         { DocumentsDelete, "Delete customer documents" },
+        { MemoriesRead, "Read customer-scoped memories" },
+        { MemoriesWrite, "Write customer-scoped memories" },
         { NotesCreate, "Create internal notes" },
         { NotesRead, "Read internal notes" },
         { NotesUpdate, "Update internal notes" },
