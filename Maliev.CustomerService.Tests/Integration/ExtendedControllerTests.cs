@@ -326,6 +326,38 @@ public class ExtendedControllerTests
     }
 
     [Fact]
+    public async Task CreateAndGetDocument_WithOrderNumber_PreservesJsonContract()
+    {
+        await _factory.ClearDatabaseAsync();
+        var client = _factory.CreateAuthenticatedClient(
+            "test-employee",
+            new[] { "roles.customer.representative" },
+            new[] { "customer.documents.create", "customer.documents.read" });
+        var ownerId = Guid.NewGuid();
+        var request = new Api.Models.Documents.CreateDocumentRequest
+        {
+            OwnerType = "Customer",
+            OwnerId = ownerId,
+            DocumentType = "Receipt",
+            FileReference = "order-linked-ref",
+            Filename = "receipt.pdf",
+            OrderNumber = "ORD-2026-00422"
+        };
+
+        var createResponse = await client.PostAsJsonAsync("/customer/v1/documents", request);
+        var created = await createResponse.Content.ReadFromJsonAsync<Api.Models.Documents.DocumentResponse>();
+        var getResponse = await client.GetAsync(
+            $"/customer/v1/documents?ownerType=Customer&ownerId={ownerId:D}");
+        var documents = await getResponse.Content.ReadFromJsonAsync<List<Api.Models.Documents.DocumentResponse>>();
+
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+        Assert.NotNull(created);
+        Assert.Equal("ORD-2026-00422", created.OrderNumber);
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        Assert.Equal("ORD-2026-00422", Assert.Single(documents!).OrderNumber);
+    }
+
+    [Fact]
     public async Task CompleteDocument_WithSignature_Succeeds()
     {
         await _factory.ClearDatabaseAsync();

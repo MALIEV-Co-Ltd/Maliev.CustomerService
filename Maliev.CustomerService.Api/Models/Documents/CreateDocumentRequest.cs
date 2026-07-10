@@ -23,6 +23,13 @@ public class CreateDocumentRequest
     public Guid OwnerId { get; set; }
 
     /// <summary>
+    /// Gets or sets the optional manufacturing order number linked to the document.
+    /// </summary>
+    [MaxLength(100)]
+    [JsonPropertyName("orderNumber")]
+    public string? OrderNumber { get; set; }
+
+    /// <summary>
     /// Document type classification
     /// </summary>
     [Required(ErrorMessage = "Document type is required")]

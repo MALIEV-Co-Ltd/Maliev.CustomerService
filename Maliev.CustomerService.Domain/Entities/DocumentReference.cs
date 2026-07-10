@@ -30,6 +30,13 @@ public class DocumentReference
     public Guid OwnerId { get; set; }
 
     /// <summary>
+    /// Optional manufacturing order number that owns the document in customer-facing workspaces
+    /// </summary>
+    [Column("order_number")]
+    [MaxLength(100)]
+    public string? OrderNumber { get; set; }
+
+    /// <summary>
     /// Document type classification
     /// </summary>
     [Column("document_type")]

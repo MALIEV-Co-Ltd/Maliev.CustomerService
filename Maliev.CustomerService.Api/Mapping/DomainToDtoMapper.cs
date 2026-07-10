@@ -227,6 +227,7 @@ public static class DomainToDtoMapper
             Id = document.Id,
             OwnerType = document.OwnerType,
             OwnerId = document.OwnerId,
+            OrderNumber = document.OrderNumber,
             DocumentType = document.DocumentType,
             FileReference = document.FileReference,
             Filename = document.Filename,

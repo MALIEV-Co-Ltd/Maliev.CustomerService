@@ -26,6 +26,12 @@ public class DocumentResponse
     public Guid OwnerId { get; set; }
 
     /// <summary>
+    /// Gets or sets the optional manufacturing order number linked to the document.
+    /// </summary>
+    [JsonPropertyName("orderNumber")]
+    public string? OrderNumber { get; set; }
+
+    /// <summary>
     /// Document type classification
     /// </summary>
     [JsonPropertyName("documentType")]

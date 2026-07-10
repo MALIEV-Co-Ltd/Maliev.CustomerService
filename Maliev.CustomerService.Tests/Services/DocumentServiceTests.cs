@@ -78,6 +78,34 @@ public class DocumentServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_WithOrderNumber_PersistsAndReturnsDurableOrderLink()
+    {
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        _mockUploadServiceClient.Setup(x => x.ValidateFileReferenceAsync("order-document-ref"))
+            .ReturnsAsync(true);
+        var ownerId = Guid.NewGuid();
+        var request = new CreateDocumentRequest
+        {
+            OwnerType = "Customer",
+            OwnerId = ownerId,
+            DocumentType = "Receipt",
+            FileReference = "order-document-ref",
+            Filename = "receipt.pdf",
+            OrderNumber = "ORD-2026-00421"
+        };
+
+        var created = await service.CreateAsync(request, "test-actor", "Customer");
+        var documents = await service.GetByOwnerAsync("Customer", ownerId);
+
+        Assert.Equal("ORD-2026-00421", created.OrderNumber);
+        Assert.Equal("ORD-2026-00421", Assert.Single(documents).OrderNumber);
+        await using var context = _fixture.CreateDbContext();
+        var stored = await context.DocumentReferences.SingleAsync(document => document.Id == created.Id);
+        Assert.Equal("ORD-2026-00421", stored.OrderNumber);
+    }
+
+    [Fact]
     public async Task CreateAsync_WithInvalidFileReference_ThrowsInvalidOperationException()
     {
         // Arrange

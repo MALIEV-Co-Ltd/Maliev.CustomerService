@@ -258,6 +258,8 @@ public class CustomerDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.OwnerType, e.OwnerId });
+            entity.HasIndex(e => new { e.OwnerType, e.OwnerId, e.OrderNumber })
+                .HasDatabaseName("ix_document_references_owner_order");
 
             // Concurrency token (PostgreSQL xmin)
             entity.Property<uint>("xmin")

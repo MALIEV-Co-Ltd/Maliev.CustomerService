@@ -69,6 +69,7 @@ public class DocumentService : IDocumentService
             Id = Guid.NewGuid(),
             OwnerType = request.OwnerType,
             OwnerId = request.OwnerId,
+            OrderNumber = string.IsNullOrWhiteSpace(request.OrderNumber) ? null : request.OrderNumber.Trim(),
             DocumentType = request.DocumentType,
             FileReference = request.FileReference,
             Filename = request.Filename,
@@ -96,6 +97,7 @@ public class DocumentService : IDocumentService
             {
                 document.OwnerType,
                 document.OwnerId,
+                document.OrderNumber,
                 document.DocumentType,
                 document.FileReference,
                 document.Filename,
