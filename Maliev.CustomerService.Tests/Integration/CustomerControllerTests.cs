@@ -97,10 +97,7 @@ public class CustomerControllerTests
                 Password = "Correct-Horse-1234"
             });
         Assert.Equal(HttpStatusCode.Created, registerResponse.StatusCode);
-        using var client = _factory.CreateAuthenticatedClient(
-            "auth-service",
-            ["roles.customer.account-service"],
-            ["customer.accounts.manage"]);
+        using var client = CreateServiceClient("auth");
 
         var response = await client.PostAsJsonAsync(
             "/customer/v1/customers/google/link-or-register",
@@ -117,6 +114,27 @@ public class CustomerControllerTests
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
         Assert.Equal("GOOGLE_EMAIL_LINK_REQUIRES_VERIFICATION", error?.Code);
+    }
+
+    [Fact]
+    public async Task POST_GoogleLinkOrRegister_DifferentPermittedService_ReturnsForbidden()
+    {
+        await _factory.ClearDatabaseAsync();
+        using var client = CreateServiceClient("quote-engine");
+
+        var response = await client.PostAsJsonAsync(
+            "/customer/v1/customers/google/link-or-register",
+            new LinkOrRegisterGoogleCustomerRequest
+            {
+                Email = "customer@gmail.com",
+                FirstName = "Forged",
+                LastName = "Identity",
+                GoogleSubject = "forged-google-subject",
+                EmailVerified = true,
+                EmailLinkAllowed = true
+            });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
 
@@ -232,5 +250,22 @@ public class CustomerControllerTests
 
         // Assert
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    private HttpClient CreateServiceClient(string serviceName)
+    {
+        var token = _factory.CreateTestJwtToken(
+            serviceName,
+            ["roles.customer.account-service"],
+            ["customer.accounts.manage"],
+            new Dictionary<string, string>
+            {
+                ["user_type"] = "service",
+                ["service_name"] = serviceName
+            });
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        return client;
     }
 }

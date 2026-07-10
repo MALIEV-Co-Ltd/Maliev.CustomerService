@@ -154,10 +154,17 @@ public class CustomerController : ControllerBase
     [RequirePermission(CustomerPermissions.AccountsManage)]
     [ProducesResponseType(typeof(CustomerAccountSessionResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<CustomerAccountSessionResponse>> LinkOrRegisterGoogle(
         [FromBody] LinkOrRegisterGoogleCustomerRequest request,
         CancellationToken cancellationToken = default)
     {
+        if (!IsTrustedAuthServiceCaller())
+        {
+            return Forbid();
+        }
+
         try
         {
             var result = await _customerService.LinkOrRegisterGoogleAsync(request, cancellationToken);
@@ -173,6 +180,24 @@ public class CustomerController : ControllerBase
                 Timestamp = DateTime.UtcNow
             });
         }
+        catch (GoogleIdentityEmailNotVerifiedException ex)
+        {
+            return Unauthorized(new ErrorResponse
+            {
+                Code = ex.Code,
+                Message = ex.Message,
+                TraceId = HttpContext.TraceIdentifier,
+                Timestamp = DateTime.UtcNow
+            });
+        }
+    }
+
+    private bool IsTrustedAuthServiceCaller()
+    {
+        var userType = User.FindFirst("user_type")?.Value;
+        var serviceName = User.FindFirst("service_name")?.Value;
+        return string.Equals(userType, "service", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(serviceName, "auth", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

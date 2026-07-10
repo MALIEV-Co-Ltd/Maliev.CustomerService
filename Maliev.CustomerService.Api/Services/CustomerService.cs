@@ -833,6 +833,11 @@ public class CustomerService : ICustomerService
     /// <inheritdoc />
     public async Task<CustomerAccountSessionResponse> LinkOrRegisterGoogleAsync(LinkOrRegisterGoogleCustomerRequest request, CancellationToken cancellationToken = default)
     {
+        if (!request.EmailVerified)
+        {
+            throw new GoogleIdentityEmailNotVerifiedException();
+        }
+
         var email = NormalizeEmail(request.Email);
         var googleSubject = request.GoogleSubject.Trim();
 

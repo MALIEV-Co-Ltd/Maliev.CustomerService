@@ -290,6 +290,26 @@ public class CustomerServiceTests
     }
 
     [Fact]
+    public async Task LinkOrRegisterGoogleAsync_UnverifiedGoogleEmailIsRejected()
+    {
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        var exception = await Assert.ThrowsAsync<GoogleIdentityEmailNotVerifiedException>(() =>
+            service.LinkOrRegisterGoogleAsync(new LinkOrRegisterGoogleCustomerRequest
+            {
+                Email = "unverified@gmail.com",
+                FirstName = "Unverified",
+                LastName = "Customer",
+                GoogleSubject = "unverified-google-subject",
+                EmailVerified = false,
+                EmailLinkAllowed = true
+            }));
+
+        Assert.Equal("GOOGLE_EMAIL_NOT_VERIFIED", exception.Code);
+    }
+
+    [Fact]
     public async Task LinkOrRegisterGoogleAsync_WithGoogleProfileImage_PersistsCustomerProfileImage()
     {
         // Arrange
