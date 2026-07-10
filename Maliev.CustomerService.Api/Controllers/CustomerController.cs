@@ -158,8 +158,21 @@ public class CustomerController : ControllerBase
         [FromBody] LinkOrRegisterGoogleCustomerRequest request,
         CancellationToken cancellationToken = default)
     {
-        var result = await _customerService.LinkOrRegisterGoogleAsync(request, cancellationToken);
-        return Ok(result);
+        try
+        {
+            var result = await _customerService.LinkOrRegisterGoogleAsync(request, cancellationToken);
+            return Ok(result);
+        }
+        catch (GoogleEmailLinkVerificationRequiredException ex)
+        {
+            return Conflict(new ErrorResponse
+            {
+                Code = ex.Code,
+                Message = ex.Message,
+                TraceId = HttpContext.TraceIdentifier,
+                Timestamp = DateTime.UtcNow
+            });
+        }
     }
 
     /// <summary>

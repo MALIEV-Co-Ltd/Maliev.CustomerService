@@ -1,7 +1,7 @@
-using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using Maliev.CustomerService.Api.Mapping;
 using Maliev.CustomerService.Api.Models.Customers;
 using Maliev.CustomerService.Api.Models.IAM;
@@ -852,6 +852,11 @@ public class CustomerService : ICustomerService
 
         var customer = await _context.Customers
             .FirstOrDefaultAsync(c => c.Email == email && !c.IsDeleted, cancellationToken);
+
+        if (customer is not null && !request.EmailLinkAllowed)
+        {
+            throw new GoogleEmailLinkVerificationRequiredException();
+        }
 
         if (customer is null)
         {

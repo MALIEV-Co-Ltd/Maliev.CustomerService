@@ -80,6 +80,45 @@ public class CustomerControllerTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task POST_GoogleLinkOrRegister_NonAuthoritativeExistingEmail_ReturnsConflict()
+    {
+        await _factory.ClearDatabaseAsync();
+        using var anonymousClient = _factory.CreateClient();
+        var email = $"third.party.{Guid.NewGuid():N}@example.com";
+        var registerResponse = await anonymousClient.PostAsJsonAsync(
+            "/customer/v1/customers/register",
+            new RegisterCustomerRequest
+            {
+                FirstName = "Existing",
+                LastName = "Customer",
+                Email = email,
+                RegistrationMethod = "Email",
+                Password = "Correct-Horse-1234"
+            });
+        Assert.Equal(HttpStatusCode.Created, registerResponse.StatusCode);
+        using var client = _factory.CreateAuthenticatedClient(
+            "auth-service",
+            ["roles.customer.account-service"],
+            ["customer.accounts.manage"]);
+
+        var response = await client.PostAsJsonAsync(
+            "/customer/v1/customers/google/link-or-register",
+            new LinkOrRegisterGoogleCustomerRequest
+            {
+                Email = email,
+                FirstName = "Different",
+                LastName = "Person",
+                GoogleSubject = "different-google-subject",
+                EmailVerified = true,
+                EmailLinkAllowed = false
+            });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        Assert.Equal("GOOGLE_EMAIL_LINK_REQUIRES_VERIFICATION", error?.Code);
+    }
+
 
     [Fact]
     public async Task GetByPrincipalId_ReturnsCustomer_WhenExists()

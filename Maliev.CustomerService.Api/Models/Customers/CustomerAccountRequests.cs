@@ -89,6 +89,12 @@ public sealed class LinkOrRegisterGoogleCustomerRequest
     [JsonPropertyName("emailVerified")]
     public bool EmailVerified { get; set; }
 
+    /// <summary>
+    /// Whether the verified provider is authoritative enough to link an existing account by email.
+    /// </summary>
+    [JsonPropertyName("emailLinkAllowed")]
+    public bool EmailLinkAllowed { get; set; }
+
     /// <summary>Profile image URL from Google profile data.</summary>
     [MaxLength(2048)]
     [JsonPropertyName("profileImageUrl")]

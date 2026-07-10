@@ -243,7 +243,8 @@ public class CustomerServiceTests
             FirstName = "Google",
             LastName = "Customer",
             GoogleSubject = "google-subject-123",
-            EmailVerified = true
+            EmailVerified = true,
+            EmailLinkAllowed = true
         });
 
         // Assert
@@ -255,6 +256,37 @@ public class CustomerServiceTests
         var account = await context.CustomerAccounts.SingleAsync();
         Assert.Equal(registered.Id, account.CustomerId);
         Assert.Equal("google-subject-123", account.GoogleSubject);
+    }
+
+    [Fact]
+    public async Task LinkOrRegisterGoogleAsync_NonAuthoritativeEmailCannotClaimExistingAccount()
+    {
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        await service.RegisterAsync(new RegisterCustomerRequest
+        {
+            FirstName = "Existing",
+            LastName = "Customer",
+            Email = "reassignable@third-party.example",
+            RegistrationMethod = "Email",
+            Password = "Initial-Password-1234"
+        });
+
+        var exception = await Assert.ThrowsAsync<GoogleEmailLinkVerificationRequiredException>(() =>
+            service.LinkOrRegisterGoogleAsync(new LinkOrRegisterGoogleCustomerRequest
+            {
+                Email = "reassignable@third-party.example",
+                FirstName = "Different",
+                LastName = "Person",
+                GoogleSubject = "unrelated-google-subject",
+                EmailVerified = true,
+                EmailLinkAllowed = false
+            }));
+
+        Assert.Equal("GOOGLE_EMAIL_LINK_REQUIRES_VERIFICATION", exception.Code);
+        await using var context = _fixture.CreateDbContext();
+        var account = await context.CustomerAccounts.SingleAsync();
+        Assert.Null(account.GoogleSubject);
     }
 
     [Fact]
