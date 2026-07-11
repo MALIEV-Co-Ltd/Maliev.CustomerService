@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Maliev.CustomerService.Api.Models;
 using Maliev.CustomerService.Api.Models.Customers;
+using Maliev.CustomerService.Domain.Entities;
 using Maliev.CustomerService.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -163,6 +165,14 @@ public class CustomerControllerTests
             Tier = "Bronze"
         };
         await dbContext.Customers.AddAsync(customer);
+        await dbContext.CustomerAccounts.AddAsync(new CustomerAccount
+        {
+            CustomerId = customer.Id,
+            PrincipalId = principalId,
+            Email = email,
+            Status = CustomerAccountStatus.Active,
+            EmailVerified = true
+        });
         await dbContext.SaveChangesAsync();
 
         // Act
@@ -170,11 +180,226 @@ public class CustomerControllerTests
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var result = await response.Content.ReadFromJsonAsync<CustomerResponse>();
+        var json = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<CustomerResponse>(json);
         Assert.NotNull(result);
         Assert.Equal(customer.Id, result!.Id);
         Assert.Equal(principalId, result.PrincipalId);
         Assert.Equal(email, result.Email);
+        using var body = JsonDocument.Parse(json);
+        Assert.False(body.RootElement.TryGetProperty("accountStatus", out _));
+        Assert.False(body.RootElement.TryGetProperty("accountEmailVerified", out _));
+    }
+
+    [Theory]
+    [InlineData(CustomerAccountStatus.Active, true)]
+    [InlineData(CustomerAccountStatus.Disabled, false)]
+    public async Task GetAuthenticationContext_ReturnsNarrowAuthoritativeAccountState_WhenAccountExists(
+        string accountStatus,
+        bool accountEmailVerified)
+    {
+        // Arrange
+        await _factory.ClearDatabaseAsync();
+        var client = _factory.CreateAuthenticatedClient(
+            "test-employee",
+            new[] { "roles.customer.account-reader" },
+            new[] { "customer.accounts.read" });
+
+        var principalId = Guid.NewGuid();
+        var email = $"account-state.{Guid.NewGuid():N}@example.com";
+        const string profileImageUrl = "https://assets.example.com/customer.png";
+
+        await using var dbContext = _factory.GetDbContext();
+        var customer = new Customer
+        {
+            FirstName = "Account",
+            LastName = "State",
+            Email = email,
+            PrincipalId = principalId,
+            Segment = "Retail",
+            Tier = "Bronze",
+            ProfileImageUrl = profileImageUrl
+        };
+        dbContext.Customers.Add(customer);
+        dbContext.CustomerAccounts.Add(new CustomerAccount
+        {
+            CustomerId = customer.Id,
+            PrincipalId = principalId,
+            Email = email,
+            Status = accountStatus,
+            EmailVerified = accountEmailVerified
+        });
+        await dbContext.SaveChangesAsync();
+
+        // Act
+        var response = await client.GetAsync(
+            $"/customer/v1/customers/by-principal/{principalId}/authentication-context");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = body.RootElement;
+        var propertyNames = root.EnumerateObject()
+            .Select(property => property.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(
+            [
+                "accountEmail",
+                "accountEmailVerified",
+                "accountStatus",
+                "customerEmail",
+                "customerId",
+                "firstName",
+                "lastName",
+                "name",
+                "principalId",
+                "profileImageUrl"
+            ],
+            propertyNames);
+        Assert.Equal(customer.Id, root.GetProperty("customerId").GetGuid());
+        Assert.Equal(principalId, root.GetProperty("principalId").GetGuid());
+        Assert.Equal("Account", root.GetProperty("firstName").GetString());
+        Assert.Equal("State", root.GetProperty("lastName").GetString());
+        Assert.Equal("Account State", root.GetProperty("name").GetString());
+        Assert.Equal(email, root.GetProperty("customerEmail").GetString());
+        Assert.Equal(email, root.GetProperty("accountEmail").GetString());
+        Assert.Equal(profileImageUrl, root.GetProperty("profileImageUrl").GetString());
+        Assert.Equal(accountStatus, root.GetProperty("accountStatus").GetString());
+        Assert.Equal(accountEmailVerified, root.GetProperty("accountEmailVerified").GetBoolean());
+    }
+
+    [Fact]
+    public async Task GetAuthenticationContext_ReturnsCustomerAndAccountEmails_WhenTheyDiffer()
+    {
+        await _factory.ClearDatabaseAsync();
+        var client = _factory.CreateAuthenticatedClient(
+            "test-employee",
+            new[] { "roles.customer.account-reader" },
+            new[] { "customer.accounts.read" });
+        var principalId = Guid.NewGuid();
+        var customerEmail = $"customer.{Guid.NewGuid():N}@example.com";
+        var accountEmail = $"account.{Guid.NewGuid():N}@example.com";
+
+        await using var dbContext = _factory.GetDbContext();
+        var customer = new Customer
+        {
+            FirstName = "Email",
+            LastName = "Drift",
+            Email = customerEmail,
+            PrincipalId = principalId,
+            Segment = "Retail",
+            Tier = "Bronze"
+        };
+        dbContext.Customers.Add(customer);
+        dbContext.CustomerAccounts.Add(new CustomerAccount
+        {
+            CustomerId = customer.Id,
+            PrincipalId = principalId,
+            Email = accountEmail,
+            Status = CustomerAccountStatus.Active,
+            EmailVerified = true
+        });
+        await dbContext.SaveChangesAsync();
+
+        var response = await client.GetAsync(
+            $"/customer/v1/customers/by-principal/{principalId}/authentication-context");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(customerEmail, body.RootElement.GetProperty("customerEmail").GetString());
+        Assert.Equal(accountEmail, body.RootElement.GetProperty("accountEmail").GetString());
+    }
+
+    [Fact]
+    public async Task GetAuthenticationContext_ReturnsNotFound_WhenAccountDoesNotExist()
+    {
+        await _factory.ClearDatabaseAsync();
+        var client = _factory.CreateAuthenticatedClient(
+            "test-employee",
+            new[] { "roles.customer.account-reader" },
+            new[] { "customer.accounts.read" });
+        var principalId = Guid.NewGuid();
+
+        await using var dbContext = _factory.GetDbContext();
+        dbContext.Customers.Add(new Customer
+        {
+            FirstName = "No",
+            LastName = "Account",
+            Email = $"no-account.{Guid.NewGuid():N}@example.com",
+            PrincipalId = principalId,
+            Segment = "Retail",
+            Tier = "Bronze"
+        });
+        await dbContext.SaveChangesAsync();
+
+        var response = await client.GetAsync(
+            $"/customer/v1/customers/by-principal/{principalId}/authentication-context");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        Assert.Equal("AUTHENTICATION_CONTEXT_NOT_FOUND", error?.Code);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GetAuthenticationContext_ReturnsNotFound_WhenCustomerIsMissingOrDeleted(
+        bool seedDeletedCustomer)
+    {
+        await _factory.ClearDatabaseAsync();
+        var client = _factory.CreateAuthenticatedClient(
+            "test-employee",
+            new[] { "roles.customer.account-reader" },
+            new[] { "customer.accounts.read" });
+        var principalId = Guid.NewGuid();
+
+        if (seedDeletedCustomer)
+        {
+            await using var dbContext = _factory.GetDbContext();
+            var customer = new Customer
+            {
+                FirstName = "Deleted",
+                LastName = "Account",
+                Email = $"deleted-account.{Guid.NewGuid():N}@example.com",
+                PrincipalId = principalId,
+                Segment = "Retail",
+                Tier = "Bronze",
+                IsDeleted = true
+            };
+            dbContext.Customers.Add(customer);
+            dbContext.CustomerAccounts.Add(new CustomerAccount
+            {
+                CustomerId = customer.Id,
+                PrincipalId = principalId,
+                Email = customer.Email,
+                Status = CustomerAccountStatus.Active,
+                EmailVerified = true
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        var response = await client.GetAsync(
+            $"/customer/v1/customers/by-principal/{principalId}/authentication-context");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        Assert.Equal("AUTHENTICATION_CONTEXT_NOT_FOUND", error?.Code);
+    }
+
+    [Fact]
+    public async Task GetAuthenticationContext_ReturnsForbidden_WhenAccountsReadIsMissing()
+    {
+        await _factory.ClearDatabaseAsync();
+        var client = _factory.CreateAuthenticatedClient(
+            "test-employee",
+            new[] { "roles.customer.representative" },
+            new[] { "customer.customers.read" });
+
+        var response = await client.GetAsync(
+            $"/customer/v1/customers/by-principal/{Guid.NewGuid()}/authentication-context");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
