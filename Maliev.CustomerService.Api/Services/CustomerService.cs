@@ -517,6 +517,35 @@ public class CustomerService : ICustomerService
         return response;
     }
 
+    /// <inheritdoc/>
+    public Task<CustomerAuthenticationContextResponse?> GetAuthenticationContextByPrincipalIdAsync(
+        Guid principalId,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Retrieving customer authentication context by Principal ID {PrincipalId}", principalId);
+
+        return (
+            from customer in _context.Customers.AsNoTracking()
+            join account in _context.CustomerAccounts.AsNoTracking()
+                on customer.Id equals account.CustomerId
+            where customer.PrincipalId == principalId
+                && !customer.IsDeleted
+                && account.PrincipalId == principalId
+            select new CustomerAuthenticationContextResponse
+            {
+                CustomerId = customer.Id,
+                PrincipalId = account.PrincipalId,
+                FirstName = customer.FirstName,
+                LastName = customer.LastName,
+                CustomerEmail = customer.Email,
+                AccountEmail = account.Email,
+                ProfileImageUrl = customer.ProfileImageUrl,
+                AccountStatus = account.Status,
+                AccountEmailVerified = account.EmailVerified
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
     /// <summary>
     /// Updates an existing customer with optimistic concurrency control and audit logging
     /// </summary>

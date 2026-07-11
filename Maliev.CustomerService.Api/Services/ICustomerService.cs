@@ -34,6 +34,16 @@ public interface ICustomerService
     Task<CustomerResponse?> GetByPrincipalIdAsync(Guid principalId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Retrieves the narrow authentication context for a customer portal account.
+    /// </summary>
+    /// <param name="principalId">The central IAM principal identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The authentication context, or null when the customer or matching account does not exist.</returns>
+    Task<CustomerAuthenticationContextResponse?> GetAuthenticationContextByPrincipalIdAsync(
+        Guid principalId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Updates an existing customer with optimistic concurrency control and audit logging
     /// </summary>
     /// <param name="id">Customer ID</param>

@@ -418,6 +418,58 @@ public class CustomerController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves the narrow customer and portal-account context used by authentication consumers.
+    /// </summary>
+    /// <param name="principalId">The central IAM principal identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The customer authentication context.</returns>
+    /// <response code="200">Authentication context found.</response>
+    /// <response code="401">Unauthorized.</response>
+    /// <response code="403">Forbidden - requires customer.accounts.read permission.</response>
+    /// <response code="404">Customer or matching portal account not found.</response>
+    [HttpGet("by-principal/{principalId:guid}/authentication-context")]
+    [RequirePermission(CustomerPermissions.AccountsRead)]
+    [ProducesResponseType(typeof(CustomerAuthenticationContextResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CustomerAuthenticationContextResponse>> GetAuthenticationContextByPrincipalId(
+        Guid principalId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var authenticationContext = await _customerService.GetAuthenticationContextByPrincipalIdAsync(
+                principalId,
+                cancellationToken);
+
+            if (authenticationContext == null)
+            {
+                _logger.LogDebug(
+                    "Customer authentication context for Principal ID {PrincipalId} not found",
+                    principalId);
+                return NotFound(new ErrorResponse
+                {
+                    Code = "AUTHENTICATION_CONTEXT_NOT_FOUND",
+                    Message = "Customer authentication context not found",
+                    TraceId = HttpContext.TraceIdentifier,
+                    Timestamp = DateTime.UtcNow
+                });
+            }
+
+            return Ok(authenticationContext);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Error retrieving customer authentication context by Principal ID {PrincipalId}",
+                principalId);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Updates an existing customer
     /// </summary>
     /// <param name="id">Customer ID</param>
