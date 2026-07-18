@@ -1,9 +1,7 @@
-name: Validate - Main
+name: Pull Request Validation
 
 on:
-  push:
-    branches:
-      - main
+  pull_request:
 
 permissions:
   contents: read
