@@ -39,13 +39,13 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Restore
-        run: dotnet restore Maliev.CustomerService.slnx --configfile nuget.validation.config /p:SharedSourceRoot=../shared
+        run: dotnet restore Maliev.CustomerService.slnx --configfile nuget.validation.config /p:SharedSourceRoot=../shared /p:UsePackageReferences=false
 
       - name: Audit dependencies
         run: dotnet list Maliev.CustomerService.slnx package --vulnerable --include-transitive --no-restore
 
       - name: Build
-        run: dotnet build Maliev.CustomerService.slnx --configuration Release --no-restore /p:SharedSourceRoot=../shared
+        run: dotnet build Maliev.CustomerService.slnx --configuration Release --no-restore /p:SharedSourceRoot=../shared /p:UsePackageReferences=false
 
       - name: Test
-        run: dotnet test Maliev.CustomerService.slnx --configuration Release --no-restore --no-build --verbosity normal /p:SharedSourceRoot=../shared
+        run: dotnet test Maliev.CustomerService.slnx --configuration Release --no-restore --no-build --verbosity normal /p:SharedSourceRoot=../shared /p:UsePackageReferences=false

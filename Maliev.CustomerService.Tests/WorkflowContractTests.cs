@@ -35,6 +35,7 @@ public sealed class WorkflowContractTests
         Assert.Contains("ref: 9c41d6524a485bf03ba022b8170f47366ab1a77a", text);
         Assert.Contains("ref: 979e1bcb3c3ed9c414f652c94b56297543c031b2", text);
         Assert.Equal(3, text.Split("/p:SharedSourceRoot=../shared", StringSplitOptions.None).Length - 1);
+        Assert.Equal(3, text.Split("/p:UsePackageReferences=false", StringSplitOptions.None).Length - 1);
         AssertSafe(text);
     }
 
