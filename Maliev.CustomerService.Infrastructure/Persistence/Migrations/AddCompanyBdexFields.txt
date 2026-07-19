@@ -1,0 +1,23 @@
+-- Migration Script: Add BDEX fields to Company table
+-- This migration adds fields to store data from BDEX (Thailand Department of Business Development) API
+
+ALTER TABLE "Companies"
+ADD COLUMN "FullNameTh" TEXT NULL,
+ADD COLUMN "RegistrationDate" TIMESTAMP WITH TIME ZONE NULL,
+ADD COLUMN "CompanyStatus" TEXT NULL,
+ADD COLUMN "CompanyStatusNameTh" TEXT NULL,
+ADD COLUMN "CompanyTypeCode" TEXT NULL,
+ADD COLUMN "BusinessObjectives" TEXT NULL,
+ADD COLUMN "IsVerifiedFromBdex" BOOLEAN NOT NULL DEFAULT FALSE,
+ADD COLUMN "BdexVerificationDate" TIMESTAMP WITH TIME ZONE NULL,
+ADD COLUMN "StockSymbol" TEXT NULL;
+
+COMMENT ON COLUMN "Companies"."FullNameTh" IS 'Full company name in Thai from BDEX';
+COMMENT ON COLUMN "Companies"."RegistrationDate" IS 'Company registration date from BDEX';
+COMMENT ON COLUMN "Companies"."CompanyStatus" IS 'Company status code from BDEX (1=Active, 5=Liquidated, etc.)';
+COMMENT ON COLUMN "Companies"."CompanyStatusNameTh" IS 'Company status description in Thai';
+COMMENT ON COLUMN "Companies"."CompanyTypeCode" IS 'Type of business entity code (3=Partnership, 5=Limited Company, etc.)';
+COMMENT ON COLUMN "Companies"."BusinessObjectives" IS 'Business objectives from BDEX (semicolon separated)';
+COMMENT ON COLUMN "Companies"."IsVerifiedFromBdex" IS 'Whether company data was verified from BDEX registry';
+COMMENT ON COLUMN "Companies"."BdexVerificationDate" IS 'Date when company was verified from BDEX';
+COMMENT ON COLUMN "Companies"."StockSymbol" IS 'Stock symbol for listed companies';

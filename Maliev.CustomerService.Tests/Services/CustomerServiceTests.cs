@@ -1,0 +1,1241 @@
+using Maliev.CustomerService.Api.Models.Customers;
+using Maliev.CustomerService.Api.Models.IAM;
+using Maliev.CustomerService.Api.Services;
+using Maliev.CustomerService.Domain.Entities;
+using Maliev.CustomerService.Tests.Infrastructure;
+using MassTransit;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Moq;
+
+namespace Maliev.CustomerService.Tests.Services;
+
+/// <summary>
+/// Unit tests for CustomerService using real PostgreSQL database
+/// Tests business logic, validation, and audit logging
+/// </summary>
+[Collection("Database Collection")]
+public class CustomerServiceTests
+{
+    private readonly TestWebApplicationFactory _fixture;
+    private readonly Mock<IIAMClient> _mockIamClient;
+    private readonly Mock<IConfiguration> _mockConfig;
+    private readonly Mock<ILogger<Api.Services.CustomerService>> _mockLogger;
+    private readonly Mock<Api.Services.MetricsService> _mockMetricsService;
+    private readonly Mock<IPublishEndpoint> _mockPublishEndpoint;
+
+    public CustomerServiceTests(TestWebApplicationFactory fixture)
+    {
+        _fixture = fixture;
+        _mockIamClient = new Mock<IIAMClient>();
+        _mockConfig = new Mock<IConfiguration>();
+        _mockPublishEndpoint = new Mock<IPublishEndpoint>();
+
+
+        // Setup default configuration (enabled in final state)
+        var mockSection = new Mock<IConfigurationSection>();
+        mockSection.Setup(s => s.Value).Returns("true");
+        _mockConfig.Setup(c => c.GetSection("Features:PrincipalBasedAuthEnabled")).Returns(mockSection.Object);
+
+        // Default IAM response (unique per call)
+        _mockIamClient.Setup(x => x.CreatePrincipalAsync(It.IsAny<CreatePrincipalRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => new CreatePrincipalResponse { PrincipalId = Guid.NewGuid(), CreatedAt = DateTime.UtcNow });
+
+        _mockLogger = new Mock<ILogger<Api.Services.CustomerService>>();
+        _mockMetricsService = new Mock<Api.Services.MetricsService>(MockBehavior.Loose, new object[] { Mock.Of<IHostEnvironment>() });
+    }
+
+    private Api.Services.CustomerService CreateService()
+    {
+        var context = _fixture.CreateDbContext();
+        return new Api.Services.CustomerService(
+            context,
+            _mockIamClient.Object,
+            _mockConfig.Object,
+            _mockLogger.Object,
+            _mockMetricsService.Object,
+            _mockPublishEndpoint.Object);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithPrincipalAuthEnabled_CallsIAMClientAndSetsPrincipalId()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+
+        // Enable feature flag
+        var mockSection = new Mock<IConfigurationSection>();
+        mockSection.Setup(s => s.Value).Returns("true");
+        _mockConfig.Setup(c => c.GetSection("Features:PrincipalBasedAuthEnabled")).Returns(mockSection.Object);
+
+        var principalId = Guid.NewGuid();
+        _mockIamClient.Setup(x => x.CreatePrincipalAsync(It.IsAny<CreatePrincipalRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CreatePrincipalResponse { PrincipalId = principalId, CreatedAt = DateTime.UtcNow });
+
+        var service = CreateService();
+        var request = new CreateCustomerRequest
+        {
+            FirstName = "IAM",
+            LastName = "User",
+            Email = "iam@example.com",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "UTC"
+        };
+
+        // Act
+        var result = await service.CreateAsync(request, "test-actor", "Employee");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(principalId, result.PrincipalId);
+        _mockIamClient.Verify(x => x.CreatePrincipalAsync(
+            It.Is<CreatePrincipalRequest>(r => r.Email == "iam@example.com"), It.IsAny<CancellationToken>()), Times.Once);
+
+        // Verify persisted in DB
+        await using var context = _fixture.CreateDbContext();
+        var customerInDb = await context.Customers.FindAsync(result.Id);
+        Assert.NotNull(customerInDb);
+        Assert.Equal(principalId, customerInDb!.PrincipalId);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithIAMFailure_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+
+        // Enable feature flag
+        var mockSection = new Mock<IConfigurationSection>();
+        mockSection.Setup(s => s.Value).Returns("true");
+        _mockConfig.Setup(c => c.GetSection("Features:PrincipalBasedAuthEnabled")).Returns(mockSection.Object);
+
+        _mockIamClient.Setup(x => x.CreatePrincipalAsync(It.IsAny<CreatePrincipalRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("IAM Error"));
+
+        var service = CreateService();
+        var request = new CreateCustomerRequest
+        {
+            FirstName = "Fail",
+            LastName = "User",
+            Email = "fail@example.com",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "UTC"
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(request, "test-actor", "Employee"));
+
+        // Verify NO customer was created in DB
+        await using var context = _fixture.CreateDbContext();
+        var count = await context.Customers.CountAsync();
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithValidData_ReturnsCustomerResponse()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var request = new CreateCustomerRequest
+        {
+            FirstName = "John",
+            LastName = "Doe",
+            Email = "john.doe@example.com",
+            Mobile = "+66-2-123-4567",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok",
+            PaymentTerms = PaymentTerms.Net30,
+            CommunicationPreferences = new Dictionary<string, object>
+            {
+                { "email_opt_in", true },
+                { "sms_opt_in", false }
+            }
+        };
+
+        // Act
+        var result = await service.CreateAsync(request, "test-actor", "Employee");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotEqual(Guid.Empty, result.Id);
+        Assert.Equal("John", result.FirstName);
+        Assert.Equal("Doe", result.LastName);
+        Assert.Equal("john.doe@example.com", result.Email);
+        Assert.Equal("+66-2-123-4567", result.Mobile);
+        Assert.Equal("Retail", result.Segment);
+        Assert.Equal("Bronze", result.Tier);
+        Assert.Equal("en", result.PreferredLanguage);
+        Assert.Equal("Asia/Bangkok", result.Timezone);
+        Assert.Equal(PaymentTerms.Net30, result.PaymentTerms);
+        Assert.NotNull(result.CommunicationPreferences);
+        Assert.True(result.CreatedAt > DateTime.UtcNow.AddSeconds(-5) && result.CreatedAt <= DateTime.UtcNow.AddSeconds(5));
+    }
+
+    [Fact]
+    public async Task RegisterAsync_WithEmailPassword_CreatesAccountAndValidatesCredentials()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var principalId = Guid.NewGuid();
+        _mockIamClient.Setup(x => x.CreatePrincipalAsync(It.IsAny<CreatePrincipalRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CreatePrincipalResponse { PrincipalId = principalId, CreatedAt = DateTime.UtcNow });
+        var service = CreateService();
+
+        var request = new RegisterCustomerRequest
+        {
+            FirstName = "Portal",
+            LastName = "Customer",
+            Email = "portal.customer@example.com",
+            RegistrationMethod = "Email",
+            Password = "Correct-Horse-1234"
+        };
+
+        // Act
+        var registered = await service.RegisterAsync(request);
+        var validation = await service.ValidateCredentialsAsync(
+            new ValidateCustomerCredentialsRequest { Email = request.Email, Password = request.Password });
+
+        // Assert
+        Assert.True(validation.IsValid);
+        Assert.Equal(registered.Id, validation.CustomerId);
+        Assert.Equal(principalId, validation.PrincipalId);
+        Assert.Equal("Portal Customer", validation.DisplayName);
+
+        await using var context = _fixture.CreateDbContext();
+        var account = await context.CustomerAccounts.SingleAsync();
+        Assert.Equal(registered.Id, account.CustomerId);
+        Assert.NotEqual(request.Password, account.PasswordHash);
+        Assert.True(account.EmailVerified);
+    }
+
+    [Fact]
+    public async Task LinkOrRegisterGoogleAsync_WithExistingCustomer_LinksAccountToSameCustomer()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var principalId = Guid.NewGuid();
+        _mockIamClient.Setup(x => x.CreatePrincipalAsync(It.IsAny<CreatePrincipalRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CreatePrincipalResponse { PrincipalId = principalId, CreatedAt = DateTime.UtcNow });
+        var service = CreateService();
+
+        var registered = await service.RegisterAsync(new RegisterCustomerRequest
+        {
+            FirstName = "Google",
+            LastName = "Customer",
+            Email = "google.customer@example.com",
+            RegistrationMethod = "Email",
+            Password = "Initial-Password-1234"
+        });
+
+        // Act
+        var linked = await service.LinkOrRegisterGoogleAsync(new LinkOrRegisterGoogleCustomerRequest
+        {
+            Email = "google.customer@example.com",
+            FirstName = "Google",
+            LastName = "Customer",
+            GoogleSubject = "google-subject-123",
+            EmailVerified = true,
+            EmailLinkAllowed = true
+        });
+
+        // Assert
+        Assert.Equal(registered.Id, linked.CustomerId);
+        Assert.Equal(principalId, linked.PrincipalId);
+        Assert.Equal("google-subject-123", linked.GoogleSubject);
+
+        await using var context = _fixture.CreateDbContext();
+        var account = await context.CustomerAccounts.SingleAsync();
+        Assert.Equal(registered.Id, account.CustomerId);
+        Assert.Equal("google-subject-123", account.GoogleSubject);
+    }
+
+    [Fact]
+    public async Task LinkOrRegisterGoogleAsync_NonAuthoritativeEmailCannotClaimExistingAccount()
+    {
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        await service.RegisterAsync(new RegisterCustomerRequest
+        {
+            FirstName = "Existing",
+            LastName = "Customer",
+            Email = "reassignable@third-party.example",
+            RegistrationMethod = "Email",
+            Password = "Initial-Password-1234"
+        });
+
+        var exception = await Assert.ThrowsAsync<GoogleEmailLinkVerificationRequiredException>(() =>
+            service.LinkOrRegisterGoogleAsync(new LinkOrRegisterGoogleCustomerRequest
+            {
+                Email = "reassignable@third-party.example",
+                FirstName = "Different",
+                LastName = "Person",
+                GoogleSubject = "unrelated-google-subject",
+                EmailVerified = true,
+                EmailLinkAllowed = false
+            }));
+
+        Assert.Equal("GOOGLE_EMAIL_LINK_REQUIRES_VERIFICATION", exception.Code);
+        await using var context = _fixture.CreateDbContext();
+        var account = await context.CustomerAccounts.SingleAsync();
+        Assert.Null(account.GoogleSubject);
+    }
+
+    [Fact]
+    public async Task LinkOrRegisterGoogleAsync_UnverifiedGoogleEmailIsRejected()
+    {
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        var exception = await Assert.ThrowsAsync<GoogleIdentityEmailNotVerifiedException>(() =>
+            service.LinkOrRegisterGoogleAsync(new LinkOrRegisterGoogleCustomerRequest
+            {
+                Email = "unverified@gmail.com",
+                FirstName = "Unverified",
+                LastName = "Customer",
+                GoogleSubject = "unverified-google-subject",
+                EmailVerified = false,
+                EmailLinkAllowed = true
+            }));
+
+        Assert.Equal("GOOGLE_EMAIL_NOT_VERIFIED", exception.Code);
+    }
+
+    [Fact]
+    public async Task LinkOrRegisterGoogleAsync_WithGoogleProfileImage_PersistsCustomerProfileImage()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var profileImageUrl = "https://lh3.googleusercontent.com/a/profile-photo";
+        var service = CreateService();
+
+        // Act
+        var linked = await service.LinkOrRegisterGoogleAsync(new LinkOrRegisterGoogleCustomerRequest
+        {
+            Email = "google.photo@example.com",
+            FirstName = "Google",
+            LastName = "Photo",
+            GoogleSubject = "google-photo-subject-123",
+            EmailVerified = true,
+            ProfileImageUrl = profileImageUrl
+        });
+
+        var profile = await service.GetByIdAsync(linked.CustomerId);
+
+        // Assert
+        Assert.Equal(profileImageUrl, linked.ProfileImageUrl);
+        Assert.Equal(profileImageUrl, profile?.ProfileImageUrl);
+
+        await using var context = _fixture.CreateDbContext();
+        var customer = await context.Customers.SingleAsync();
+        Assert.Equal(profileImageUrl, customer.ProfileImageUrl);
+    }
+
+    [Fact]
+    public async Task ConfirmPasswordResetAsync_WithIssuedToken_ChangesValidatedPassword()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var registered = await service.RegisterAsync(new RegisterCustomerRequest
+        {
+            FirstName = "Reset",
+            LastName = "Customer",
+            Email = "reset.customer@example.com",
+            RegistrationMethod = "Email",
+            Password = "Old-Password-1234"
+        });
+
+        // Act
+        var reset = await service.RequestPasswordResetAsync(new PasswordResetRequest { Email = "reset.customer@example.com" });
+        var confirmed = await service.ConfirmPasswordResetAsync(new ConfirmPasswordResetRequest
+        {
+            Email = "reset.customer@example.com",
+            Token = reset.ResetToken!,
+            NewPassword = "New-Password-1234"
+        });
+        var oldPassword = await service.ValidateCredentialsAsync(new ValidateCustomerCredentialsRequest
+        {
+            Email = "reset.customer@example.com",
+            Password = "Old-Password-1234"
+        });
+        var newPassword = await service.ValidateCredentialsAsync(new ValidateCustomerCredentialsRequest
+        {
+            Email = "reset.customer@example.com",
+            Password = "New-Password-1234"
+        });
+
+        // Assert
+        Assert.True(reset.Accepted);
+        Assert.True(confirmed.Accepted);
+        Assert.Equal(registered.Id, confirmed.CustomerId);
+        Assert.False(oldPassword.IsValid);
+        Assert.True(newPassword.IsValid);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithAccountManager_PersistsEmployeeReference()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var accountManagerId = Guid.NewGuid();
+
+        var request = new CreateCustomerRequest
+        {
+            FirstName = "Managed",
+            LastName = "Customer",
+            Email = "managed.customer@example.com",
+            Segment = "Enterprise",
+            Tier = "Gold",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok",
+            AccountManagerEmployeeId = accountManagerId
+        };
+
+        // Act
+        var result = await service.CreateAsync(request, "test-actor", "Employee");
+
+        // Assert
+        Assert.Equal(accountManagerId, result.AccountManagerEmployeeId);
+
+        await using var context = _fixture.CreateDbContext();
+        var customerInDb = await context.Customers.FindAsync(result.Id);
+        Assert.NotNull(customerInDb);
+        Assert.Equal(accountManagerId, customerInDb!.AccountManagerEmployeeId);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithDuplicateEmail_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var request = new CreateCustomerRequest
+        {
+            FirstName = "Jane",
+            LastName = "Smith",
+            Email = "duplicate@example.com",
+            Mobile = "+66-2-123-4567",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        };
+
+        // Create first customer
+        await service.CreateAsync(request, "test-actor", "Employee");
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await service.CreateAsync(request, "test-actor", "Employee"));
+    }
+
+    [Fact]
+    public async Task CreateAsync_CreatesAuditLog()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var request = new CreateCustomerRequest
+        {
+            FirstName = "Audit",
+            LastName = "Test",
+            Email = "audit.test@example.com",
+            Mobile = "+66-2-123-4567",
+            Segment = "Wholesale",
+            Tier = "Silver",
+            PreferredLanguage = "th",
+            Timezone = "Asia/Bangkok"
+        };
+
+        // Act
+        var result = await service.CreateAsync(request, "employee-123", "Employee");
+
+        // Assert
+        await using var context = _fixture.CreateDbContext();
+        var auditLog = await context.AuditLogs
+            .Where(a => a.EntityId == result.Id.ToString())
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(auditLog);
+        Assert.Equal("employee-123", auditLog!.ActorId);
+        Assert.Equal("Employee", auditLog.ActorType);
+        Assert.Equal(AuditAction.Create, auditLog.Action);
+        Assert.Equal("Customer", auditLog.EntityType);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithExistingCustomer_ReturnsCustomerResponse()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Get",
+            LastName = "Test",
+            Email = "get.test@example.com",
+            Mobile = "+66-2-123-4567",
+            Segment = "Enterprise",
+            Tier = "Gold",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "test-actor", "Employee");
+
+        // Act
+        var result = await service.GetByIdAsync(created.Id);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(created.Id, result!.Id);
+        Assert.Equal("get.test@example.com", result.Email);
+        Assert.Equal("Enterprise", result.Segment);
+        Assert.Equal("Gold", result.Tier);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithLinkedCompany_ReturnsCompanyVatNumber()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        await using var context = _fixture.CreateDbContext();
+        var company = new Company
+        {
+            Name = "MALIEV Test Buyer Co., Ltd.",
+            VatNumber = "TH-0123456789012",
+            Segment = "Enterprise",
+            Tier = "Gold"
+        };
+        context.Companies.Add(company);
+        await context.SaveChangesAsync();
+
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Vat",
+            LastName = "Buyer",
+            Email = "vat.buyer@example.com",
+            CompanyId = company.Id,
+            Segment = "Enterprise",
+            Tier = "Gold",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "test-actor", "Employee");
+
+        // Act
+        var result = await service.GetByIdAsync(created.Id);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("MALIEV Test Buyer Co., Ltd.", result!.CompanyName);
+        Assert.Equal("TH-0123456789012", result.VatNumber);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithNonExistentCustomer_ReturnsNull()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var nonExistentId = Guid.NewGuid();
+
+        // Act
+        var result = await service.GetByIdAsync(nonExistentId);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithSoftDeletedCustomer_ReturnsNull()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Delete",
+            LastName = "Test",
+            Email = "delete.test@example.com",
+            Mobile = "+66-2-123-4567",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "test-actor", "Employee");
+
+        // Soft delete the customer
+        await service.SoftDeleteAsync(created.Id, created.xmin, "test-actor", "Employee");
+
+        // Act
+        var result = await service.GetByIdAsync(created.Id);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithValidData_ReturnsUpdatedCustomer()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Update",
+            LastName = "Test",
+            Email = "update.test@example.com",
+            Mobile = "+66-2-123-4567",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "test-actor", "Employee");
+
+        var updateRequest = new UpdateCustomerRequest
+        {
+            FirstName = "Updated",
+            Mobile = "+66-2-999-9999",
+            Tier = "Silver",
+            xmin = created.xmin
+        };
+
+        // Act
+        var result = await service.UpdateAsync(created.Id, updateRequest, "test-actor2", "Employee");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("Updated", result.FirstName);
+        Assert.Equal("+66-2-999-9999", result.Mobile);
+        Assert.Equal("Silver", result.Tier);
+        Assert.Equal("Test", result.LastName); // Unchanged
+        Assert.Equal("update.test@example.com", result.Email); // Unchanged
+        Assert.True(result.UpdatedAt > created.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithPaymentTerms_PersistsPaymentTerms()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Payment",
+            LastName = "Terms",
+            Email = "payment.terms@example.com",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "test-actor", "Employee");
+
+        var updateRequest = new UpdateCustomerRequest
+        {
+            PaymentTerms = PaymentTerms.Net45,
+            xmin = created.xmin
+        };
+
+        // Act
+        var result = await service.UpdateAsync(created.Id, updateRequest, "test-actor2", "Employee");
+
+        // Assert
+        Assert.Equal(PaymentTerms.Net45, result.PaymentTerms);
+
+        await using var context = _fixture.CreateDbContext();
+        var customerInDb = await context.Customers.FindAsync(created.Id);
+        Assert.NotNull(customerInDb);
+        Assert.Equal(PaymentTerms.Net45, customerInDb!.PaymentTerms);
+    }
+
+    [Fact]
+    public async Task GetPaymentTermsAsync_ReturnsSeededTermsWithDescriptions()
+    {
+        // Arrange
+        var service = CreateService();
+
+        // Act
+        var result = await service.GetPaymentTermsAsync();
+
+        // Assert
+        Assert.Contains(result, term => term.Name == PaymentTerms.DueOnReceipt && term.IsDefault);
+        Assert.Contains(result, term => term.Name == PaymentTerms.Net90 && term.DueDays == 90);
+        Assert.Contains(result, term => term.Name == PaymentTerms.TwoTenNet30 && term.DiscountPercent == 2m && term.DiscountDays == 10);
+        Assert.Contains(result, term => term.Name == PaymentTerms.MilestoneProgress && term.Category == "Milestone");
+        Assert.All(result, term =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(term.Description));
+            Assert.False(string.IsNullOrWhiteSpace(term.TypicalUse));
+        });
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithAccountManager_UpdatesEmployeeReference()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var accountManagerId = Guid.NewGuid();
+
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Update",
+            LastName = "Manager",
+            Email = "update.manager@example.com",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "test-actor", "Employee");
+
+        var updateRequest = new UpdateCustomerRequest
+        {
+            AccountManagerEmployeeId = accountManagerId,
+            xmin = created.xmin
+        };
+
+        // Act
+        var result = await service.UpdateAsync(created.Id, updateRequest, "test-actor2", "Employee");
+
+        // Assert
+        Assert.Equal(accountManagerId, result.AccountManagerEmployeeId);
+    }
+
+    [Fact]
+    public async Task GetActivityAsync_WhenCompanyChanges_UsesCompanyNamesInDescription()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        await using (var context = _fixture.CreateDbContext())
+        {
+            context.Companies.AddRange(
+                new Company { Id = Guid.Parse("db741b8f-67cf-40ba-8db8-5b899ad80001"), Name = "Old Robotics", Segment = "Enterprise" },
+                new Company { Id = Guid.Parse("efdd1db7-7225-4c40-914f-83dc3af80002"), Name = "New Manufacturing", Segment = "Enterprise" });
+            await context.SaveChangesAsync();
+        }
+
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Company",
+            LastName = "Change",
+            Email = "company.change@example.com",
+            Segment = "Enterprise",
+            Tier = "Gold",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok",
+            CompanyId = Guid.Parse("db741b8f-67cf-40ba-8db8-5b899ad80001")
+        }, "employee-1", "Employee");
+
+        await service.UpdateAsync(created.Id, new UpdateCustomerRequest
+        {
+            CompanyId = Guid.Parse("efdd1db7-7225-4c40-914f-83dc3af80002"),
+            xmin = created.xmin
+        }, "employee-2", "Employee");
+
+        // Act
+        var activity = await service.GetActivityAsync(created.Id, page: 1, pageSize: 10);
+
+        // Assert
+        var update = Assert.Single(activity.Items, item => item.Action == AuditAction.Update);
+        Assert.Contains("changed company from '**Old Robotics**' to '**New Manufacturing**'", update.Description);
+        Assert.DoesNotContain("CompanyId", update.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("db741b8f", update.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("efdd1db7", update.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetActivityAsync_WhenAccountManagerChanges_UsesHumanReadableDescription()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var accountManagerId = Guid.Parse("ea3ff5ea-244b-48db-95ab-829000000001");
+
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Account",
+            LastName = "Manager",
+            Email = "account.manager.activity@example.com",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "employee-1", "Employee");
+
+        await service.UpdateAsync(created.Id, new UpdateCustomerRequest
+        {
+            AccountManagerEmployeeId = accountManagerId,
+            xmin = created.xmin
+        }, "employee-2", "Employee");
+
+        // Act
+        var activity = await service.GetActivityAsync(created.Id, page: 1, pageSize: 10);
+
+        // Assert
+        var update = Assert.Single(activity.Items, item => item.Action == AuditAction.Update);
+        Assert.Contains("set account manager to '**assigned employee**'", update.Description);
+        Assert.DoesNotContain("AccountManagerEmployeeId", update.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("accountmanageremployeeid", update.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ea3ff5ea", update.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetActivityAsync_WithSearch_FiltersBeforePagination()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Activity",
+            LastName = "Search",
+            Email = "activity.search@example.com",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "employee-1", "Employee");
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            context.AuditLogs.AddRange(
+                new AuditLog
+                {
+                    Id = Guid.NewGuid(),
+                    EntityType = nameof(InternalNote),
+                    EntityId = Guid.NewGuid().ToString(),
+                    Action = AuditAction.Create,
+                    ActorId = "employee-2",
+                    ActorType = "Employee",
+                    ChangedFields = $"{{\"OwnerId\":\"{created.Id}\",\"NoteText\":\"First internal follow-up\"}}",
+                    Timestamp = DateTime.UtcNow.AddMinutes(2)
+                },
+                new AuditLog
+                {
+                    Id = Guid.NewGuid(),
+                    EntityType = nameof(InternalNote),
+                    EntityId = Guid.NewGuid().ToString(),
+                    Action = AuditAction.Create,
+                    ActorId = "employee-3",
+                    ActorType = "Employee",
+                    ChangedFields = $"{{\"OwnerId\":\"{created.Id}\",\"NoteText\":\"Second internal follow-up\"}}",
+                    Timestamp = DateTime.UtcNow.AddMinutes(1)
+                },
+                new AuditLog
+                {
+                    Id = Guid.NewGuid(),
+                    EntityType = nameof(Address),
+                    EntityId = Guid.NewGuid().ToString(),
+                    Action = AuditAction.Create,
+                    ActorId = "employee-4",
+                    ActorType = "Employee",
+                    ChangedFields = $"{{\"CustomerId\":\"{created.Id}\",\"Type\":\"Billing\"}}",
+                    Timestamp = DateTime.UtcNow
+                });
+            await context.SaveChangesAsync();
+        }
+
+        // Act
+        var activity = await service.GetActivityAsync(created.Id, page: 1, pageSize: 1, search: "internal note");
+
+        // Assert
+        Assert.Equal(2, activity.TotalCount);
+        Assert.Equal(2, activity.TotalPages);
+        var item = Assert.Single(activity.Items);
+        Assert.Equal(AuditAction.Create, item.Action);
+        Assert.Contains("internal note", item.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithClearAccountManager_ClearsEmployeeReference()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Clear",
+            LastName = "Manager",
+            Email = "clear.manager@example.com",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok",
+            AccountManagerEmployeeId = Guid.NewGuid()
+        }, "test-actor", "Employee");
+
+        var updateRequest = new UpdateCustomerRequest
+        {
+            ClearAccountManager = true,
+            xmin = created.xmin
+        };
+
+        // Act
+        var result = await service.UpdateAsync(created.Id, updateRequest, "test-actor2", "Employee");
+
+        // Assert
+        Assert.Null(result.AccountManagerEmployeeId);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithNonExistentCustomer_ThrowsKeyNotFoundException()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var nonExistentId = Guid.NewGuid();
+        var updateRequest = new UpdateCustomerRequest
+        {
+            FirstName = "Updated",
+            xmin = 1
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            async () => await service.UpdateAsync(nonExistentId, updateRequest, "test-actor", "Employee"));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithWrongVersion_ThrowsDbUpdateConcurrencyException()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Concurrency",
+            LastName = "Test",
+            Email = "concurrency.test@example.com",
+            Mobile = "+66-2-123-4567",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "test-actor", "Employee");
+
+        var updateRequest = new UpdateCustomerRequest
+        {
+            FirstName = "Updated",
+            xmin = 99 // Wrong version
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await service.UpdateAsync(created.Id, updateRequest, "test-actor", "Employee"));
+        Assert.Contains("customer was modified by another user", exception.Message);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_CreatesAuditLog()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Audit",
+            LastName = "Update",
+            Email = "audit.update@example.com",
+            Mobile = "+66-2-123-4567",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "test-actor", "Employee");
+
+        var updateRequest = new UpdateCustomerRequest
+        {
+            FirstName = "Updated Audit",
+            xmin = created.xmin
+        };
+
+        // Act
+        await service.UpdateAsync(created.Id, updateRequest, "customer-456", "Customer");
+
+        // Assert
+        await using var context = _fixture.CreateDbContext();
+        var auditLogs = await context.AuditLogs
+            .Where(a => a.EntityId == created.Id.ToString())
+            .OrderBy(a => a.Timestamp)
+            .ToListAsync();
+
+        Assert.Equal(2, auditLogs.Count); // Create + Update
+        var updateAudit = auditLogs[1];
+        Assert.Equal("customer-456", updateAudit.ActorId);
+        Assert.Equal("Customer", updateAudit.ActorType);
+        Assert.Equal(AuditAction.Update, updateAudit.Action);
+    }
+
+    [Fact]
+    public async Task SoftDeleteAsync_WithExistingCustomer_ReturnsTrue()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Delete",
+            LastName = "Test",
+            Email = "soft.delete@example.com",
+            Mobile = "+66-2-123-4567",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "test-actor", "Employee");
+
+        // Act
+        var result = await service.SoftDeleteAsync(created.Id, created.xmin, "admin-789", "Admin");
+
+        // Assert
+        Assert.True(result);
+
+        // Verify customer is marked as deleted
+        await using var context = _fixture.CreateDbContext();
+        var customer = await context.Customers
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(c => c.Id == created.Id);
+        Assert.NotNull(customer);
+        Assert.True(customer!.IsDeleted);
+    }
+
+    [Fact]
+    public async Task SoftDeleteAsync_WithNonExistentCustomer_ReturnsFalse()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var nonExistentId = Guid.NewGuid();
+
+        // Act
+        var result = await service.SoftDeleteAsync(nonExistentId, 0, "test-actor", "Employee");
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task SoftDeleteAsync_CreatesAuditLog()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Audit",
+            LastName = "Delete",
+            Email = "audit.delete@example.com",
+            Mobile = "+66-2-123-4567",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "test-actor", "Employee");
+
+        // Act
+        await service.SoftDeleteAsync(created.Id, created.xmin, "manager-999", "Manager");
+
+        // Assert
+        await using var context = _fixture.CreateDbContext();
+        var auditLogs = await context.AuditLogs
+            .Where(a => a.EntityId == created.Id.ToString())
+            .OrderBy(a => a.Timestamp)
+            .ToListAsync();
+
+        Assert.Equal(2, auditLogs.Count); // Create + SoftDelete
+        var deleteAudit = auditLogs[1];
+        Assert.Equal("manager-999", deleteAudit.ActorId);
+        Assert.Equal("Manager", deleteAudit.ActorType);
+        Assert.Equal(AuditAction.SoftDelete, deleteAudit.Action);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithNoFilters_ReturnsAllCustomers()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        // Create 3 customers
+        for (int i = 0; i < 3; i++)
+        {
+            await service.CreateAsync(new CreateCustomerRequest
+            {
+                FirstName = $"Customer{i}",
+                LastName = "Test",
+                Email = $"customer{i}@example.com",
+                Mobile = "+66-2-123-4567",
+                Segment = "Retail",
+                Tier = "Bronze",
+                PreferredLanguage = "en",
+                Timezone = "Asia/Bangkok"
+            }, "test-actor", "Employee");
+        }
+
+        // Act
+        var result = await service.GetAllAsync();
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(3, result.Items.Count);
+        Assert.Equal(1, result.Page);
+        Assert.Equal(50, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithSegmentFilter_ReturnsFilteredCustomers()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Retail",
+            LastName = "Customer",
+            Email = "retail@example.com",
+            Mobile = "+66-2-123-4567",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "test-actor", "Employee");
+
+        await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Enterprise",
+            LastName = "Customer",
+            Email = "enterprise@example.com",
+            Mobile = "+66-2-123-4568",
+            Segment = "Enterprise",
+            Tier = "Gold",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "test-actor", "Employee");
+
+        // Act
+        var result = await service.GetAllAsync(segment: "Enterprise");
+
+        // Assert
+        Assert.Equal(1, result.TotalCount);
+        Assert.Single(result.Items);
+        Assert.Equal("Enterprise", result.Items[0].Segment);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithPagination_ReturnsCorrectPage()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        // Create 5 customers
+        for (int i = 0; i < 5; i++)
+        {
+            await service.CreateAsync(new CreateCustomerRequest
+            {
+                FirstName = $"Customer{i}",
+                LastName = "Test",
+                Email = $"page{i}@example.com",
+                Mobile = "+66-2-123-4567",
+                Segment = "Retail",
+                Tier = "Bronze",
+                PreferredLanguage = "en",
+                Timezone = "Asia/Bangkok"
+            }, "test-actor", "Employee");
+        }
+
+        // Act
+        var page1 = await service.GetAllAsync(page: 1, pageSize: 2);
+        var page2 = await service.GetAllAsync(page: 2, pageSize: 2);
+
+        // Assert
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Equal(1, page1.Page);
+        Assert.Equal(5, page1.TotalCount);
+
+        Assert.Equal(2, page2.Items.Count);
+        Assert.Equal(2, page2.Page);
+        Assert.Equal(5, page2.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_ExcludesDeletedCustomersByDefault()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        var created = await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "ToDelete",
+            LastName = "Customer",
+            Email = "todelete@example.com",
+            Mobile = "+66-2-123-4567",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "en",
+            Timezone = "Asia/Bangkok"
+        }, "test-actor", "Employee");
+
+        await service.SoftDeleteAsync(created.Id, created.xmin, "test-actor", "Employee");
+
+        // Act
+        var result = await service.GetAllAsync();
+
+        // Assert
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task GetPreferencesAsync_ReturnsCustomerPreferences()
+    {
+        // Arrange
+        await _fixture.ClearDatabaseAsync();
+        var service = CreateService();
+
+        await service.CreateAsync(new CreateCustomerRequest
+        {
+            FirstName = "Preferences",
+            LastName = "Test",
+            Email = "prefs@example.com",
+            Mobile = "+66-2-123-4567",
+            Segment = "Retail",
+            Tier = "Bronze",
+            PreferredLanguage = "th",
+            Timezone = "Asia/Bangkok",
+            CommunicationPreferences = new Dictionary<string, object>
+            {
+                { "email_opt_in", true },
+                { "sms_opt_in", false }
+            }
+        }, "test-actor", "Employee");
+
+        // Act
+        var result = await service.GetPreferencesAsync();
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Single(result.Items);
+
+        var pref = result.Items[0];
+        Assert.Equal("th", pref.PreferredLanguage);
+        Assert.Equal("Asia/Bangkok", pref.Timezone);
+        Assert.NotNull(pref.CommunicationPreferences);
+    }
+}

@@ -2,8 +2,7 @@ name: Validate - Release Tag
 
 on:
   push:
-    tags:
-      - 'release/v*'
+    tags: ["release/v*"]
 
 permissions:
   contents: read

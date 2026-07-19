@@ -1,0 +1,87 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Customer Service - Principal Migration",
+    "version": "v1"
+  },
+  "paths": {
+    "/customer/v1/customers/by-principal/{principalId}": {
+      "get": {
+        "tags": [ "Customers" ],
+        "summary": "Get customer by Principal ID",
+        "parameters": [
+          {
+            "name": "principalId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CustomerResponse" }
+              }
+            }
+          },
+          "404": { "description": "Customer not found" }
+        }
+      }
+    },
+    "/customer/v1/customers/validate": {
+      "post": {
+        "tags": [ "Customers" ],
+        "summary": "Validate credentials",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ValidateCredentialsRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validation result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CredentialValidationResponse" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CustomerResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "principalId": { "type": "string", "format": "uuid" },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
+          "email": { "type": "string" }
+        }
+      },
+      "ValidateCredentialsRequest": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string" },
+          "password": { "type": "string" }
+        }
+      },
+      "CredentialValidationResponse": {
+        "type": "object",
+        "properties": {
+          "isValid": { "type": "boolean" },
+          "principalId": { "type": "string", "format": "uuid" },
+          "email": { "type": "string" },
+          "name": { "type": "string" }
+        }
+      }
+    }
+  }
+}

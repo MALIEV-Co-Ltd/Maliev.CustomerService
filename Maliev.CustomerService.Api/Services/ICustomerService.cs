@@ -1,0 +1,156 @@
+using Maliev.CustomerService.Api.Models.Customers;
+
+namespace Maliev.CustomerService.Api.Services;
+
+/// <summary>
+/// Service interface for customer management operations
+/// </summary>
+public interface ICustomerService
+{
+    /// <summary>
+    /// Creates a new customer with audit logging
+    /// </summary>
+    /// <param name="request">Customer creation request</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Created customer response</returns>
+    Task<CustomerResponse> CreateAsync(CreateCustomerRequest request, string actorId, string actorType, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves a customer by ID
+    /// </summary>
+    /// <param name="id">Customer ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Customer response or null if not found</returns>
+    Task<CustomerResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves a customer by their central IAM Principal ID
+    /// </summary>
+    /// <param name="principalId">The IAM Principal ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Customer response or null if not found</returns>
+    Task<CustomerResponse?> GetByPrincipalIdAsync(Guid principalId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves the narrow authentication context for a customer portal account.
+    /// </summary>
+    /// <param name="principalId">The central IAM principal identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The authentication context, or null when the customer or matching account does not exist.</returns>
+    Task<CustomerAuthenticationContextResponse?> GetAuthenticationContextByPrincipalIdAsync(
+        Guid principalId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates an existing customer with optimistic concurrency control and audit logging
+    /// </summary>
+    /// <param name="id">Customer ID</param>
+    /// <param name="request">Customer update request</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Updated customer response</returns>
+    /// <exception cref="KeyNotFoundException">Customer not found</exception>
+    /// <exception cref="InvalidOperationException">Version conflict</exception>
+    Task<CustomerResponse> UpdateAsync(Guid id, UpdateCustomerRequest request, string actorId, string actorType, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Soft deletes a customer with optimistic concurrency control and audit logging
+    /// </summary>
+    /// <param name="id">Customer ID</param>
+    /// <param name="xmin">PostgreSQL xmin for concurrency control</param>
+    /// <param name="actorId">ID of the actor performing the action</param>
+    /// <param name="actorType">Type of actor (Customer, Employee, System)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if deleted, false if not found</returns>
+    /// <exception cref="InvalidOperationException">Thrown when version conflict occurs</exception>
+    Task<bool> SoftDeleteAsync(Guid id, uint xmin, string actorId, string actorType, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets all customers with optional filtering and pagination (T119-T120, T126-T127)
+    /// </summary>
+    Task<PaginatedResponse<CustomerResponse>> GetAllAsync(
+        string? query = null,
+        string? segment = null,
+        string? tier = null,
+        string? preferredLanguage = null,
+        string? email = null,
+        Guid? companyId = null,
+        DateTime? createdFrom = null,
+        DateTime? createdTo = null,
+        bool includeDeleted = false,
+        int page = 1,
+        int pageSize = 50,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets customer preferences for compliance/audit purposes (T123)
+    /// </summary>
+    Task<PaginatedResponse<GetCustomerPreferencesResponse>> GetPreferencesAsync(
+        int page = 1,
+        int pageSize = 100,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets available payment terms for customer profile selection.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Payment term reference data ordered for presentation</returns>
+    Task<IReadOnlyList<PaymentTermResponse>> GetPaymentTermsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Registers a new customer (self-registration via public endpoint).
+    /// Creates IAM principal if needed and publishes <c>CustomerRegisteredEvent</c>.
+    /// </summary>
+    /// <param name="request">Self-registration request data</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Created customer response</returns>
+    Task<CustomerResponse> RegisterAsync(RegisterCustomerRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Validates customer email/password credentials for AuthService.
+    /// </summary>
+    /// <param name="request">Credential validation request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Validation response</returns>
+    Task<ValidateCustomerCredentialsResponse> ValidateCredentialsAsync(ValidateCustomerCredentialsRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Links an existing customer or registers a new one using Google SSO identity.
+    /// </summary>
+    /// <param name="request">Google account request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Customer account session response</returns>
+    Task<CustomerAccountSessionResponse> LinkOrRegisterGoogleAsync(LinkOrRegisterGoogleCustomerRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Starts password reset for a customer account.
+    /// </summary>
+    /// <param name="request">Password reset request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Password reset response</returns>
+    Task<PasswordResetResponse> RequestPasswordResetAsync(PasswordResetRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Confirms a password reset token and updates the password hash.
+    /// </summary>
+    /// <param name="request">Password reset confirmation request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Password reset confirmation response</returns>
+    Task<ConfirmPasswordResetResponse> ConfirmPasswordResetAsync(ConfirmPasswordResetRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Checks if a customer with the specified email already exists
+    /// </summary>
+    /// <param name="email">Email address to check (will be normalized to lowercase)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if email exists, false otherwise</returns>
+    Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets activity history for a customer with pagination or skip/take
+    /// </summary>
+    Task<PaginatedResponse<CustomerActivityResponse>> GetActivityAsync(Guid id, int? skip = null, int? take = null, int page = 1, int pageSize = 50, string? search = null, CancellationToken cancellationToken = default);
+}
