@@ -1,0 +1,51 @@
+name: Reusable Validation
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Checkout exact MessagingContracts source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: MALIEV-Co-Ltd/Maliev.MessagingContracts
+          ref: 9c41d6524a485bf03ba022b8170f47366ab1a77a
+          path: shared/Maliev.MessagingContracts
+          persist-credentials: false
+
+      - name: Checkout exact ServiceDefaults source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: MALIEV-Co-Ltd/Maliev.Aspire
+          ref: 979e1bcb3c3ed9c414f652c94b56297543c031b2
+          path: shared/Maliev.Aspire
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore Maliev.CustomerService.slnx --configfile nuget.validation.config /p:SharedSourceRoot=../shared
+
+      - name: Audit dependencies
+        run: dotnet list Maliev.CustomerService.slnx package --vulnerable --include-transitive --no-restore
+
+      - name: Build
+        run: dotnet build Maliev.CustomerService.slnx --configuration Release --no-restore /p:SharedSourceRoot=../shared
+
+      - name: Test
+        run: dotnet test Maliev.CustomerService.slnx --configuration Release --no-restore --no-build --verbosity normal /p:SharedSourceRoot=../shared
