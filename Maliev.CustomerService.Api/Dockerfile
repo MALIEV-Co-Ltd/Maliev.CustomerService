@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.4
 # See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
 # This stage is used when running from VS in fast mode (Default for Debug configuration)
@@ -7,13 +8,20 @@ WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
 
-
 # This stage is used to build the service project
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Maliev.CustomerService.Api/Maliev.CustomerService.Api.csproj", "Maliev.CustomerService.Api/"]
-RUN dotnet restore "./Maliev.CustomerService.Api/Maliev.CustomerService.Api.csproj"
+COPY ["Maliev.CustomerService.Application/Maliev.CustomerService.Application.csproj", "Maliev.CustomerService.Application/"]
+COPY ["Maliev.CustomerService.Domain/Maliev.CustomerService.Domain.csproj", "Maliev.CustomerService.Domain/"]
+COPY ["Maliev.CustomerService.Infrastructure/Maliev.CustomerService.Infrastructure.csproj", "Maliev.CustomerService.Infrastructure/"]
+COPY ["nuget.config", "."]
+RUN --mount=type=secret,id=nuget_username \
+  --mount=type=secret,id=nuget_password \
+  NUGET_USERNAME=$(cat /run/secrets/nuget_username) \
+  NUGET_PASSWORD=$(cat /run/secrets/nuget_password) \
+  dotnet restore "./Maliev.CustomerService.Api/Maliev.CustomerService.Api.csproj"
 COPY . .
 WORKDIR "/src/Maliev.CustomerService.Api"
 RUN dotnet build "./Maliev.CustomerService.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build
@@ -26,5 +34,22 @@ RUN dotnet publish "./Maliev.CustomerService.Api.csproj" -c $BUILD_CONFIGURATION
 # This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
 FROM base AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+
+# Ensure 'app' owns the workdir (app user already exists in ASP.NET runtime image)
+RUN chown -R app:app /app
+
+# Switch to non-root user
+USER app
+
+# Copy published application (now owned by app)
+COPY --chown=app:app --from=publish /app/publish .
+
+# Set environment variables
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8080/customer/liveness || exit 1
+
 ENTRYPOINT ["dotnet", "Maliev.CustomerService.Api.dll"]

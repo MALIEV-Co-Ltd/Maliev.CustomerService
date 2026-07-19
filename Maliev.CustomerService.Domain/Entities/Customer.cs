@@ -1,0 +1,214 @@
+using System.ComponentModel.DataAnnotations;
+using Maliev.CustomerService.Domain.Attributes;
+
+namespace Maliev.CustomerService.Domain.Entities;
+
+/// <summary>
+/// Customer entity with segmentation, localization, and communication preferences
+/// </summary>
+public class Customer
+{
+    /// <summary>
+    /// Unique customer identifier
+    /// </summary>
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    /// <summary>
+    /// Reference to the central IAM principal ID
+    /// </summary>
+    [Required]
+    public Guid PrincipalId { get; set; }
+
+    /// <summary>
+    /// Customer's first name
+    /// </summary>
+    [Required]
+    [MaxLength(100)]
+    public string FirstName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Customer's last name
+    /// </summary>
+    [Required]
+    [MaxLength(100)]
+    public string LastName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Customer's email address (unique per active customer)
+    /// </summary>
+    [Required]
+    [MaxLength(255)]
+    public string Email { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Customer's mobile phone number (E.164 format)
+    /// </summary>
+    [MaxLength(20)]
+    public string? Mobile { get; set; }
+
+    /// <summary>
+    /// Extension number for reaching the customer via the company landline
+    /// </summary>
+    [MaxLength(10)]
+    public string? Extension { get; set; }
+
+    /// <summary>
+    /// Customer's personal or direct landline phone number (E.164 format)
+    /// </summary>
+    [MaxLength(20)]
+    public string? Landline { get; set; }
+
+    /// <summary>
+    /// URL for the customer's profile image, usually imported from an external identity provider.
+    /// </summary>
+    [MaxLength(2048)]
+    public string? ProfileImageUrl { get; set; }
+
+    /// <summary>
+    /// Customer segmentation: Retail, Wholesale, Enterprise, Government
+    /// </summary>
+    [Required]
+    [MaxLength(50)]
+    public string Segment { get; set; } = "Retail";
+
+    /// <summary>
+    /// Customer tier: Bronze, Silver, Gold, Platinum, VIP
+    /// </summary>
+    [Required]
+    [MaxLength(50)]
+    public string Tier { get; set; } = "Bronze";
+
+    /// <summary>
+    /// Preferred language (ISO 639-1 format, e.g., "en", "th")
+    /// </summary>
+    [Required]
+    [MaxLength(2)]
+    public string PreferredLanguage { get; set; } = "en";
+
+    /// <summary>
+    /// Timezone (IANA format, e.g., "Asia/Bangkok")
+    /// </summary>
+    [Required]
+    [MaxLength(50)]
+    public string Timezone { get; set; } = "UTC";
+
+    /// <summary>
+    /// Communication preferences stored as JSON (email_opt_in, sms_opt_in, etc.)
+    /// </summary>
+    public string? CommunicationPreferences { get; set; }
+
+    /// <summary>
+    /// Payment terms agreed for this customer profile.
+    /// </summary>
+    [Required]
+    [MaxLength(100)]
+    public string PaymentTerms { get; set; } = global::Maliev.CustomerService.Domain.Entities.PaymentTerms.DueOnReceipt;
+
+    /// <summary>
+    /// Employee-facing lifecycle status for sales and account management.
+    /// </summary>
+    [Required]
+    [MaxLength(40)]
+    public string Status { get; set; } = CustomerLifecycleStatus.Active;
+
+    /// <summary>
+    /// Optional link to Company entity
+    /// </summary>
+    public Guid? CompanyId { get; set; }
+
+    /// <summary>
+    /// Optional EmployeeService employee ID for the internal account manager assigned to this customer.
+    /// </summary>
+    public Guid? AccountManagerEmployeeId { get; set; }
+
+    /// <summary>
+    /// Whether to use the company's billing address instead of a personal one
+    /// </summary>
+    public bool UsesCompanyBillingAddress { get; set; } = true;
+
+    /// <summary>
+    /// Thai National ID (13 digits) - Encrypted at rest for PDPA compliance
+    /// Used for personal identity on documents (quotations, invoices, receipts)
+    /// MaxLength 500 to accommodate encrypted output (plaintext is 13 chars)
+    /// </summary>
+    [MaxLength(500)]
+    [Encrypted]
+    public string? ThaiNationalId { get; set; }
+
+    /// <summary>
+    /// Whether this customer is the primary contact for their company.
+    /// Only one customer per company can have this set to true.
+    /// Enforced at service layer (not DB constraint).
+    /// </summary>
+    public bool IsPrimaryContact { get; set; } = false;
+
+    /// <summary>
+    /// Soft delete flag
+    /// </summary>
+    public bool IsDeleted { get; set; } = false;
+
+    /// <summary>
+    /// Record creation timestamp
+    /// </summary>
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Record last update timestamp
+    /// </summary>
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+}
+
+/// <summary>
+/// Customer segment enumeration
+/// </summary>
+public static class CustomerSegment
+{
+    /// <summary>Retail segment.</summary>
+    public const string Retail = "Retail";
+    /// <summary>Wholesale segment.</summary>
+    public const string Wholesale = "Wholesale";
+    /// <summary>Enterprise segment.</summary>
+    public const string Enterprise = "Enterprise";
+    /// <summary>Government segment.</summary>
+    public const string Government = "Government";
+
+    /// <summary>All customer segments.</summary>
+    public static readonly string[] All = { Retail, Wholesale, Enterprise, Government };
+}
+
+/// <summary>
+/// Customer tier enumeration
+/// </summary>
+public static class CustomerTier
+{
+    /// <summary>Bronze tier.</summary>
+    public const string Bronze = "Bronze";
+    /// <summary>Silver tier.</summary>
+    public const string Silver = "Silver";
+    /// <summary>Gold tier.</summary>
+    public const string Gold = "Gold";
+    /// <summary>Platinum tier.</summary>
+    public const string Platinum = "Platinum";
+    /// <summary>VIP tier.</summary>
+    public const string VIP = "VIP";
+
+    /// <summary>All customer tiers.</summary>
+    public static readonly string[] All = { Bronze, Silver, Gold, Platinum, VIP };
+}
+
+/// <summary>
+/// Employee-facing customer lifecycle statuses.
+/// </summary>
+public static class CustomerLifecycleStatus
+{
+    /// <summary>Active customer record.</summary>
+    public const string Active = "Active";
+    /// <summary>Lead or prospect record.</summary>
+    public const string Lead = "Lead";
+    /// <summary>Inactive customer record that remains retained for history.</summary>
+    public const string Inactive = "Inactive";
+
+    /// <summary>All supported customer lifecycle statuses.</summary>
+    public static readonly string[] All = { Active, Lead, Inactive };
+}

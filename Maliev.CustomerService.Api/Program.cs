@@ -1,119 +1,209 @@
-using Asp.Versioning;
-using Asp.Versioning.ApiExplorer;
-using HealthChecks.UI.Client;
-using Maliev.CustomerService.Api.Middleware; // Keep if CorrelationIdMiddleware is kept
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Options;
-using Serilog;
-using Serilog.Filters;
-using Swashbuckle.AspNetCore.SwaggerGen;
+using Maliev.CustomerService.Api.Services;
+using Maliev.CustomerService.Infrastructure.Persistence;
+using Maliev.CustomerService.Infrastructure.Persistence.Interceptors;
+using Maliev.CustomerService.Infrastructure.Persistence.Repositories;
+using Maliev.CustomerService.Infrastructure.Security;
+using MassTransit;
+using Microsoft.EntityFrameworkCore;
 
-var builder = WebApplication.CreateBuilder(args);
-
-// Configure Serilog
-Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .Enrich.FromLogContext()
-    .Enrich.WithEnvironmentName()
-    .Enrich.WithMachineName()
-    .Enrich.WithProcessId()
-    .Enrich.WithThreadId()
-    .Filter.ByExcluding(Matching.WithProperty<string>("RequestPath", path =>
-        path.StartsWith("/health") || path.StartsWith("/metrics")))
-    .WriteTo.Console(outputTemplate:
-        "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {CorrelationId} {SourceContext} {Message:lj}{NewLine}{Exception}")
-    .WriteTo.File(
-        path: "logs/customer-service-.txt",
-        rollingInterval: RollingInterval.Day,
-        retainedFileCountLimit: 31,
-        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {CorrelationId} {SourceContext} {Message:lj}{NewLine}{Exception}")
-    .CreateLogger();
-
-builder.Host.UseSerilog();
+// Initialize bootstrap logging
+using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
+var bootstrapLogger = loggerFactory.CreateLogger("Program");
 
 try
 {
-    Log.Information("Starting Maliev Customer Service");
+    Maliev.CustomerService.Api.Program.Log.StartingHost(bootstrapLogger, "Customer Service");
 
-    // Load secrets.yaml (keep if secrets are used for anything, e.g., connection strings for health checks)
-    builder.Configuration.AddYamlFile("secrets.yaml", optional: true, reloadOnChange: true);
+    var builder = WebApplication.CreateBuilder(args);
 
-    // Load secrets from mounted volume in GKE (keep if deployed in GKE)
-    var secretsPath = "/mnt/secrets";
-    if (Directory.Exists(secretsPath))
-    {
-        builder.Configuration.AddKeyPerFile(directoryPath: secretsPath, optional: true);
-    }
+    // --- Secrets & Configuration ---
+    builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if available
 
-    // Add services to the container.
-    builder.Services.AddControllers();
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddOpenApi();
-    builder.Services.AddApiVersioning(options =>
+    // --- Infrastructure & Observability ---
+    builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
+    builder.AddStandardMiddleware(options =>
     {
-        options.DefaultApiVersion = new ApiVersion(1, 0);
-        options.AssumeDefaultVersionWhenUnspecified = true;
-        options.ReportApiVersions = true;
-        options.ApiVersionReader = new UrlSegmentApiVersionReader();
-    }).AddApiExplorer(options =>
-    {
-        options.GroupNameFormat = "'v'VVV";
-        options.SubstituteApiVersionInUrl = true;
+        options.EnableRequestLogging = true;
     });
+    builder.AddServiceMeters("customers-meter"); // Register service meters for OpenTelemetry business metrics
 
-    builder.Services.AddTransient<IConfigureOptions<SwaggerGenOptions>, Maliev.CustomerService.Api.Configurations.ConfigureSwaggerOptions>();
-    builder.Services.AddSwaggerGen();
+    builder.AddStandardCache("customer:"); // Redis + in-memory fallback, memory-optimized
+    builder.AddMassTransitWithRabbitMq(configure: x =>
+    {
+        x.AddEntityFrameworkOutbox<CustomerDbContext>(options =>
+        {
+            _ = options.UsePostgres();
+            options.UseBusOutbox();
+        });
 
-    // Keep basic health check
-    builder.Services.AddHealthChecks();
+        x.AddConsumer<Maliev.CustomerService.Api.Consumers.GetCustomerDetailsConsumer>();
+        x.AddConsumer<Maliev.CustomerService.Api.Consumers.FileDeletedEventConsumer>();
+        x.AddConsumer<Maliev.CustomerService.Api.Consumers.OrderPaidEventConsumer>();
+        x.AddConsumer<Maliev.CustomerService.Api.Consumers.SearchReindexRequestedConsumer>();
+    }); // RabbitMQ message bus (non-blocking startup)
+    builder.AddPostgresDbContext<CustomerDbContext>(connectionName: "CustomerDbContext"); // PostgreSQL with retry logic
 
+    // --- API Configuration ---
+    builder.AddStandardCors(); // CORS with fail-fast validation
+    builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
+
+    builder.Services.AddMemoryCache(); // Required for CountryServiceClient caching
+
+    // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
+    builder.AddJwtAuthentication();
+
+    // Add OpenAPI (must be in Program.cs for XML comments to work via source generator)
+    builder.AddStandardOpenApi(
+        title: "MALIEV Customer Service API",
+        description: "Comprehensive customer management service. Handles individual and corporate customer profiles, address books, NDA tracking, document management, and customer lifecycle status.");
+
+    builder.Services.AddSingleton<Maliev.CustomerService.Api.Services.MetricsService>();
+
+    // Security Services
+    builder.Services.AddSingleton<Maliev.CustomerService.Application.Interfaces.IEncryptionService, EncryptionService>();
+    builder.Services.AddSingleton<EncryptionInterceptor>();
+
+    // Application Services
+    builder.Services.AddScoped<Maliev.CustomerService.Api.Services.ICustomerService, Maliev.CustomerService.Api.Services.CustomerService>();
+    builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IAddressService, Maliev.CustomerService.Api.Services.AddressService>();
+    builder.Services.AddScoped<Maliev.CustomerService.Api.Services.ICustomerMemoryService, Maliev.CustomerService.Api.Services.CustomerMemoryService>();
+    builder.Services.AddScoped<Maliev.CustomerService.Api.Services.ICompanyService, Maliev.CustomerService.Api.Services.CompanyService>();
+    builder.Services.AddScoped<Maliev.CustomerService.Api.Services.INDAService, Maliev.CustomerService.Api.Services.NDAService>();
+    builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IDocumentService, Maliev.CustomerService.Api.Services.DocumentService>();
+    builder.Services.AddScoped<Maliev.CustomerService.Api.Services.IInternalNoteService, Maliev.CustomerService.Api.Services.InternalNoteService>();
+
+    // Tier Calculation Services
+    builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.ICompanyRepository, CompanyRepository>();
+    builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.ICompanyTierSettingsRepository, CompanyTierSettingsRepository>();
+    builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.ICompanyDocumentRepository, CompanyDocumentRepository>();
+    builder.Services.AddScoped<Maliev.CustomerService.Application.Interfaces.IOrderRepository, OrderRepository>();
+    builder.Services.AddScoped<Maliev.CustomerService.Application.Services.ITierCalculationService, Maliev.CustomerService.Application.Services.TierCalculationService>();
+    builder.Services.AddScoped<Maliev.CustomerService.Application.Services.IYearEndTierProcessor, Maliev.CustomerService.Application.Services.YearEndTierProcessor>();
+
+    // Scripts
+    // builder.Services.AddScoped<Maliev.CustomerService.Api.Scripts.MigrateToPrincipalsScript>();
+
+    // Background Services
+
+    builder.Services.AddHostedService<Maliev.CustomerService.Api.BackgroundServices.NDAExpirationBackgroundService>();
+    builder.Services.AddHostedService<Maliev.CustomerService.Api.BackgroundServices.DocumentDeletionRetryBackgroundService>();
+    builder.Services.AddHostedService<Maliev.CustomerService.Application.BackgroundServices.YearEndTierJob>();
+
+    // IAM Service Client (now with Service Account authentication)
+    builder.AddIAMServiceClient("customer");
+    builder.Services.AddIAMRegistration<CustomerIAMRegistrationService>("customer");
+    builder.Services.AddHttpClient<Maliev.CustomerService.Api.Services.IIAMClient,
+        Maliev.CustomerService.Api.Services.IAMClient>("CustomerService.IAM", (sp, client) =>
+        {
+            var configuration = sp.GetRequiredService<IConfiguration>();
+            var explicitUrl = configuration["Services:IAMService:BaseUrl"];
+
+            client.BaseAddress = new Uri(!string.IsNullOrEmpty(explicitUrl)
+                ? explicitUrl
+                : "https+http://IAMService");
+            client.DefaultRequestHeaders.Add("X-Service-Name", "customer");
+            client.Timeout = TimeSpan.FromSeconds(90);
+        })
+        .AddServiceDiscovery()
+        .AddHttpMessageHandler<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>();
+
+    // External Service Clients
+    builder.AddAuthenticatedServiceClient<Maliev.CustomerService.Api.Services.External.ICountryServiceClient,
+        Maliev.CustomerService.Api.Services.External.CountryServiceClient>("CountryService", sourceServiceName: "customer");
+
+    builder.AddAuthenticatedServiceClient<Maliev.CustomerService.Api.Services.External.IUploadServiceClient,
+        Maliev.CustomerService.Api.Services.External.UploadServiceClient>("UploadService", sourceServiceName: "customer");
+
+    // Controllers
+    builder.Services.AddControllers()
+        .AddJsonOptions(options =>
+        {
+            options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+        });
+
+    // Rate Limiting (memory-optimized for low-spec nodes)
+    builder.AddStandardRateLimiting();
     var app = builder.Build();
 
-    
+    var logger = app.Services.GetRequiredService<ILogger<Maliev.CustomerService.Api.Program>>();
 
-    // Configure the HTTP request pipeline.
-    if (app.Environment.IsDevelopment())
+
+    // Run database migrations on startup
+    await app.MigrateDatabaseAsync<CustomerDbContext>();
+
+
+    // Force instantiation of MetricsService to ensure OpenTelemetry meters are created
+    var metricsService = app.Services.GetRequiredService<Maliev.CustomerService.Api.Services.MetricsService>();
+
+    // Warm up database connection pool to avoid first-request timeout
+    using var warmupScope = app.Services.CreateScope();
+    var dbContext = warmupScope.ServiceProvider.GetRequiredService<CustomerDbContext>();
+    await dbContext.Database.ExecuteSqlRawAsync("SELECT 1");
+    logger.LogInformation("Database connection pool warmed up");
+
+    // Middleware Pipeline
+    app.UseStandardMiddleware();
+    if (!app.Environment.IsDevelopment())
     {
+        app.UseHttpsRedirection();
     }
 
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
-        foreach (var description in provider.ApiVersionDescriptions)
-        {
-            c.SwaggerEndpoint($"/swagger/{description.GroupName}/swagger.json", description.GroupName.ToUpperInvariant());
-        }
-        c.RoutePrefix = "customers/swagger";
-    });
+    app.UseRouting();
+    app.UseCors();
+    app.UseRateLimiter();
 
-    app.UseMiddleware<ExceptionHandlingMiddleware>(); // Keep if desired for error handling
-    app.UseHttpsRedirection();
+    // Authentication and Authorization middleware
+    app.UseAuthentication();
+    app.UseAuthorization();
 
-    app.MapHealthChecks("/customers/liveness", new HealthCheckOptions
-    {
-        Predicate = healthCheck => healthCheck.Tags.Contains("liveness")
-    });
-
-    app.MapHealthChecks("/customers/readiness", new HealthCheckOptions
-    {
-        Predicate = healthCheck => healthCheck.Tags.Contains("readiness"),
-        ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-    });
-
+    // Map endpoints after middleware
     app.MapControllers();
 
-    app.Run();
+    // Map Aspire default endpoints (/health, /alive, /metrics)
+    app.MapDefaultEndpoints(servicePrefix: "customer");
+
+    // Map OpenAPI and Scalar documentation (dev/staging only)
+    app.MapApiDocumentation(servicePrefix: "customer");
+
+    Maliev.CustomerService.Api.Program.Log.ServiceStarted(logger, "Customer Service");
+    await app.RunAsync();
 }
 catch (Exception ex)
 {
-    Log.Fatal(ex, "Application terminated unexpectedly");
+    Maliev.CustomerService.Api.Program.Log.HostTerminated(bootstrapLogger, ex, "Customer Service");
+    // Force flush to ensure Aspire captures the error before process exits
+    Console.Out.Flush();
+    Console.Error.Flush();
+    throw;
 }
 finally
 {
-    Log.CloseAndFlush();
+    loggerFactory.Dispose();
 }
 
-// Make Program class accessible for integration tests
-public partial class Program
-{ }
+namespace Maliev.CustomerService.Api
+{
+    /// <summary>
+    /// Represents the entry point and main application class for the program.
+    /// </summary>
+    public partial class Program
+    {
+        internal static partial class Log
+        {
+            [LoggerMessage(Level = LogLevel.Information, Message = "Starting {ServiceName} host")]
+            public static partial void StartingHost(ILogger logger, string serviceName);
+
+            [LoggerMessage(Level = LogLevel.Critical, Message = "{ServiceName} host terminated unexpectedly during startup")]
+            public static partial void HostTerminated(ILogger logger, Exception ex, string serviceName);
+
+            [LoggerMessage(Level = LogLevel.Information, Message = "{ServiceName} started successfully")]
+            public static partial void ServiceStarted(ILogger logger, string serviceName);
+
+            [LoggerMessage(Level = LogLevel.Error, Message = "Database migration failed - application may not function correctly")]
+            public static partial void MigrationFailed(ILogger logger, Exception exception);
+
+            [LoggerMessage(Level = LogLevel.Information, Message = "OpenTelemetry metrics service initialized")]
+            public static partial void MetricsInitialized(ILogger logger);
+        }
+    }
+}

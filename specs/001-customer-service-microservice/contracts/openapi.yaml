@@ -1,0 +1,2089 @@
+openapi: 3.0.3
+info:
+  title: Customer Service API
+  description: |
+    Customer Service microservice manages customer and company master data, including personal/company information,
+    VAT/tax data, multiple billing/shipping addresses, NDA lifecycle management, and document references.
+    The service also owns user account management for customer authentication (employee accounts managed by separate Employee Service).
+  version: 1.0.0
+  contact:
+    name: Maliev Engineering Team
+    email: engineering@maliev.com
+
+servers:
+  - url: https://api.maliev.com/customers/v1
+    description: Production
+  - url: https://staging.maliev.com/customers/v1
+    description: Staging
+  - url: http://localhost:8080/customers/v1
+    description: Local Development
+
+tags:
+  - name: Users
+    description: User account management and credential validation
+  - name: Customers
+    description: Customer master data operations
+  - name: Companies
+    description: Company master data operations
+  - name: Addresses
+    description: Address management for customers and companies
+  - name: Documents
+    description: Document reference management
+  - name: NDAs
+    description: NDA lifecycle management
+  - name: Internal Notes
+    description: Internal notes management (employee-only)
+  - name: Health
+    description: Service health checks
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ============================================================================
+  # User Account Management
+  # ============================================================================
+
+  /users:
+    post:
+      tags: [Users]
+      summary: Create customer user account
+      description: Creates a new customer user account with username, password, email, and customer role. Links to Customer entity.
+      operationId: createUser
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Username or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{id}/password:
+    put:
+      tags: [Users]
+      summary: Update user password
+      description: Updates user password hash and invalidates existing sessions
+      operationId: updatePassword
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePasswordRequest'
+      responses:
+        '204':
+          description: Password updated successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{id}/roles:
+    put:
+      tags: [Users]
+      summary: Update customer user roles
+      description: Updates customer user roles (only Customer role supported in this service)
+      operationId: updateRoles
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRolesRequest'
+      responses:
+        '200':
+          description: Roles updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /validate:
+    post:
+      tags: [Users]
+      summary: Validate customer credentials
+      description: |
+        Validates customer username and password combination. Used by Auth Service for customer authentication.
+        Auth Service should call Employee Service for employee credential validation.
+        Rate limited to 10 requests per minute per source IP.
+      operationId: validateCredentials
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateCredentialsRequest'
+      responses:
+        '200':
+          description: Validation response (success or failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          description: Rate limit exceeded
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds until rate limit resets
+
+  # ============================================================================
+  # Customers
+  # ============================================================================
+
+  /customers:
+    post:
+      tags: [Customers]
+      summary: Create customer
+      description: Creates a new customer with personal information
+      operationId: createCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomerRequest'
+      responses:
+        '201':
+          description: Customer created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags: [Customers]
+      summary: List customers
+      description: Retrieves paginated list of customers with optional filtering
+      operationId: listCustomers
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: companyId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by company ID
+        - name: isDeleted
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include soft-deleted customers
+      responses:
+        '200':
+          description: Paginated customer list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CustomerResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /customers/{id}:
+    get:
+      tags: [Customers]
+      summary: Get customer by ID
+      description: Retrieves detailed customer information including addresses and documents
+      operationId: getCustomer
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      responses:
+        '200':
+          description: Customer details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Customers]
+      summary: Update customer
+      description: Updates customer information with optimistic concurrency control
+      operationId: updateCustomer
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCustomerRequest'
+      responses:
+        '200':
+          description: Customer updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ConcurrencyConflict'
+
+    delete:
+      tags: [Customers]
+      summary: Delete customer (soft delete)
+      description: Soft deletes customer by setting is_deleted flag
+      operationId: deleteCustomer
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      responses:
+        '204':
+          description: Customer deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================================
+  # Companies
+  # ============================================================================
+
+  /companies:
+    post:
+      tags: [Companies]
+      summary: Create company
+      description: Creates a new company with business information
+      operationId: createCompany
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCompanyRequest'
+      responses:
+        '201':
+          description: Company created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    get:
+      tags: [Companies]
+      summary: List companies
+      description: Retrieves paginated list of companies with optional filtering
+      operationId: listCompanies
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: vatNumber
+          in: query
+          schema:
+            type: string
+          description: Filter by VAT number
+      responses:
+        '200':
+          description: Paginated company list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CompanyResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /companies/{id}:
+    get:
+      tags: [Companies]
+      summary: Get company by ID
+      description: Retrieves detailed company information
+      operationId: getCompany
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+      responses:
+        '200':
+          description: Company details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Companies]
+      summary: Update company
+      description: Updates company information with optimistic concurrency control
+      operationId: updateCompany
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCompanyRequest'
+      responses:
+        '200':
+          description: Company updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ConcurrencyConflict'
+
+    delete:
+      tags: [Companies]
+      summary: Delete company
+      description: Deletes company and all associated data
+      operationId: deleteCompany
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+      responses:
+        '204':
+          description: Company deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================================
+  # Addresses
+  # ============================================================================
+
+  /addresses:
+    post:
+      tags: [Addresses]
+      summary: Create address
+      description: Creates a billing or shipping address for customer or company
+      operationId: createAddress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAddressRequest'
+      responses:
+        '201':
+          description: Address created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddressResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          description: Country Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags: [Addresses]
+      summary: List addresses
+      description: Retrieves addresses for specific owner (customer or company)
+      operationId: listAddresses
+      parameters:
+        - name: ownerType
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [Customer, Company]
+        - name: ownerId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [Billing, Shipping]
+          description: Filter by address type
+      responses:
+        '200':
+          description: Address list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AddressResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /addresses/{id}:
+    get:
+      tags: [Addresses]
+      summary: Get address by ID
+      description: Retrieves address details
+      operationId: getAddress
+      parameters:
+        - $ref: '#/components/parameters/AddressId'
+      responses:
+        '200':
+          description: Address details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddressResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Addresses]
+      summary: Update address
+      description: Updates address information with optimistic concurrency control
+      operationId: updateAddress
+      parameters:
+        - $ref: '#/components/parameters/AddressId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAddressRequest'
+      responses:
+        '200':
+          description: Address updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddressResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ConcurrencyConflict'
+        '503':
+          description: Country Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Addresses]
+      summary: Delete address
+      description: Deletes address
+      operationId: deleteAddress
+      parameters:
+        - $ref: '#/components/parameters/AddressId'
+      responses:
+        '204':
+          description: Address deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================================
+  # Documents
+  # ============================================================================
+
+  /documents:
+    post:
+      tags: [Documents]
+      summary: Create document reference
+      description: Creates document reference metadata for file stored in Upload Service
+      operationId: createDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDocumentRequest'
+      responses:
+        '201':
+          description: Document reference created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          description: Upload Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags: [Documents]
+      summary: List documents
+      description: Retrieves documents for specific owner (customer or company)
+      operationId: listDocuments
+      parameters:
+        - name: ownerType
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [Customer, Company]
+        - name: ownerId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: documentType
+          in: query
+          schema:
+            type: string
+          description: Filter by document type
+      responses:
+        '200':
+          description: Document list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DocumentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /documents/{id}:
+    get:
+      tags: [Documents]
+      summary: Get document by ID
+      description: Retrieves document reference details
+      operationId: getDocument
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: Document details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Documents]
+      summary: Update document reference
+      description: Updates document reference metadata
+      operationId: updateDocument
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDocumentRequest'
+      responses:
+        '200':
+          description: Document updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ConcurrencyConflict'
+
+    delete:
+      tags: [Documents]
+      summary: Delete document reference
+      description: Deletes document reference and initiates file deletion from Upload Service
+      operationId: deleteDocument
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '204':
+          description: Document deletion initiated (may be deferred)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================================
+  # NDAs
+  # ============================================================================
+
+  /ndas:
+    post:
+      tags: [NDAs]
+      summary: Create NDA record
+      description: Creates NDA record in Draft status
+      operationId: createNda
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNdaRequest'
+      responses:
+        '201':
+          description: NDA created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NdaResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    get:
+      tags: [NDAs]
+      summary: List NDAs
+      description: Retrieves NDAs for specific customer
+      operationId: listNdas
+      parameters:
+        - name: customerId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Draft, Signed, Expired, Revoked]
+          description: Filter by NDA status
+      responses:
+        '200':
+          description: NDA list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NdaResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /ndas/{id}:
+    get:
+      tags: [NDAs]
+      summary: Get NDA by ID
+      description: Retrieves NDA details
+      operationId: getNda
+      parameters:
+        - $ref: '#/components/parameters/NdaId'
+      responses:
+        '200':
+          description: NDA details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NdaResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /ndas/{id}/sign:
+    put:
+      tags: [NDAs]
+      summary: Sign NDA
+      description: Transitions NDA from Draft to Signed status
+      operationId: signNda
+      parameters:
+        - $ref: '#/components/parameters/NdaId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignNdaRequest'
+      responses:
+        '200':
+          description: NDA signed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NdaResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Invalid state transition or concurrency conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /ndas/{id}/revoke:
+    put:
+      tags: [NDAs]
+      summary: Revoke NDA
+      description: Transitions NDA from Signed to Revoked status
+      operationId: revokeNda
+      parameters:
+        - $ref: '#/components/parameters/NdaId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevokeNdaRequest'
+      responses:
+        '200':
+          description: NDA revoked successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NdaResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Invalid state transition or concurrency conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================================
+  # Internal Notes (Employee-Only)
+  # ============================================================================
+
+  /internal-notes:
+    post:
+      tags: [Internal Notes]
+      summary: Create internal note
+      description: Creates internal note for customer or company (employee-only, hidden from customers)
+      operationId: createInternalNote
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInternalNoteRequest'
+      responses:
+        '201':
+          description: Internal note created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalNoteResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden - customer users cannot create internal notes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags: [Internal Notes]
+      summary: List internal notes
+      description: Retrieves internal notes for specific owner (customer or company) - employee-only
+      operationId: listInternalNotes
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ownerType
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [Customer, Company]
+        - name: ownerId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Internal notes list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InternalNoteResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden - customer users cannot view internal notes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /internal-notes/{id}:
+    get:
+      tags: [Internal Notes]
+      summary: Get internal note by ID
+      description: Retrieves internal note details (employee-only)
+      operationId: getInternalNote
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/InternalNoteId'
+      responses:
+        '200':
+          description: Internal note details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalNoteResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Internal Notes]
+      summary: Update internal note
+      description: Updates internal note text (employee-only)
+      operationId: updateInternalNote
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/InternalNoteId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInternalNoteRequest'
+      responses:
+        '200':
+          description: Internal note updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalNoteResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ConcurrencyConflict'
+
+    delete:
+      tags: [Internal Notes]
+      summary: Delete internal note
+      description: Deletes internal note permanently (employee-only)
+      operationId: deleteInternalNote
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/InternalNoteId'
+      responses:
+        '204':
+          description: Internal note deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================================
+  # Health Checks
+  # ============================================================================
+
+  /liveness:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      description: Lightweight health check for Kubernetes liveness probe
+      operationId: liveness
+      security: []
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Healthy
+
+  /readiness:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      description: Comprehensive health check including database and external services
+      operationId: readiness
+      security: []
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+        '503':
+          description: Service not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+
+# ==============================================================================
+# Components
+# ==============================================================================
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token authentication
+
+  parameters:
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: User identifier
+
+    CustomerId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Customer identifier
+
+    CompanyId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Company identifier
+
+    AddressId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Address identifier
+
+    DocumentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Document identifier
+
+    NdaId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: NDA identifier
+
+    InternalNoteId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Internal note identifier
+
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination
+
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of items per page
+
+  schemas:
+    # ============================================================================
+    # User Schemas
+    # ============================================================================
+
+    CreateUserRequest:
+      type: object
+      required:
+        - username
+        - email
+        - password
+        - roles
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 100
+          example: john.doe
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          example: john.doe@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 100
+          description: Plain text password (will be hashed)
+          example: SecureP@ssw0rd
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [Customer]
+          minItems: 1
+          example: [Customer]
+          description: Only Customer role supported (Employee roles managed by Employee Service)
+        linkedCustomerId:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID of linked Customer record
+
+    UpdatePasswordRequest:
+      type: object
+      required:
+        - newPassword
+      properties:
+        newPassword:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 100
+          description: New password (will be hashed)
+
+    UpdateRolesRequest:
+      type: object
+      required:
+        - roles
+      properties:
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [Customer]
+          minItems: 1
+          example: [Customer]
+          description: Only Customer role supported
+
+    ValidateCredentialsRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: john.doe
+        password:
+          type: string
+          format: password
+          example: SecureP@ssw0rd
+
+    ValidationResponse:
+      type: object
+      required:
+        - isValid
+      properties:
+        isValid:
+          type: boolean
+          description: True if credentials are valid
+          example: true
+        userId:
+          type: string
+          format: uuid
+          nullable: true
+          description: User ID if validation successful
+          example: 550e8400-e29b-41d4-a716-446655440000
+        username:
+          type: string
+          nullable: true
+          description: Username if validation successful
+          example: john.doe
+        roles:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: User roles if validation successful
+          example: [Customer]
+
+    UserResponse:
+      type: object
+      required:
+        - id
+        - username
+        - email
+        - roles
+        - isActive
+        - createdAt
+        - updatedAt
+        - version
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        username:
+          type: string
+          example: john.doe
+        email:
+          type: string
+          format: email
+          example: john.doe@example.com
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [Customer]
+          example: [Customer]
+        linkedCustomerId:
+          type: string
+          format: uuid
+          nullable: true
+        isActive:
+          type: boolean
+          example: true
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Most recent successful authentication timestamp (UTC)
+          example: '2025-10-08T14:25:00Z'
+        createdAt:
+          type: string
+          format: date-time
+          example: '2025-10-08T10:30:00Z'
+        updatedAt:
+          type: string
+          format: date-time
+          example: '2025-10-08T10:30:00Z'
+        version:
+          type: string
+          description: Base64-encoded RowVersion for optimistic concurrency
+          example: AAAAAAAABkI=
+
+    # ============================================================================
+    # Customer Schemas
+    # ============================================================================
+
+    CreateCustomerRequest:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - email
+        - phone
+      properties:
+        firstName:
+          type: string
+          maxLength: 100
+          example: John
+        lastName:
+          type: string
+          maxLength: 100
+          example: Doe
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          example: john.doe@example.com
+        phone:
+          type: string
+          maxLength: 20
+          pattern: '^\+[1-9]\d{1,14}$'
+          description: E.164 format
+          example: '+66812345678'
+        segment:
+          type: string
+          enum: [Retail, Wholesale, Enterprise, Government]
+          nullable: true
+          description: Business segment classification for pricing and marketing rules
+          example: Retail
+        tier:
+          type: string
+          enum: [Bronze, Silver, Gold, Platinum, VIP]
+          nullable: true
+          description: Customer tier for differentiated service levels
+          example: Bronze
+        preferredLanguage:
+          type: string
+          pattern: '^[a-z]{2}$'
+          nullable: true
+          description: ISO 639-1 two-letter language code
+          example: en
+        timezone:
+          type: string
+          maxLength: 50
+          nullable: true
+          description: IANA timezone identifier
+          example: Asia/Bangkok
+        communicationPreferences:
+          type: object
+          nullable: true
+          description: Flexible communication opt-in/opt-out preferences
+          example:
+            email_opt_in: true
+            sms_opt_in: false
+            marketing_opt_in: true
+        companyId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Optional company affiliation
+
+    UpdateCustomerRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateCustomerRequest'
+        - type: object
+          required:
+            - version
+          properties:
+            version:
+              type: string
+              description: Base64-encoded RowVersion for optimistic concurrency
+              example: AAAAAAAABkI=
+
+    CustomerResponse:
+      type: object
+      required:
+        - id
+        - firstName
+        - lastName
+        - email
+        - phone
+        - isDeleted
+        - createdAt
+        - updatedAt
+        - version
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: Doe
+        email:
+          type: string
+          format: email
+          example: john.doe@example.com
+        phone:
+          type: string
+          example: '+66812345678'
+        segment:
+          type: string
+          enum: [Retail, Wholesale, Enterprise, Government]
+          nullable: true
+          example: Retail
+        tier:
+          type: string
+          enum: [Bronze, Silver, Gold, Platinum, VIP]
+          nullable: true
+          example: Bronze
+        preferredLanguage:
+          type: string
+          nullable: true
+          description: ISO 639-1 two-letter language code
+          example: en
+        timezone:
+          type: string
+          nullable: true
+          description: IANA timezone identifier
+          example: Asia/Bangkok
+        communicationPreferences:
+          type: object
+          nullable: true
+          description: Flexible communication opt-in/opt-out preferences
+          example:
+            email_opt_in: true
+            sms_opt_in: false
+            marketing_opt_in: true
+        companyId:
+          type: string
+          format: uuid
+          nullable: true
+        isDeleted:
+          type: boolean
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+          example: '2025-10-08T10:30:00Z'
+        updatedAt:
+          type: string
+          format: date-time
+          example: '2025-10-08T10:30:00Z'
+        version:
+          type: string
+          description: Base64-encoded RowVersion for optimistic concurrency
+          example: AAAAAAAABkI=
+
+    # ============================================================================
+    # Company Schemas
+    # ============================================================================
+
+    CreateCompanyRequest:
+      type: object
+      required:
+        - name
+        - vatNumber
+        - registrationNumber
+        - contactEmail
+        - contactPhone
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          example: Maliev Co. Ltd.
+        vatNumber:
+          type: string
+          maxLength: 50
+          pattern: '^[A-Z]{2}-\d{10,15}$'
+          description: Country-prefixed VAT number
+          example: TH-1234567890
+        registrationNumber:
+          type: string
+          maxLength: 50
+          example: '0105558123456'
+        contactEmail:
+          type: string
+          format: email
+          maxLength: 255
+          example: contact@maliev.com
+        contactPhone:
+          type: string
+          maxLength: 20
+          pattern: '^\+[1-9]\d{1,14}$'
+          description: E.164 format
+          example: '+66812345678'
+        segment:
+          type: string
+          enum: [SMB, MidMarket, Enterprise, Government]
+          nullable: true
+          description: Business segment classification for account management
+          example: Enterprise
+        tier:
+          type: string
+          enum: [Standard, Premium, Strategic, Partner]
+          nullable: true
+          description: Company tier for partnership and service levels
+          example: Premium
+
+    UpdateCompanyRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateCompanyRequest'
+        - type: object
+          required:
+            - version
+          properties:
+            version:
+              type: string
+              description: Base64-encoded RowVersion for optimistic concurrency
+
+    CompanyResponse:
+      type: object
+      required:
+        - id
+        - name
+        - vatNumber
+        - registrationNumber
+        - contactEmail
+        - contactPhone
+        - createdAt
+        - updatedAt
+        - version
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        vatNumber:
+          type: string
+        registrationNumber:
+          type: string
+        contactEmail:
+          type: string
+          format: email
+        contactPhone:
+          type: string
+        segment:
+          type: string
+          enum: [SMB, MidMarket, Enterprise, Government]
+          nullable: true
+          description: Business segment classification
+          example: Enterprise
+        tier:
+          type: string
+          enum: [Standard, Premium, Strategic, Partner]
+          nullable: true
+          description: Company tier for partnership levels
+          example: Premium
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: string
+          description: Base64-encoded RowVersion for optimistic concurrency
+
+    # ============================================================================
+    # Address Schemas
+    # ============================================================================
+
+    CreateAddressRequest:
+      type: object
+      required:
+        - ownerType
+        - ownerId
+        - type
+        - addressLine1
+        - city
+        - postalCode
+        - countryId
+      properties:
+        ownerType:
+          type: string
+          enum: [Customer, Company]
+        ownerId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [Billing, Shipping]
+        addressLine1:
+          type: string
+          maxLength: 200
+          example: 123 Main Street
+        addressLine2:
+          type: string
+          maxLength: 200
+          nullable: true
+          example: Suite 101
+        city:
+          type: string
+          maxLength: 100
+          example: Bangkok
+        province:
+          type: string
+          maxLength: 100
+          nullable: true
+          example: Bangkok
+        postalCode:
+          type: string
+          maxLength: 20
+          example: '10110'
+        countryId:
+          type: string
+          format: uuid
+          description: Reference to Country Service
+
+    UpdateAddressRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateAddressRequest'
+        - type: object
+          required:
+            - version
+          properties:
+            version:
+              type: string
+              description: Base64-encoded RowVersion for optimistic concurrency
+
+    AddressResponse:
+      type: object
+      required:
+        - id
+        - ownerType
+        - ownerId
+        - type
+        - addressLine1
+        - city
+        - postalCode
+        - countryId
+        - createdAt
+        - updatedAt
+        - version
+      properties:
+        id:
+          type: string
+          format: uuid
+        ownerType:
+          type: string
+          enum: [Customer, Company]
+        ownerId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [Billing, Shipping]
+        addressLine1:
+          type: string
+        addressLine2:
+          type: string
+          nullable: true
+        city:
+          type: string
+        province:
+          type: string
+          nullable: true
+        postalCode:
+          type: string
+        countryId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: string
+          description: Base64-encoded RowVersion for optimistic concurrency
+
+    # ============================================================================
+    # Document Schemas
+    # ============================================================================
+
+    CreateDocumentRequest:
+      type: object
+      required:
+        - ownerType
+        - ownerId
+        - documentType
+        - fileReference
+        - filename
+      properties:
+        ownerType:
+          type: string
+          enum: [Customer, Company]
+        ownerId:
+          type: string
+          format: uuid
+        documentType:
+          type: string
+          maxLength: 100
+          example: NDA
+        fileReference:
+          type: string
+          maxLength: 255
+          description: Upload Service file ID
+          example: upload-550e8400-e29b-41d4-a716-446655440000
+        filename:
+          type: string
+          maxLength: 255
+          example: nda-agreement.pdf
+
+    UpdateDocumentRequest:
+      type: object
+      required:
+        - version
+      properties:
+        documentType:
+          type: string
+          maxLength: 100
+        signedBy:
+          type: string
+          maxLength: 100
+          nullable: true
+        signedAt:
+          type: string
+          format: date-time
+          nullable: true
+        version:
+          type: string
+          description: Base64-encoded RowVersion for optimistic concurrency
+
+    DocumentResponse:
+      type: object
+      required:
+        - id
+        - ownerType
+        - ownerId
+        - documentType
+        - fileReference
+        - filename
+        - status
+        - version
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        ownerType:
+          type: string
+          enum: [Customer, Company]
+        ownerId:
+          type: string
+          format: uuid
+        documentType:
+          type: string
+        fileReference:
+          type: string
+          description: Upload Service file ID
+        filename:
+          type: string
+        status:
+          type: string
+          enum: [Pending, Complete, PendingDeletion, Orphaned, MissingFile]
+        version:
+          type: integer
+          description: Document version number (increments on file update)
+        signedBy:
+          type: string
+          nullable: true
+        signedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        rowVersion:
+          type: string
+          description: Base64-encoded RowVersion for optimistic concurrency
+
+    # ============================================================================
+    # NDA Schemas
+    # ============================================================================
+
+    CreateNdaRequest:
+      type: object
+      required:
+        - customerId
+        - expiresAt
+      properties:
+        customerId:
+          type: string
+          format: uuid
+        expiresAt:
+          type: string
+          format: date-time
+          description: Future expiration date
+          example: '2026-10-08T00:00:00Z'
+
+    SignNdaRequest:
+      type: object
+      required:
+        - documentReferenceId
+        - signedBy
+        - version
+      properties:
+        documentReferenceId:
+          type: string
+          format: uuid
+          description: Required document reference for signing
+        signedBy:
+          type: string
+          maxLength: 100
+          example: John Doe
+        version:
+          type: string
+          description: Base64-encoded RowVersion for optimistic concurrency
+
+    RevokeNdaRequest:
+      type: object
+      required:
+        - version
+      properties:
+        version:
+          type: string
+          description: Base64-encoded RowVersion for optimistic concurrency
+
+    NdaResponse:
+      type: object
+      required:
+        - id
+        - customerId
+        - status
+        - expiresAt
+        - createdAt
+        - updatedAt
+        - version
+      properties:
+        id:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        documentReferenceId:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: [Draft, Signed, Expired, Revoked]
+        signedBy:
+          type: string
+          nullable: true
+        signedAt:
+          type: string
+          format: date-time
+          nullable: true
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: string
+          description: Base64-encoded RowVersion for optimistic concurrency
+
+    # ============================================================================
+    # Internal Note Schemas
+    # ============================================================================
+
+    CreateInternalNoteRequest:
+      type: object
+      required:
+        - ownerType
+        - ownerId
+        - noteText
+      properties:
+        ownerType:
+          type: string
+          enum: [Customer, Company]
+          description: Type of entity the note is attached to
+        ownerId:
+          type: string
+          format: uuid
+          description: ID of customer or company
+        noteText:
+          type: string
+          maxLength: 5000
+          description: Internal note content (employee-only, never visible to customers)
+          example: Customer prefers morning calls. Negotiating volume discount for Q3.
+
+    UpdateInternalNoteRequest:
+      type: object
+      required:
+        - noteText
+        - version
+      properties:
+        noteText:
+          type: string
+          maxLength: 5000
+          description: Updated internal note content
+        version:
+          type: string
+          description: Base64-encoded RowVersion for optimistic concurrency
+
+    InternalNoteResponse:
+      type: object
+      required:
+        - id
+        - ownerType
+        - ownerId
+        - noteText
+        - createdBy
+        - createdAt
+        - updatedAt
+        - version
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        ownerType:
+          type: string
+          enum: [Customer, Company]
+        ownerId:
+          type: string
+          format: uuid
+        noteText:
+          type: string
+          description: Internal note content
+          example: Customer prefers morning calls
+        createdBy:
+          type: string
+          description: Employee identifier who created the note
+          example: employee-123
+        createdAt:
+          type: string
+          format: date-time
+          example: '2025-10-08T10:30:00Z'
+        updatedAt:
+          type: string
+          format: date-time
+          example: '2025-10-08T10:30:00Z'
+        version:
+          type: string
+          description: Base64-encoded RowVersion for optimistic concurrency
+          example: AAAAAAAABkI=
+
+    # ============================================================================
+    # Common Schemas
+    # ============================================================================
+
+    PaginatedResponse:
+      type: object
+      required:
+        - data
+        - page
+        - pageSize
+        - totalCount
+        - totalPages
+      properties:
+        data:
+          type: array
+          items: {}
+        page:
+          type: integer
+          minimum: 1
+          example: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          example: 20
+        totalCount:
+          type: integer
+          minimum: 0
+          example: 150
+        totalPages:
+          type: integer
+          minimum: 0
+          example: 8
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - timestamp
+      properties:
+        error:
+          type: string
+          example: BadRequest
+        message:
+          type: string
+          example: Invalid email format
+        details:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Field-level validation errors
+          example:
+            email: [Email must be in valid format]
+            phone: [Phone must be in E.164 format]
+        timestamp:
+          type: string
+          format: date-time
+          example: '2025-10-08T10:30:00Z'
+
+    HealthCheckResponse:
+      type: object
+      required:
+        - status
+        - checks
+      properties:
+        status:
+          type: string
+          enum: [Healthy, Degraded, Unhealthy]
+          example: Healthy
+        checks:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              status:
+                type: string
+                enum: [Healthy, Degraded, Unhealthy]
+              description:
+                type: string
+              data:
+                type: object
+          example:
+            database:
+              status: Healthy
+              description: PostgreSQL connection successful
+            uploadService:
+              status: Healthy
+              description: Upload Service reachable
+            countryService:
+              status: Healthy
+              description: Country Service reachable
+
+  responses:
+    BadRequest:
+      description: Bad request - validation errors
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Unauthorized - missing or invalid JWT token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ConcurrencyConflict:
+      description: Concurrency conflict - version mismatch
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Conflict
+            message: The record has been modified by another user. Please retrieve the latest version and retry.
+            timestamp: '2025-10-08T10:30:00Z'
