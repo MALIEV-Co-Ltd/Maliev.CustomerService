@@ -30,7 +30,7 @@ public sealed class WorkflowContractTests
     {
         var text = ReadWorkflow("_validate.yml");
 
-        Assert.Contains("actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0", text);
+        Assert.Contains("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", text);
         Assert.Contains("actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68", text);
         Assert.Contains("ref: 9c41d6524a485bf03ba022b8170f47366ab1a77a", text);
         Assert.Contains("ref: 979e1bcb3c3ed9c414f652c94b56297543c031b2", text);
